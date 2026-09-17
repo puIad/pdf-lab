@@ -20,11 +20,16 @@ source SDKs directly. ToS + quota realities rule every choice below.
 - Use for: momentum, seasonality, geo, related queries (PRD §11) across 7d/30d/90d+12m
   windows (PRD §22). Breakage → decision request, never a scraper hack without §4c review.
 
-## Web search (Part 1.2, DEC-002)
+## Web search (Part 1.2, DEC-002 — RESOLVED 2026-09-17: Serper)
 
 - Pick exactly ONE free-tier provider for MVP: Brave / Serper / Tavily / Bing.
   Decide on LIVE pricing + snippet quality (need URL+title+snippet+date) at Part 1.2 start;
   log in DEC-002.
+- DEC-002 outcome: **Serper** (`SERPER_API_KEY`, `POST https://google.serper.dev/search`).
+  2,500 free credits, no credit card, ~$1/1K → ~$0.30/1K; raw Google SERP JSON matches
+  the adapter shape directly. Brave (card + attribution, ~1,000/mo credit), Tavily
+  ($8/1K — extraction is a Phase-2 concern), and Bing (API retired summer 2025) lost.
+  Until a key lands, `WebAdapter` reports `skipped` honestly — no filler.
 - Use for: competitor discovery, products, articles, discussions, terminology (PRD §11).
 
 ## Tier-2/3 (later)

@@ -43,7 +43,7 @@ patch the affected guide/phase file (link the follow-up commit).
   URL+title+snippet+date wins for MVP.
 - Recommendation: decide at Part 1.2 start with live pricing pages open.
 - Question for user: (in Part 1.2) "Provider P free tier = X/mo — approve, or supply a key?"
-- Resolution: _unresolved_
+- Resolution: _resolved 2026-09-17 in Phase 1 Part 1.2_ — picked **Serper** (`SERPER_API_KEY`, endpoint `POST https://google.serper.dev/search`). Live pricing verified 2026-09-17 via web search: **Serper** = 2,500 free credits, no credit card, PAYG ~$1/1K down to ~$0.30/1K at volume, raw Google SERP JSON (URL+title+snippet+date — exactly the adapter's needs); **Brave** = $5/mo credit (~1,000 reqs) then $5/1K, requires credit card + site attribution, true free tier closed Feb 2026; **Tavily** = 1,000 free/mo then $0.008/query ($8/1K basic) — best-shaped (LLM answers/extraction) but 8–27× pricier, extraction is a Phase-2 concern not MVP ingest; **Bing API** = dead (retired summer 2025). Serper wins on largest true free tier + no card + cheapest overage + direct shape match. No cost incurred this part: adapter degrades honestly (`skipped`, no filler) until a key lands; live web proof via Composio-search dev harness through `WebAdapter.normalize()` (same DEC-006 pattern, zero repo dependency). Follow-up: user pastes `SERPER_API_KEY` (free, no card at https://serper.dev) into `.env.local` → prod path activates, zero code change. Guide `sources-reddit-trends-search.md` patched with the pick.
 
 ## DEC-003 — Supabase project creation + keys needed to finish Part 0.2
 - Date: 2026-09-16

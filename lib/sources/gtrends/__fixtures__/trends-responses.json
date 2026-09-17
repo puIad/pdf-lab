@@ -1,0 +1,22 @@
+{
+  "_fixture": "SAMPLE DATA — canned google-trends-api responses for offline unit tests. Never touches the DB (docs/06-EVIDENCE-CONTRACT.md fixture rule).",
+  "interestOverTime": {
+    "default": {
+      "timelineData": [
+        { "time": "1787011200", "formattedTime": "Aug 18, 2026", "value": [64] },
+        { "time": "1787097600", "formattedTime": "Aug 19, 2026", "value": [70] },
+        { "time": "1787184000", "formattedTime": "Aug 20, 2026", "value": [82] },
+        { "time": "1787270400", "formattedTime": "Aug 21, 2026", "value": [91] }
+      ]
+    }
+  },
+  "relatedQueries": {
+    "default": {
+      "rankedList": [
+        { "rankedKeyword": [{ "query": "basic pc troubleshooting", "value": 100 }] },
+        { "rankedKeyword": [{ "query": "pc troubleshooting flowchart", "value": 45 }] }
+      ]
+    }
+  },
+  "autoComplete": { "default": { "topics": [{ "title": "test", "type": "topic" }] } }
+}

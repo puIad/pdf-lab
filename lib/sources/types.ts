@@ -78,3 +78,17 @@ export interface SourceAdapter {
   normalize(raw: RawSignal): MarketSignal; // maps to `signals` row shape
   healthCheck(): Promise<HealthStatus>;
 }
+
+/**
+ * Thrown by `collect` when the adapter has no credentials/config and therefore
+ * cannot run (e.g. web adapter without SERPER_API_KEY). Additive export from
+ * Phase 1 Part 1.2 (DEC-002): lets the ingest pipeline report the source as
+ * `skipped` (honest completeness, PRD §55) instead of `failed`. No interface
+ * change — existing adapters are unaffected.
+ */
+export class SourceNotConfiguredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SourceNotConfiguredError";
+  }
+}

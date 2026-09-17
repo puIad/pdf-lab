@@ -1,0 +1,26 @@
+{
+  "_fixture": "SAMPLE DATA — canned Serper /search response for offline unit tests. Never touches the DB (docs/06-EVIDENCE-CONTRACT.md fixture rule).",
+  "searchParameters": { "q": "pc troubleshooting", "num": 10 },
+  "organic": [
+    {
+      "title": "PC Troubleshooting 101: Fix It Yourself",
+      "link": "https://example.com/pc-troubleshooting-101",
+      "snippet": "A step-by-step checklist for diagnosing boot failures, driver conflicts and overheating.",
+      "date": "Aug 12, 2026",
+      "position": 1
+    },
+    {
+      "title": "Why does my PC keep freezing?",
+      "link": "https://example.com/pc-freezing",
+      "snippet": "Users report random freezes after the latest driver update; rollback steps inside.",
+      "date": "3 days ago",
+      "position": 2
+    },
+    {
+      "title": "Linkless result is dropped by collect()",
+      "link": "",
+      "snippet": "No URL means no stable external id and no evidence link.",
+      "position": 3
+    }
+  ]
+}

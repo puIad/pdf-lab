@@ -3,9 +3,13 @@
 // adapter module directly (docs/08-ADAPTERS.md rule 1).
 
 import { RedditAdapter, redditConfigFromEnv } from "./reddit/index.ts";
+import { GTrendsAdapter, gtrendsConfigFromEnv } from "./gtrends/index.ts";
+import { WebAdapter, webConfigFromEnv } from "./web/index.ts";
 import { registerAdapter } from "./registry.ts";
 
 registerAdapter(new RedditAdapter(redditConfigFromEnv()));
+registerAdapter(new GTrendsAdapter(gtrendsConfigFromEnv()));
+registerAdapter(new WebAdapter(webConfigFromEnv()));
 
 export { adapterKeys, getAdapter, listAdapters, registerAdapter } from "./registry.ts";
 export type {
@@ -16,3 +20,4 @@ export type {
   SignalEngagement,
   SourceAdapter,
 } from "./types.ts";
+export { SourceNotConfiguredError } from "./types.ts";

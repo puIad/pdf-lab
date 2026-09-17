@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --test lib/sources/registry.test.ts lib/sources/reddit/reddit-adapter.test.ts"
+    "test": "node --test lib/sources/registry.test.ts lib/sources/reddit/reddit-adapter.test.ts lib/sources/gtrends/gtrends-adapter.test.ts lib/sources/web/web-adapter.test.ts lib/ingest/pipeline.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.116.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.3.0",
+    "google-trends-api": "4.9.2",
     "lucide-react": "^1.46.0",
     "next": "16.3.5",
     "react": "19.2.8",
