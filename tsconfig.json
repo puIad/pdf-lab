@@ -11,6 +11,11 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Phase 1 Part 1.1: explicit `.ts` import extensions so plain `node --test`
+    // (type-stripping, no resolver) can run unit tests with zero extra deps.
+    // Pair with noEmit (already set) per TS constraint; Next/webpack resolves
+    // these literally and the build stays green (verified this part).
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [

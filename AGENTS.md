@@ -14,6 +14,12 @@ Every task, in this order:
 Rules: evidence before synthesis; adapters own source code; problems halt into
 `docs/DECISIONS.md`; one part = one commit (`phase-<N>-part-<M>: <summary>`).
 
+Docs freshness: `docs/03-STACK.md` + `docs/guides/*` are plans, not build-time truth —
+re-verify via Context7 (resolve library ID, then query-docs) AND the canonical doc links
+before installing or using any library. Next.js additionally via
+`node_modules/next/dist/docs/`. On mismatch: decision-request trigger per
+`docs/01-PHILOSOPHY.md` §4a, never silently upgrade/downgrade.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

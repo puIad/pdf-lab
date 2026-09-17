@@ -15,7 +15,7 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
-| 1.1 | Adapter interface + registry + Reddit adapter | pending | — | |
+| 1.1 | Adapter interface + registry + Reddit adapter | done | bb10295f | Types+registry exact per 08-ADAPTERS; Reddit adapter (OAuth app-only + public fallback, sha256 authors, throttle/backoff/cache, healthCheck); GET /api/sources/health; fixture + 11 unit tests green (stub content-type fix this turn); lint+typecheck+build green 2026-09-17. Live acceptance via Composio-OAuth dev harness (DEC-006): 10 deduped `signals` rows source `reddit` (`pc troubleshooting`), leaks:none, rerun dedup proven (count stays 10). Prod collect() still awaits own app-id (DEC-005 approval); zero code change when it lands. |
 | 1.2 | Trends + web-search adapters + ingest | pending | — | DEC-002 decided here |
 | 1.3 | AI extraction via AIRouter | pending | — | |
 | 1.4 | Clustering (pgvector) + market scoring | pending | — | |

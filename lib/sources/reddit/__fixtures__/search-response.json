@@ -1,0 +1,62 @@
+{
+  "_fixture": "reddit-search",
+  "_label": "SAMPLE DATA — labeled fixture for unit tests only. Never inserted into the DB, never scored.",
+  "_source": "Hand-written, shaped like GET /search?raw_json=1 (Reddit listing JSON, official API docs https://www.reddit.com/dev/api#GET_search).",
+  "kind": "Listing",
+  "data": {
+    "after": "t3_fixc",
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "fixpost1",
+          "name": "t3_fixpost1",
+          "title": "PC keeps crashing when gaming — BSOD every 20 minutes",
+          "selftext": "My pc troubleshooting journey: fresh Windows install, still getting blue screens. Any checklist I can follow?",
+          "author": "FixtureUserOne",
+          "permalink": "/r/techsupport/comments/fixpost1/pc_keeps_crashing_when_gaming/",
+          "url": "https://www.reddit.com/r/techsupport/comments/fixpost1/pc_keeps_crashing_when_gaming/",
+          "created_utc": 1757800000,
+          "score": 42,
+          "num_comments": 17,
+          "upvote_ratio": 0.94,
+          "subreddit": "techsupport"
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "fixpost2",
+          "name": "t3_fixpost2",
+          "title": "Best driver updater routine for Windows 11?",
+          "selftext": "",
+          "author": "[deleted]",
+          "permalink": "/r/pchelp/comments/fixpost2/best_driver_updater_routine/",
+          "url": "https://www.reddit.com/r/pchelp/comments/fixpost2/best_driver_updater_routine/",
+          "created_utc": 1757700000,
+          "score": 5,
+          "num_comments": 3,
+          "upvote_ratio": 0.71,
+          "subreddit": "pchelp"
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "fixpost3",
+          "name": "t3_fixpost3",
+          "title": "Old thread about wifi drops (for since-filter test)",
+          "selftext": "ancient post",
+          "author": "FixtureUserTwo",
+          "permalink": "/r/techsupport/comments/fixpost3/old_thread/",
+          "url": "https://www.reddit.com/r/techsupport/comments/fixpost3/old_thread/",
+          "created_utc": 1600000000,
+          "score": 1,
+          "num_comments": 0,
+          "upvote_ratio": 0.5,
+          "subreddit": "techsupport"
+        }
+      }
+    ]
+  }
+}
