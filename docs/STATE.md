@@ -8,8 +8,8 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
 | 0.1 | Scaffold Next.js + Tailwind + shadcn/ui + hygiene | done | bcc11dff | Next 16.3.5, 8 ui comps, /api/health 200; lint+tsc+build green 2026-09-16 |
-| 0.2 | Supabase + schema v1 + pgvector + RLS + env | done | 5660cef4 | Live project pdf-lab (ref cjboiijclrwumgmgzvcl, eu-west-3, free); 10 tables + vector ext + RLS (6 policies) + 3 seed sources verified live; embedding/cosine probe dist 0; /api/health sources=3; lint/build green 2026-09-17; DEC-003 resolved |
-| 0.3 | Vercel deploy + CI gate + env docs | pending | — | |
+| 0.2 | Supabase + schema v1 + pgvector + RLS + env | done | 1390511f | Live project pdf-lab (ref cjboiijclrwumgmgzvcl, eu-west-3, free); 10 tables + vector ext + RLS (6 policies) + 3 seed sources verified live; embedding/cosine probe dist 0; /api/health sources=3; lint/build green 2026-09-17; DEC-003 resolved |
+| 0.3 | Vercel deploy + CI gate + env docs | in_progress | — | Docs re-verified 2026-09-17 via Context7 (/vercel/vercel) + Exa (KB + issue #15204): CI-gate-only pattern (Vercel Git builds; Actions runs lint/typecheck/build; avoid --prebuilt for pnpm monorepos). Code done + green (lint/typecheck/build, /api/health sources=3, no secrets in repo). Awaiting Vercel auth (Composio link sent 2026-09-17) → create project (Root Dir Projects/PDF-Lab) + set envs + record prod URL |
 
 ## Phase 1 — Research engine
 
