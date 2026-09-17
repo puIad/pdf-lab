@@ -7,8 +7,8 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
-| 0.1 | Scaffold Next.js + Tailwind + shadcn/ui + hygiene | done | — | Next 16.3.5, 8 ui comps, /api/health 200; lint+tsc+build green 2026-09-16 |
-| 0.2 | Supabase + schema v1 + pgvector + RLS + env | pending | — | |
+| 0.1 | Scaffold Next.js + Tailwind + shadcn/ui + hygiene | done | bcc11dff | Next 16.3.5, 8 ui comps, /api/health 200; lint+tsc+build green 2026-09-16 |
+| 0.2 | Supabase + schema v1 + pgvector + RLS + env | done | 5660cef4 | Live project pdf-lab (ref cjboiijclrwumgmgzvcl, eu-west-3, free); 10 tables + vector ext + RLS (6 policies) + 3 seed sources verified live; embedding/cosine probe dist 0; /api/health sources=3; lint/build green 2026-09-17; DEC-003 resolved |
 | 0.3 | Vercel deploy + CI gate + env docs | pending | — | |
 
 ## Phase 1 — Research engine
