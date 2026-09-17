@@ -48,10 +48,24 @@ pnpm dev
 ## Vercel setup (dashboard)
 
 1. Import repo `puIad/ai-os`, set Root Directory to `Projects/PDF-Lab`, framework Next.js.
+   (Part 0.3 created the project via API instead: project `pdf-lab`
+   (`prj_s2iR7ouCA0Xknlsd0fnwFBfXiqJr`), framework `nextjs`, rootDirectory
+   `Projects/PDF-Lab` — verified via API 2026-09-17.)
 2. Environment Variables (per environment: Production / Preview):
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` → all environments.
    - `SUPABASE_SERVICE_ROLE_KEY` → Production + Preview, **Sensitive** type.
 3. Push to default branch → production deploy; open a PR → preview deploy + CI gate must be green.
+4. Deployment Protection: API-created projects start with Vercel Authentication
+   (SSO) on ALL deployments — Part 0.3 disabled it via
+   `PATCH /v9/projects/:id {"ssoProtection": null}` so production
+   (`https://pdf-lab-puiads-projects.vercel.app`) is public. Previews stay
+   behind Standard Protection (login required), which is the Hobby default.
+5. FOLLOW-UP (manual, one click): the project has no linked git repo
+   (`link: null` via API 2026-09-17), so pushes/PRs do NOT auto-deploy yet —
+   Part 0.3 deployed via API per event. In the dashboard go to Project →
+   Settings → Git → Connect `puIad/ai-os` (keep Root Directory
+   `Projects/PDF-Lab`). Preview builds themselves are proven
+   (probe PR #1 → READY preview `dpl_FWoqjutLnCCuX6mJi1X8MTurm7bQ`, closed unmerged).
 
 ## Rotation
 
