@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --test lib/sources/registry.test.ts lib/sources/reddit/reddit-adapter.test.ts lib/sources/gtrends/gtrends-adapter.test.ts lib/sources/web/web-adapter.test.ts lib/ingest/pipeline.test.ts lib/ai/router.test.ts lib/ai/extraction.test.ts lib/scoring/scoring.test.ts lib/cluster/cluster.test.ts"
+    "test": "node --test lib/sources/registry.test.ts lib/sources/reddit/reddit-adapter.test.ts lib/sources/gtrends/gtrends-adapter.test.ts lib/sources/web/web-adapter.test.ts lib/ingest/pipeline.test.ts lib/ai/router.test.ts lib/ai/extraction.test.ts lib/scoring/scoring.test.ts lib/cluster/cluster.test.ts lib/evidence/evidence.test.ts lib/runs/orchestrator.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
