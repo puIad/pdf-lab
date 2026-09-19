@@ -10,6 +10,8 @@ import type {
   CallUsage,
   ChatRequest,
   ChatResponse,
+  EmbedRequest,
+  EmbedResponse,
   ProviderHealth,
 } from "../types.ts";
 
@@ -90,6 +92,46 @@ export class OllamaProvider implements AIProvider {
       throw new Error("Ollama returned no assistant content");
     }
     return { content, model: body.model || req.model, usage: toUsage(body.usage) };
+  }
+
+  async embed(req: EmbedRequest): Promise<EmbedResponse> {
+    if (!req.texts || req.texts.length === 0) {
+      return { embeddings: [], model: req.model, usage: toUsage({}) };
+    }
+    let res: Response;
+    try {
+      res = await this.config.fetchFn(`${this.config.baseUrl}/v1/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: req.model,
+          input: req.texts,
+        }),
+      });
+    } catch (err) {
+      throw new Error(
+        `Ollama unreachable at ${this.config.baseUrl} (is \`ollama serve\` running?): ` +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Ollama embed failed (HTTP ${res.status}): ${text.slice(0, 300)}`);
+    }
+    const body = (await res.json()) as {
+      model?: string;
+      data?: Array<{ embedding: number[]; index?: number }>;
+      usage?: unknown;
+    };
+    if (!body.data || !Array.isArray(body.data)) {
+      throw new Error("Ollama returned no embedding data array");
+    }
+    const sorted = [...body.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    return {
+      embeddings: sorted.map((d) => d.embedding),
+      model: body.model || req.model,
+      usage: toUsage(body.usage),
+    };
   }
 
   async healthCheck(): Promise<ProviderHealth> {

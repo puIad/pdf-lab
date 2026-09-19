@@ -10,6 +10,8 @@ import type {
   CallUsage,
   ChatRequest,
   ChatResponse,
+  EmbedRequest,
+  EmbedResponse,
   ProviderHealth,
 } from "../types.ts";
 import { AIProviderNotConfiguredError } from "../types.ts";
@@ -18,6 +20,8 @@ export const OPENROUTER_KEY = "openrouter";
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 /** Verified 2026-09-17 (see DEC-free probe in Part 1.3 notes). Env overrides. */
 export const OPENROUTER_DEFAULT_CHEAP_MODEL = "nex-agi/nex-n2.5-pro:free";
+/** Verified 2026-09-19: 1536 dimensions matching schema v1. Env overrides. */
+export const OPENROUTER_DEFAULT_EMBED_MODEL = "openai/text-embedding-3-small";
 
 export interface OpenRouterConfig {
   apiKey?: string;
@@ -106,6 +110,44 @@ export class OpenRouterProvider implements AIProvider {
       throw new Error("OpenRouter returned no assistant content");
     }
     return { content, model: body.model || req.model, usage: toUsage(body.usage) };
+  }
+
+  async embed(req: EmbedRequest): Promise<EmbedResponse> {
+    const apiKey = this.requireKey();
+    if (!req.texts || req.texts.length === 0) {
+      return { embeddings: [], model: req.model, usage: toUsage({}) };
+    }
+    const res = await this.config.fetchFn(`${this.config.baseUrl}/embeddings`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": this.config.referer,
+        "X-Title": this.config.title,
+      },
+      body: JSON.stringify({
+        model: req.model,
+        input: req.texts,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`OpenRouter embed failed (HTTP ${res.status}): ${text.slice(0, 300)}`);
+    }
+    const body = (await res.json()) as {
+      model?: string;
+      data?: Array<{ embedding: number[]; index?: number }>;
+      usage?: unknown;
+    };
+    if (!body.data || !Array.isArray(body.data)) {
+      throw new Error("OpenRouter returned no embedding data array");
+    }
+    const sorted = [...body.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    return {
+      embeddings: sorted.map((d) => d.embedding),
+      model: body.model || req.model,
+      usage: toUsage(body.usage),
+    };
   }
 
   async healthCheck(): Promise<ProviderHealth> {

@@ -45,6 +45,17 @@ export interface ChatResponse {
   usage: CallUsage;
 }
 
+export interface EmbedRequest {
+  model: string;
+  texts: string[];
+}
+
+export interface EmbedResponse {
+  embeddings: number[][];
+  model: string;
+  usage: CallUsage;
+}
+
 /** Result of `AIProvider.healthCheck`. Never throws — failure is `{ ok: false }`. */
 export interface ProviderHealth {
   ok: boolean;
@@ -61,6 +72,7 @@ export interface AIProvider {
   /** True when required credentials/config are present (no network call). */
   readonly isConfigured: boolean;
   chatComplete(req: ChatRequest): Promise<ChatResponse>;
+  embed?(req: EmbedRequest): Promise<EmbedResponse>;
   healthCheck(): Promise<ProviderHealth>;
 }
 

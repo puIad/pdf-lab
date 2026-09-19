@@ -9,12 +9,15 @@ import type {
   CallUsage,
   ChatRequest,
   ChatResponse,
+  EmbedRequest,
+  EmbedResponse,
   ProviderHealth,
 } from "../types.ts";
 import { AIProviderNotConfiguredError } from "../types.ts";
 
 export const OPENAI_COMPAT_KEY = "openai-compatible";
 export const OPENAI_COMPAT_DEFAULT_BASE_URL = "https://api.openai.com/v1";
+export const OPENAI_DEFAULT_EMBED_MODEL = "text-embedding-3-small";
 
 export interface OpenAICompatConfig {
   apiKey?: string;
@@ -99,6 +102,44 @@ export class OpenAICompatProvider implements AIProvider {
       throw new Error("OpenAI-compatible endpoint returned no assistant content");
     }
     return { content, model: body.model || req.model, usage: toUsage(body.usage) };
+  }
+
+  async embed(req: EmbedRequest): Promise<EmbedResponse> {
+    const apiKey = this.requireKey();
+    if (!req.texts || req.texts.length === 0) {
+      return { embeddings: [], model: req.model, usage: toUsage({}) };
+    }
+    const res = await this.config.fetchFn(`${this.config.baseUrl}/embeddings`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: req.model,
+        input: req.texts,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(
+        `OpenAI-compatible embed failed (HTTP ${res.status}): ${text.slice(0, 300)}`,
+      );
+    }
+    const body = (await res.json()) as {
+      model?: string;
+      data?: Array<{ embedding: number[]; index?: number }>;
+      usage?: unknown;
+    };
+    if (!body.data || !Array.isArray(body.data)) {
+      throw new Error("OpenAI-compatible endpoint returned no embedding data array");
+    }
+    const sorted = [...body.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    return {
+      embeddings: sorted.map((d) => d.embedding),
+      model: body.model || req.model,
+      usage: toUsage(body.usage),
+    };
   }
 
   async healthCheck(): Promise<ProviderHealth> {

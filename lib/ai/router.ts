@@ -24,7 +24,10 @@ import type {
 } from "./types.ts";
 import { addUsage, emptyUsage } from "./types.ts";
 import { OLLAMA_DEFAULT_MODEL } from "./providers/ollama.ts";
-import { OPENROUTER_DEFAULT_CHEAP_MODEL } from "./providers/openrouter.ts";
+import {
+  OPENROUTER_DEFAULT_CHEAP_MODEL,
+  OPENROUTER_DEFAULT_EMBED_MODEL,
+} from "./providers/openrouter.ts";
 
 export interface TierSelection {
   tier: TaskTier;
@@ -59,6 +62,11 @@ const FALLBACK_ORDER = ["ollama", "openrouter", "openai-compatible"];
 function defaultModelFor(provider: string, tier: TaskTier, env: NodeJS.ProcessEnv): string {
   const override = env[TIER_ENV[tier].modelVar];
   if (override) return override;
+  if (tier === "embed") {
+    if (provider === "openrouter") return env.OPENROUTER_EMBED_MODEL || OPENROUTER_DEFAULT_EMBED_MODEL;
+    if (provider === "ollama") return env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
+    if (provider === "openai-compatible") return env.OPENAI_EMBED_MODEL || "text-embedding-3-small";
+  }
   if (provider === "ollama") return env.OLLAMA_MODEL || OLLAMA_DEFAULT_MODEL;
   if (provider === "openrouter") {
     if (tier === "cheap") return env.OPENROUTER_CHEAP_MODEL || OPENROUTER_DEFAULT_CHEAP_MODEL;
@@ -116,7 +124,11 @@ export class AIRouter {
     let fallbackFrom: string | undefined;
     for (const name of chain) {
       const provider = this.providers.get(name);
-      if (!provider || !provider.isConfigured) {
+      if (
+        !provider ||
+        !provider.isConfigured ||
+        (tier === "embed" && typeof provider.embed !== "function")
+      ) {
         if (name === first) fallbackFrom = first;
         continue;
       }
@@ -241,6 +253,66 @@ export class AIRouter {
     const preview = attempts.map((a) => a.text.slice(0, 200)).join(" || ");
     throw new Error(
       `provider returned invalid JSON/object twice: ${lastError instanceof Error ? lastError.message : String(lastError)} — preview: ${preview}`,
+    );
+  }
+
+  async embed(input: {
+    texts: string[];
+    providerName?: string;
+    model?: string;
+  }): Promise<{
+    embeddings: number[][];
+    model: string;
+    provider: string;
+    fallbackFrom?: string;
+    usage: CallUsage;
+    latencyMs: number;
+  }> {
+    if (!input.texts || input.texts.length === 0) {
+      return {
+        embeddings: [],
+        model: input.model || "",
+        provider: input.providerName || "none",
+        usage: emptyUsage(),
+        latencyMs: 0,
+      };
+    }
+    const sel = input.providerName
+      ? {
+          tier: "embed" as const,
+          provider: input.providerName,
+          model: input.model || defaultModelFor(input.providerName, "embed", this.env),
+        }
+      : this.resolveTier("embed");
+    const chain = [sel.provider, ...FALLBACK_ORDER.filter((n) => n !== sel.provider)];
+    let lastError: unknown = null;
+    for (const name of chain) {
+      const provider = this.providers.get(name);
+      if (!provider || !provider.isConfigured || typeof provider.embed !== "function") continue;
+      if (name !== sel.provider) {
+        const h = await provider.healthCheck().catch(() => ({ ok: false as const }));
+        if (!h.ok) continue;
+      }
+      const t0 = this.nowFn();
+      try {
+        const res = await provider.embed({
+          model: input.model || (sel.provider === name ? sel.model : defaultModelFor(name, "embed", this.env)),
+          texts: input.texts,
+        });
+        return {
+          embeddings: res.embeddings,
+          model: res.model,
+          provider: name,
+          fallbackFrom: name === sel.provider ? sel.fallbackFrom : sel.provider,
+          usage: res.usage,
+          latencyMs: this.nowFn() - t0,
+        };
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw new Error(
+      `all AI providers failed for tier 'embed': ${lastError instanceof Error ? lastError.message : String(lastError)}`,
     );
   }
 
