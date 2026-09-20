@@ -11,11 +11,8 @@ import { writeEvidence } from "../evidence/writer.ts";
 import { createServerEvidenceDeps } from "../evidence/service-deps.ts";
 import { fetchRunCompleteness } from "./completeness.ts";
 import { buildSearchFilter } from "../db/search.ts";
-import type {
-  OrchestratorDeps,
-  OrchestratorOpportunityItem,
-} from "./orchestrator.ts";
-import type { EvidenceInput } from "../evidence/types.ts";
+import { generate25Opportunities, type OpportunityMarketInput } from "../opportunities/index.ts";
+import type { OrchestratorDeps } from "./orchestrator.ts";
 
 const EXPECTED_EMBEDDING_DIM = 1536;
 
@@ -298,51 +295,50 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
     },
 
     generateOpportunities: async (markets) => {
-      // In Phase 1 Part 1.5, synthesize initial high-relevance opportunity per market candidate
-      // with full evidence backing (QC Rule 1). Phase 2 Part 2.1 expands this to 25 diversified opportunities.
-      const result: Array<{
-        opportunity: OrchestratorOpportunityItem;
-        evidence: EvidenceInput[];
-      }> = [];
+      const marketInputs: OpportunityMarketInput[] = markets.map((m) => ({
+        id: m.id,
+        name: m.name,
+        demandScore: m.demandScore,
+        confidence: m.confidence,
+        pdfFitScore: m.pdfFitScore,
+        signals: m.signals.map((s) => ({
+          id: s.id,
+          source_id: s.source_id,
+          source_type: s.source_type,
+          title: s.title,
+          content: s.content,
+          url: s.url,
+          published_at: s.published_at,
+          analysis: s.analysis ? {
+            audience: s.analysis.audience,
+            problem: s.analysis.problem,
+            intent: s.analysis.intent,
+            urgency: s.analysis.urgency,
+            pdf_relevance: s.analysis.pdf_relevance,
+          } : null,
+        })),
+      }));
 
-      for (const market of markets) {
-        if (market.signals.length === 0) continue;
+      const res = await generate25Opportunities(marketInputs, {
+        targetCount: 25,
+        router,
+        tier: "strong",
+      });
 
-        const topSignal = market.signals[0];
-        const oppId = crypto.randomUUID();
-        const oppTitle = `${market.name} Step-by-Step Diagnostic & Action Checklist`;
-        const audience = topSignal.analysis?.audience || "PC troubleshooting seekers";
-        const problem = topSignal.analysis?.problem || market.name;
-        const solution = `Comprehensive, printable offline PDF checklist covering root-cause verification and quick-fix procedures.`;
-
-        const oppEvidence: EvidenceInput[] = market.signals.slice(0, 3).map((sig) => ({
-          entityType: "opportunity",
-          entityId: oppId,
-          sourceId: sig.source_id,
-          claim: `Opportunity directly addresses observed problem: "${sig.title || sig.content?.slice(0, 80)}"`,
-          excerpt: sig.content ? sig.content.slice(0, 250) : null,
-          url: sig.url,
-          signalType: "pain_point",
-          confidence: market.confidence,
-        }));
-
-        result.push({
-          opportunity: {
-            id: oppId,
-            marketId: market.id,
-            title: oppTitle,
-            targetAudience: audience,
-            problem,
-            solution,
-            format: "checklist",
-            opportunityScore: market.demandScore,
-            confidence: market.confidence,
-          },
-          evidence: oppEvidence,
-        });
-      }
-
-      return result;
+      return res.opportunities.map((opp) => ({
+        opportunity: {
+          id: opp.id,
+          marketId: opp.marketId,
+          title: opp.title,
+          targetAudience: opp.targetAudience,
+          problem: opp.problem,
+          solution: opp.solution,
+          format: opp.format,
+          opportunityScore: opp.opportunityScore,
+          confidence: opp.confidence,
+        },
+        evidence: opp.evidence,
+      }));
     },
 
     saveOpportunities: async (opportunities) => {
