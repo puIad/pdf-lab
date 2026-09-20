@@ -26,7 +26,7 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
 | 2.1 | 25-opportunity generator | done | 17eee89 | Strong-tier synthesis over clusters+evidence; candidate pool generation + MMR diversification constraint (pairwise-distinct on audience, problem, format; max 36% format cap; 8 diversification dimensions); QC Rule 1, 4, 5 enforced on all 25 rows; POST /api/opportunities/generate + orchestrator wiring; 94/94 tests pass, lint+typecheck+build green. |
-| 2.2 | Opportunity + market report pages + citations | pending | — | ★ MVP gate |
+| 2.2 | Opportunity + market report pages + citations | done | 3d89043 | Market report page (app/markets/[id]) per 09-UX-SPEC (bars+confidence, why-market, buyer language, competitors, gaps, opportunities table); Opportunity detail page (app/opportunities/[id]) with all 14 PRD §47 blocks; Evidence components (EvidenceList, EvidenceBadge, EvidenceDialog, FactsInterpretationSuggestion enforcing QC Rule 5 visually); 94/94 tests, lint+typecheck+build green. ★ MVP gate foundation ready. |
 | 2.3 | Competition + review mining (Tier-2 adapters) | pending | — | |
 | 2.4 | Export (MD/CSV/JSON) + quality panel | pending | — | |
 
