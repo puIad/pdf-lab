@@ -15,12 +15,18 @@ import {
   ChevronRight,
   ShieldCheck,
   AlertCircle,
+  Star,
+  Layers,
+  Quote,
+  ShoppingBag,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EvidenceList, EvidenceDialog } from "@/components/evidence";
 import type { EvidenceRow } from "@/lib/evidence/types";
+import { calculateLandscape, mineReviewsAndGaps, type CompetitorProduct } from "@/lib/competition";
+import { parsePrice } from "@/lib/sources/marketplace-helper";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +99,35 @@ export default async function MarketPage(props: MarketPageProps) {
   const demandScore = Math.round(market.demand_score || 0);
   const pdfFitScore = Math.round(market.pdf_fit_score || 0);
   const confidencePct = Math.round((market.confidence || 0.5) * 100);
+
+  const competitorProducts: CompetitorProduct[] = compList.map((comp) => {
+    const { priceNumeric } = parsePrice(comp.price);
+    return {
+      id: comp.id,
+      platform: comp.platform || "web",
+      title: comp.title || "Untitled Product",
+      url: comp.url,
+      price: comp.price,
+      priceNumeric,
+      format: ((comp as Record<string, unknown>).format as string) || "guide",
+      rating: comp.rating,
+      reviewCount: comp.review_count,
+      positioning: null,
+      promises: [],
+      reviews: [],
+    };
+  });
+
+  const landscape = calculateLandscape(competitorProducts);
+  const { productGaps } = mineReviewsAndGaps(
+    competitorProducts,
+    signalsList.map((s) => ({
+      title: (s.title as string | null) || null,
+      content: (s.content as string | null) || null,
+      url: (s.url as string | null) || null,
+      source_type: ((s.sources as { type?: string })?.type as string | null) || null,
+    })),
+  );
 
   // Extract customer language phrases
   const customerQuotes: Array<{ quote: string; url?: string | null }> = [];
@@ -324,15 +359,25 @@ export default async function MarketPage(props: MarketPageProps) {
           )}
         </section>
 
-        {/* Section 3: COMPETITORS & MARKET GAPS (QC Rule 3) */}
-        <section className="flex flex-col gap-3">
+        {/* Section 3: COMPETITORS & MARKET GAPS (PRD §20 & §21, QC Rule 3) */}
+        <section className="flex flex-col gap-5">
           <div className="flex items-center justify-between border-b border-border pb-2">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">
-              Competition & Product Gaps
-            </h2>
-            <Badge variant="outline" className="text-xs font-mono uppercase">
-              QC Rule 3 Enforced
-            </Badge>
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                Competition Landscape & Product Gaps
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Observed products across monitored marketplaces with review-mined customer friction points.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs font-mono uppercase">
+                QC Rule 3 Enforced
+              </Badge>
+              <Badge variant="secondary" className="text-xs font-mono">
+                {compList.length} Observed Products
+              </Badge>
+            </div>
           </div>
 
           {compList.length === 0 ? (
@@ -346,13 +391,233 @@ export default async function MarketPage(props: MarketPageProps) {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {compList.map((comp) => (
-                <Card key={comp.id} className="p-3 text-xs">
-                  <div className="font-semibold text-foreground">{comp.title}</div>
-                  <div className="text-muted-foreground">{comp.platform} — {comp.price || "Free"}</div>
-                </Card>
-              ))}
+            <div className="flex flex-col gap-6">
+              {/* 3A: Observed Competitors Grid */}
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <ShoppingBag className="size-4 text-primary" />
+                  <span>Observed Marketplace Products</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {compList.map((comp) => {
+                    const platformName = (comp.platform || "web").toLowerCase();
+                    const badgeColor =
+                      platformName === "etsy"
+                        ? "bg-orange-500/10 text-orange-600 border-orange-500/30"
+                        : platformName === "gumroad"
+                        ? "bg-pink-500/10 text-pink-600 border-pink-500/30"
+                        : platformName === "amazon_kdp" || platformName === "kdp"
+                        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                        : "bg-blue-500/10 text-blue-600 border-blue-500/30";
+
+                    return (
+                      <Card key={comp.id} className="p-3 text-xs flex flex-col justify-between gap-2.5 border-border/80 hover:border-primary/40 transition-colors">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge variant="outline" className={`text-[10px] font-mono capitalize ${badgeColor}`}>
+                              {comp.platform === "amazon_kdp" ? "Amazon KDP" : comp.platform}
+                            </Badge>
+                            <span className="font-mono font-semibold text-foreground text-[11px]">
+                              {comp.price || "Free"}
+                            </span>
+                          </div>
+
+                          <div className="font-semibold text-foreground leading-snug line-clamp-2">
+                            {comp.title}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            {comp.rating ? (
+                              <span className="flex items-center gap-0.5 text-amber-500 font-medium">
+                                <Star className="size-3 fill-amber-500" />
+                                {comp.rating.toFixed(1)}
+                                {comp.review_count ? ` (${comp.review_count})` : ""}
+                              </span>
+                            ) : (
+                              <span className="italic text-muted-foreground/80">Unrated</span>
+                            )}
+                          </div>
+
+                          {comp.url && (
+                            <a
+                              href={comp.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                            >
+                              <span>View Product</span>
+                              <ExternalLink className="size-3" />
+                            </a>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3B: Landscape Shares (PRD §20 — percentages strictly summing to 100%) */}
+              <Card className="p-4 bg-card/60">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                        <Layers className="size-4 text-primary" />
+                        <span>Landscape Distribution</span>
+                      </h3>
+                      <span className="text-[11px] text-muted-foreground">
+                        Shares calculated strictly from {landscape.totalObserved} observed competitor rows (PRD §20)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-mono">
+                      {typeof landscape.averagePrice === "number" && (
+                        <span>Avg Price: <strong>${landscape.averagePrice.toFixed(2)}</strong></span>
+                      )}
+                      {typeof landscape.averageRating === "number" && (
+                        <span>Avg Rating: <strong>★ {landscape.averageRating.toFixed(1)}</strong></span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Platform Shares */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-medium text-foreground">Platform Share</span>
+                      <div className="flex flex-col gap-1.5">
+                        {landscape.platformShares.map((ps) => (
+                          <div key={ps.label} className="flex flex-col gap-0.5">
+                            <div className="flex justify-between text-[11px]">
+                              <span className="capitalize text-muted-foreground">
+                                {ps.label === "amazon_kdp" ? "Amazon KDP" : ps.label}
+                              </span>
+                              <span className="font-mono font-medium">{ps.percentage.toFixed(1)}% ({ps.count})</span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                              <div className="h-full bg-primary" style={{ width: `${ps.percentage}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Format Shares */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-medium text-foreground">Format Breakdown</span>
+                      <div className="flex flex-col gap-1.5">
+                        {landscape.formatShares.map((fs) => (
+                          <div key={fs.label} className="flex flex-col gap-0.5">
+                            <div className="flex justify-between text-[11px]">
+                              <span className="capitalize text-muted-foreground">
+                                {fs.label.replace("_", " ")}
+                              </span>
+                              <span className="font-mono font-medium">{fs.percentage.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                              <div className="h-full bg-emerald-500" style={{ width: `${fs.percentage}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Price Tier Shares */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs font-medium text-foreground">Price Tier Distribution</span>
+                      <div className="flex flex-col gap-1.5">
+                        {landscape.priceTierShares.map((ts) => (
+                          <div key={ts.label} className="flex flex-col gap-0.5">
+                            <div className="flex justify-between text-[11px]">
+                              <span className="capitalize text-muted-foreground">
+                                {ts.label.replace("_", " ")}
+                              </span>
+                              <span className="font-mono font-medium">{ts.percentage.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                              <div className="h-full bg-amber-500" style={{ width: `${ts.percentage}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* 3C: Review-Mined Product Gaps (PRD §21) */}
+              {productGaps.length > 0 && (
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      <Quote className="size-4 text-primary" />
+                      <span>Review Mining: Product Gaps & Unmet Needs</span>
+                    </h3>
+                    <span className="text-[11px] text-muted-foreground">
+                      Customer friction points extracted from observed reviews and translated into plain-English product opportunities (PRD §21)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {productGaps.map((gap) => (
+                      <Card key={gap.id} className="p-3.5 flex flex-col justify-between gap-3 border-border/80">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge variant="outline" className="text-[10px] font-mono uppercase bg-primary/5 text-primary border-primary/20">
+                              {gap.category.replace("_", " ")}
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {gap.reviewExcerpts.length} Citation{gap.reviewExcerpts.length > 1 ? "s" : ""}
+                            </span>
+                          </div>
+
+                          <div className="text-sm font-semibold text-foreground">
+                            {gap.title}
+                          </div>
+
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {gap.summary}
+                          </p>
+
+                          <div className="rounded bg-emerald-500/10 p-2 text-emerald-800 dark:text-emerald-300 text-[11px] leading-relaxed">
+                            <strong>Opportunity:</strong> {gap.opportunityTranslation}
+                          </div>
+                        </div>
+
+                        {/* Quoted Review Excerpts */}
+                        {gap.reviewExcerpts.length > 0 && (
+                          <div className="flex flex-col gap-1.5 border-t border-border/60 pt-2">
+                            <span className="text-[10px] uppercase font-mono tracking-wide text-muted-foreground">
+                              Quoted Review Evidence:
+                            </span>
+                            {gap.reviewExcerpts.map((excerpt, eIdx) => (
+                              <div key={eIdx} className="rounded bg-muted/40 p-2 text-[11px] flex flex-col gap-1">
+                                <blockquote className="italic text-foreground/90 leading-snug">
+                                  &ldquo;{excerpt.quote}&rdquo;
+                                </blockquote>
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                  <span>{excerpt.source}</span>
+                                  {excerpt.url && (
+                                    <a
+                                      href={excerpt.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-0.5 text-primary hover:underline"
+                                    >
+                                      <span>Source</span>
+                                      <ExternalLink className="size-2.5" />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>

@@ -18,7 +18,22 @@ export function getServiceDeps(): IngestDeps {
         .eq("type", adapterKey)
         .maybeSingle();
       if (error) throw new Error(`sources lookup failed: ${error.message}`);
-      return (data?.id as string | undefined) ?? null;
+      if (data?.id) return data.id;
+
+      const adapter = listAdapters().find((a) => a.key === adapterKey);
+      if (adapter) {
+        const { data: inserted, error: insErr } = await supabase
+          .from("sources")
+          .insert({
+            type: adapter.key,
+            name: adapter.displayName,
+            status: "active",
+          })
+          .select("id")
+          .single();
+        if (!insErr && inserted?.id) return inserted.id;
+      }
+      return null;
     },
     upsertSignals: async (rows) => {
       const { data, error } = await supabase

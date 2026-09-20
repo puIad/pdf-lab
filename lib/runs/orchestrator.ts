@@ -13,6 +13,7 @@ import {
   enforceRule4_DemandCounts,
   enforceRule5_SeparationOfConcerns,
 } from "../evidence/qc.ts";
+import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 
 export interface ResearchRunOptions {
   query: string;
@@ -63,6 +64,18 @@ export interface OrchestratorOpportunityItem {
   opportunityScore: number;
   confidence: number;
 }
+export interface OrchestratorCompetitorItem {
+  platform: string;
+  title: string;
+  url?: string | null;
+  price?: string | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+  format?: string;
+  positioning?: string | null;
+  promises?: string[];
+  reviews?: string[];
+}
 
 export interface OrchestratorDeps {
   createRun: (run: { query: string; mode: string; userId?: string | null }) => Promise<{
@@ -94,11 +107,16 @@ export interface OrchestratorDeps {
     evidence: EvidenceInput[];
   }>>;
   saveOpportunities: (items: OrchestratorOpportunityItem[]) => Promise<Array<{ id: string; title: string }>>;
-  observeCompetition: (signals: StoredSignalForRun[]) => Promise<Array<{
+  observeCompetition: (signals: StoredSignalForRun[]) => Promise<OrchestratorCompetitorItem[]>;
+  saveCompetitors?: (competitors: Array<{
+    market_id: string;
     platform: string;
     title: string;
     url?: string | null;
-  }>>;
+    price?: string | null;
+    rating?: number | null;
+    review_count?: number | null;
+  }>) => Promise<Array<{ id: string }>>;
   fetchCompleteness: (runId: string, query: string) => Promise<ResearchCompleteness>;
 }
 
@@ -248,14 +266,70 @@ export async function executeResearchRun(
     const compState = enforceRule3_CompetitionObserved(observedCompetitors);
 
     if (compState.hasCompetitors) {
+      const primaryMarketId = marketCandidates[0]?.id || runId;
+
+      if (deps.saveCompetitors && marketCandidates.length > 0) {
+        await deps.saveCompetitors(
+          observedCompetitors.map((c) => ({
+            market_id: primaryMarketId,
+            platform: c.platform,
+            title: c.title,
+            url: c.url,
+            price: c.price,
+            rating: c.rating,
+            review_count: c.reviewCount,
+          })),
+        );
+      }
+
       const compEvidenceItems: EvidenceInput[] = observedCompetitors.map((c) => ({
         entityType: "competition",
-        entityId: marketCandidates[0]?.id || runId,
+        entityId: primaryMarketId,
         claim: `Observed competitor on ${c.platform}: ${c.title}`,
         url: c.url,
         signalType: "competition_observed",
         confidence: 0.9,
       }));
+
+      // Review mining -> likes/dislikes/missing/confusing/requests -> product gaps (PRD §21)
+      const competitorProducts: CompetitorProduct[] = observedCompetitors.map((c) => ({
+        platform: c.platform,
+        title: c.title,
+        url: c.url || null,
+        price: c.price || null,
+        format: c.format || "guide",
+        rating: c.rating || null,
+        reviewCount: c.reviewCount || null,
+        positioning: c.positioning || null,
+        promises: c.promises || [],
+        reviews: c.reviews || [],
+      }));
+
+      const { productGaps } = mineReviewsAndGaps(
+        competitorProducts,
+        freshSignals.map((s) => ({
+          title: s.title,
+          content: s.content,
+          url: s.url,
+          source_type: s.source_type,
+        })),
+      );
+
+      // Add product gaps with quoted review excerpts as competition evidence
+      for (const gap of productGaps) {
+        for (const excerpt of gap.reviewExcerpts) {
+          compEvidenceItems.push({
+            entityType: "competition",
+            entityId: primaryMarketId,
+            claim: `Product gap "${gap.title}": ${gap.opportunityTranslation}`,
+            excerpt: excerpt.quote,
+            url: excerpt.url,
+            signalType: "competition_observed",
+            confidence: 0.85,
+          });
+        }
+      }
+
       const written = await deps.saveEvidence(compEvidenceItems);
       totalEvidenceCreated += written.length;
       allCreatedEvidence.push(...written);

@@ -85,3 +85,20 @@ patch the affected guide/phase file (link the follow-up commit).
 - Recommendation: (a) — done this turn. Prod `collect()` still needs own app-id when approval lands (zero code change); `/api/sources/health` honestly keeps reporting anon-mode blocked until then.
 - Question for user: "Composio harness accepted as 1.1 live proof so 1.2 can start — or require own app-id before marking done?"
 - Resolution: _resolved 2026-09-17_ — live verification: 10 `signals` rows source `reddit` (`t3_1wa541j…t3_1724bsg`), `upsert 201`, rerun `409 duplicate` count stays 10 (DB `(source_id,external_id)` dedup proven); privacy probe `leaks:none`, all `author_hash=sha256:…`; `pnpm test` 11/11 green (fixed stub `listingResponse` missing `content-type: application/json` — Node defaults to `text/plain`, tripping the DEC-004 non-JSON guard); `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0 (`/api/sources/health` present). Follow-up: swap harness → own `REDDIT_CLIENT_ID/SECRET` when Reddit approves; no guide patch (OAuth surface unchanged).
+
+## DEC-007 — Tier-2 marketplace adapters (Etsy, Gumroad, Amazon KDP) approach
+- Date: 2026-09-20
+- Part: Phase 2 Part 2.3
+- Expected: Tier-2 adapters for Etsy, Gumroad, and Amazon KDP behind the SourceAdapter interface (08-ADAPTERS.md). ToS-checked; web-search-backed where official public search APIs are absent; log approach per source in DECISIONS per §4c.
+- Found:
+  1. Etsy: Etsy Open API v3 requires full commercial developer application, per-user OAuth2 token, and restricted access. Direct unauthenticated scraping of Etsy violates Etsy Terms of Use §3 and is guarded by Cloudflare anti-bot walls.
+  2. Gumroad: Gumroad API (`/v2/products`) only exposes the authenticated seller's own inventory, not a public marketplace-wide discovery search endpoint.
+  3. Amazon KDP: Amazon Product Advertising API (PA-API) requires an active affiliate account with 3 qualifying sales within 180 days (or keys are terminated); KDP has no public search API. Direct scraping of amazon.com violates Amazon Conditions of Use and triggers automated CAPTCHA challenges.
+- Options:
+  (a) Unauthenticated direct DOM scraping (Puppeteer/Cheerio against etsy.com, gumroad.com, amazon.com) — REJECTED: Violates ToS, high breakage risk, IP blocking, violates 08-ADAPTERS rule 2.
+  (b) Web-search-backed targeted queries via existing Serper infrastructure (`site:etsy.com <query> (pdf OR digital download OR printable)`, `site:gumroad.com <query> (pdf OR guide OR checklist)`, `site:amazon.com <query> (kindle OR ebook OR paperback)`) behind the identical `SourceAdapter` interface — CHOSEN: 100% ToS-clean (no direct scraping), zero new vendor credentials required (reuses `SERPER_API_KEY` from DEC-002), extracts real product URLs, titles, pricing, ratings, and snippets. Degrades gracefully to `skipped` when `SERPER_API_KEY` is not present (PRD §55 completeness).
+  (c) Paid scraping proxies / commercial marketplace APIs (e.g. Rainforest API, Bright Data) — REJECTED for MVP: adds recurring vendor cost, violating near-zero dev cost constraint (PRD §52/§62).
+- Recommendation: Option (b) — web-search-backed marketplace adapters behind the normative `SourceAdapter` interface.
+- Question for user: None required as plan specifies "(or web-backed where APIs absent), log approach per source in DECISIONS — §4c".
+- Resolution: Resolved 2026-09-20 — implemented EtsyAdapter, GumroadAdapter, and KdpAdapter using targeted site-filtered search over Serper. Extracted products provide verified URLs, titles, price points, and review snippets without ToS violations or scraper fragility.
+

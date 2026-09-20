@@ -12,7 +12,8 @@ import { createServerEvidenceDeps } from "../evidence/service-deps.ts";
 import { fetchRunCompleteness } from "./completeness.ts";
 import { buildSearchFilter } from "../db/search.ts";
 import { generate25Opportunities, type OpportunityMarketInput } from "../opportunities/index.ts";
-import type { OrchestratorDeps } from "./orchestrator.ts";
+import type { OrchestratorDeps, OrchestratorCompetitorItem } from "./orchestrator.ts";
+import { parseMarketplaceProduct } from "../sources/marketplace-helper.ts";
 
 const EXPECTED_EMBEDDING_DIM = 1536;
 
@@ -372,18 +373,78 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
     },
 
     observeCompetition: async (signals) => {
-      // Observe competitors from web signals or marketplace indicators
-      const observed: Array<{ platform: string; title: string; url?: string | null }> = [];
+      const observed: OrchestratorCompetitorItem[] = [];
+
+      // Check signals for marketplace signals (etsy, gumroad, kdp) or web competitor products
       for (const sig of signals) {
-        if (sig.source_type === "web" && sig.url && (sig.title?.toLowerCase().includes("guide") || sig.title?.toLowerCase().includes("manual"))) {
+        const isMarketplace =
+          sig.source_type === "etsy" ||
+          sig.source_type === "gumroad" ||
+          sig.source_type === "kdp";
+
+        const isWebProduct =
+          sig.source_type === "web" &&
+          sig.url &&
+          /guide|handbook|manual|checklist|book|workbook|template|cheat sheet|troubleshooting/i.test(
+            sig.title || "",
+          );
+
+        if ((isMarketplace || isWebProduct) && sig.url) {
+          const platform =
+            sig.source_type === "kdp"
+              ? "amazon_kdp"
+              : sig.source_type === "etsy"
+              ? "etsy"
+              : sig.source_type === "gumroad"
+              ? "gumroad"
+              : "web";
+
+          const parsed = parseMarketplaceProduct(platform, {
+            title: sig.title || undefined,
+            link: sig.url || undefined,
+            snippet: sig.content || undefined,
+          });
+
           observed.push({
-            platform: "web",
-            title: sig.title,
-            url: sig.url,
+            platform,
+            title: parsed.title,
+            url: parsed.url,
+            price: parsed.price,
+            rating: parsed.rating,
+            reviewCount: parsed.reviewCount,
+            format: parsed.format,
+            positioning: parsed.positioning,
+            promises: parsed.promises,
+            reviews: parsed.reviews,
           });
         }
       }
-      return observed.slice(0, 5);
+
+      return observed.slice(0, 10);
+    },
+
+    saveCompetitors: async (competitors) => {
+      const saved: Array<{ id: string }> = [];
+      for (const c of competitors) {
+        const { data, error } = await supabase
+          .from("competitors")
+          .insert({
+            market_id: c.market_id,
+            platform: c.platform,
+            title: c.title,
+            url: c.url || null,
+            price: c.price || null,
+            rating: c.rating || null,
+            review_count: c.review_count || null,
+          })
+          .select("id")
+          .single();
+
+        if (!error && data) {
+          saved.push({ id: data.id });
+        }
+      }
+      return saved;
     },
 
     fetchCompleteness: async (runId, query) => {
