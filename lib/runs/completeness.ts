@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResearchCompleteness } from "./types.ts";
+import { buildSearchFilter } from "../db/search.ts";
 
 export interface CompletenessRawCounts {
   sourcesCovered: number;
@@ -68,13 +69,12 @@ export async function fetchRunCompleteness(
   supabase: SupabaseClient,
   query: string,
 ): Promise<ResearchCompleteness> {
-  const q = `%${query.trim().replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
-
-  // 1. Signals for query
-  const { data: signals, error: sigErr } = await supabase
-    .from("signals")
-    .select("id, source_id")
-    .or(`title.ilike.${q},content.ilike.${q}`);
+  const filter = buildSearchFilter(query);
+  let queryBuilder = supabase.from("signals").select("id, source_id");
+  if (filter) {
+    queryBuilder = queryBuilder.or(filter);
+  }
+  const { data: signals, error: sigErr } = await queryBuilder;
 
   if (sigErr) {
     throw new Error(`Failed to count signals for completeness: ${sigErr.message}`);

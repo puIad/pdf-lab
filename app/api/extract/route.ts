@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/db/client";
 import { getRouter, runExtractionJob } from "@/lib/ai/index";
 import type { ExtractionInput } from "@/lib/ai/index";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
+import { buildSearchFilter } from "@/lib/db/search";
 
 // POST /api/extract — Phase 1 Part 1.3.
 // Turns STORED signals into validated `signal_analysis` rows (one per
@@ -106,13 +107,16 @@ export async function POST(req: Request) {
       .order("collected_at", { ascending: true })
       .limit(limit * 3); // over-fetch: missing-analysis filter applies below
     if (typeof body.query === "string" && body.query.trim().length > 0) {
-      const q = `%${body.query.trim().replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
-      query = query.or(`title.ilike.${q},content.ilike.${q}`);
+      const filter = buildSearchFilter(body.query);
+      if (filter) {
+        query = query.or(filter);
+      }
     }
     const { data, error } = await query;
     if (error) return NextResponse.json({ error: `signals lookup failed: ${error.message}` }, { status: 500 });
     const rows = (data ?? []) as Array<SignalRow & { signal_analysis: unknown }>;
-    const missing = onlyMissing ? rows.filter((r) => r.signal_analysis == null) : rows;
+    const hasNoAnalysis = (sa: unknown) => sa == null || (Array.isArray(sa) && sa.length === 0);
+    const missing = onlyMissing ? rows.filter((r) => hasNoAnalysis(r.signal_analysis)) : rows;
     signals = missing.slice(0, limit).map(({ id, title, content, url }) => ({ id, title, content, url }));
   }
 

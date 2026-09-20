@@ -13,6 +13,7 @@ import type { ClusterSignal } from "@/lib/cluster/index";
 import { cosineSimilarity } from "@/lib/cluster/similarity";
 import { summarizeCostLog } from "@/lib/ai/types";
 import type { CostLogEntry } from "@/lib/ai/types";
+import { buildSearchFilter } from "@/lib/db/search";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,11 @@ export async function POST(req: Request) {
 
   if (Array.isArray(body.signal_ids) && body.signal_ids.length > 0) {
     query = query.in("id", body.signal_ids as string[]);
+  } else if (typeof body.query === "string" && body.query.trim().length > 0) {
+    const filter = buildSearchFilter(body.query);
+    if (filter) {
+      query = query.or(filter);
+    }
   }
 
   const { data: rawRows, error: fetchErr } = await query;

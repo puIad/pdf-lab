@@ -10,6 +10,7 @@ import type { ClusterSignal } from "../cluster/types.ts";
 import { writeEvidence } from "../evidence/writer.ts";
 import { createServerEvidenceDeps } from "../evidence/service-deps.ts";
 import { fetchRunCompleteness } from "./completeness.ts";
+import { buildSearchFilter } from "../db/search.ts";
 import type {
   OrchestratorDeps,
   OrchestratorOpportunityItem,
@@ -84,8 +85,8 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
     },
 
     getSignals: async (query) => {
-      const q = `%${query.trim().replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
-      const { data, error } = await supabase
+      const filter = buildSearchFilter(query);
+      let queryBuilder = supabase
         .from("signals")
         .select(`
           id, title, content, url, source_id, published_at,
@@ -93,9 +94,13 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           signal_analysis (
             id, audience, problem, intent, urgency, pdf_relevance, embedding
           )
-        `)
-        .or(`title.ilike.${q},content.ilike.${q}`)
-        .order("collected_at", { ascending: false });
+        `);
+
+      if (filter) {
+        queryBuilder = queryBuilder.or(filter);
+      }
+
+      const { data, error } = await queryBuilder.order("collected_at", { ascending: false });
 
       if (error) {
         throw new Error(`Failed to fetch signals for run: ${error.message}`);
