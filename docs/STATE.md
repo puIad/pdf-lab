@@ -35,7 +35,7 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
 | 3.1 | Explorer homepage (DB-backed) | done | aa3ef59 | DB-backed explorer table with evidence-derived scores, confidence indicators, search bar, 4 filter tabs (Trending, Fastest Growing, High Buyer Intent, Recently Discovered), pagination, and Deep Research dialog per PRD §7, §40; UI primitives from megalibrary; 134/134 tests pass, lint+typecheck+build green. |
-| 3.2 | Market search + overview page | pending | — | |
+| 3.2 | Market search + overview page | done | 5ad56cc | PRD §8 overview (size proxy, search interest, trend direction, discussion counts, buyer-intent, marketplace activity, competitive density, pains, underserved submarkets); QC Rule 2 enforced; each line cites evidence or states 'Not observed'; research_runs persistence per user; /api/search + /search UI; 140/140 tests pass, lint+typecheck+build green. |
 | 3.3 | Trending engine + Radar | pending | — | |
 | 3.4 | NL research + modes | pending | — | |
 
