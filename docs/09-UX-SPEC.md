@@ -1,6 +1,8 @@
 # 09 — UX SPEC (PRD §7–§9, §19, §26–§28, §40–§48)
 
 Scores shown are EVIDENCE-DERIVED (PRD §7 note). Any number without backing rows is a bug.
+Frontend rule: ALWAYS and ONLY use components, UI primitives, and directing prompts from
+`C:\Users\pulad\Desktop\frontend-ai-megalibrary`.
 
 ## Dashboard (PRD §40)
 

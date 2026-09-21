@@ -34,3 +34,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 button, card, input, badge, tabs, table, dialog, skeleton (+ select, tooltip, progress
 as needed in Phase 3). Every data surface needs loading (skeleton) + empty + error
 states — checklist item in Phase 2/3 parts.
+
+## Mandatory Component & Prompt Source
+
+Per project contract, ALWAYS and ONLY use components, UI primitives, and directing prompts from
+`C:\Users\pulad\Desktop\frontend-ai-megalibrary` (primitives, blocks, animated components, and UI design methodologies).
