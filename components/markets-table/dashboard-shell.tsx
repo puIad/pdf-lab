@@ -6,6 +6,7 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Search,
+  Compass,
   Flame,
   TrendingUp,
   DollarSign,
@@ -252,8 +253,14 @@ export function DashboardShell({
           </p>
         </div>
 
-        {/* Top CTAs: Market Search & Run Deep Research */}
+        {/* Top CTAs: Market Search, Market Radar & Run Deep Research */}
         <div className="flex items-center gap-2.5">
+          <Link href="/radar">
+            <Button variant="outline" size="sm" className="gap-1.5 cursor-pointer border-primary/40 hover:border-primary">
+              <Compass className="size-4 text-primary" />
+              <span>Market Radar</span>
+            </Button>
+          </Link>
           <Link href="/search">
             <Button variant="outline" size="sm" className="gap-1.5 cursor-pointer">
               <Search className="size-4" />

@@ -8,6 +8,7 @@ import { WebAdapter, webConfigFromEnv } from "./web/index.ts";
 import { EtsyAdapter, etsyConfigFromEnv } from "./etsy/index.ts";
 import { GumroadAdapter, gumroadConfigFromEnv } from "./gumroad/index.ts";
 import { KdpAdapter, kdpConfigFromEnv } from "./kdp/index.ts";
+import { YouTubeAdapter, youtubeConfigFromEnv } from "./youtube/index.ts";
 import { registerAdapter } from "./registry.ts";
 
 registerAdapter(new RedditAdapter(redditConfigFromEnv()));
@@ -16,6 +17,7 @@ registerAdapter(new WebAdapter(webConfigFromEnv()));
 registerAdapter(new EtsyAdapter(etsyConfigFromEnv()));
 registerAdapter(new GumroadAdapter(gumroadConfigFromEnv()));
 registerAdapter(new KdpAdapter(kdpConfigFromEnv()));
+registerAdapter(new YouTubeAdapter(youtubeConfigFromEnv()));
 
 export { adapterKeys, getAdapter, listAdapters, registerAdapter } from "./registry.ts";
 export type {
