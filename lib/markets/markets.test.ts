@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchMarketsData } from "./fetcher.ts";
-import type { MarketRowData, MarketTab } from "./types.ts";
+import type { MarketRowData } from "./types.ts";
 
 function createMockSupabase(overrides: {
   markets?: Record<string, unknown>[];

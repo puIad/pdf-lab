@@ -3,6 +3,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   Search,
   Flame,
@@ -16,6 +17,7 @@ import {
   FileCheck2,
   Database,
   LineChart,
+  ChevronRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -250,8 +252,14 @@ export function DashboardShell({
           </p>
         </div>
 
-        {/* Top CTA: Run Deep Research */}
-        <div className="flex items-center gap-3">
+        {/* Top CTAs: Market Search & Run Deep Research */}
+        <div className="flex items-center gap-2.5">
+          <Link href="/search">
+            <Button variant="outline" size="sm" className="gap-1.5 cursor-pointer">
+              <Search className="size-4" />
+              <span>Market Search</span>
+            </Button>
+          </Link>
           <DeepResearchDialog onSuccess={refreshMarkets} />
         </div>
       </div>
@@ -331,6 +339,19 @@ export function DashboardShell({
             </button>
           )}
         </div>
+
+        {searchQuery.trim() && (
+          <div className="flex items-center justify-between text-xs px-2 pt-1.5 text-muted-foreground">
+            <span>Filtering table ({filteredAndSortedMarkets.length} results)</span>
+            <Link
+              href={`/search?q=${encodeURIComponent(searchQuery.trim())}`}
+              className="text-primary hover:underline font-medium inline-flex items-center gap-1 cursor-pointer"
+            >
+              <span>View full PRD §8 overview for &ldquo;{searchQuery.trim()}&rdquo;</span>
+              <ChevronRight className="size-3" />
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* 4. Four Filter Tabs per PRD §40 */}
