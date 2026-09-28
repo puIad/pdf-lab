@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local agent tooling + generated knowledge graph (git-ignored)
+    ".claude/**",
+    "graphify-out/**",
   ]),
 ]);
 
