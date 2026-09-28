@@ -11,7 +11,11 @@ export function escapeCsvField(val: unknown): string {
   if (val === null || val === undefined) {
     return "";
   }
-  const str = String(val);
+  let str = String(val);
+  // Mitigate CSV formula injection (M-1)
+  if (/^[=+\-@]/.test(str)) {
+    str = "'" + str;
+  }
   if (/[",\r\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }

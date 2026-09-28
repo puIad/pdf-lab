@@ -16,7 +16,7 @@ export function isValidTransition(from: LifecycleState, to: LifecycleState): boo
 
   if (fromIdx === -1 || toIdx === -1) return false;
   // Must transition to next sequential state or forward
-  return toIdx > fromIdx;
+  return toIdx === fromIdx + 1;
 }
 
 export class LifecycleTracker {

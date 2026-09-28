@@ -59,7 +59,7 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
-| 6.1 | QC enforcement + confidence display | pending | — | |
+| 6.1 | QC enforcement + code review fixes | done | pending | Applied all 22 fixes from code-review-report (C-1 to L-3), 150/150 tests pass, lint clean. |
 | 6.2 | Metrics instrumentation (§58–§59) | pending | — | |
 | 6.3 | Launch checklist + handoff | pending | — | |
 

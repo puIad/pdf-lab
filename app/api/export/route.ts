@@ -127,7 +127,7 @@ export async function POST(req: Request) {
     });
 
     const fileSlug = sanitizeFilename(reportData.market.name || reportData.query);
-    const download = body.download ?? false;
+    const download = body.download === true || String(body.download).toLowerCase() === "true";
 
     switch (format) {
       case "markdown": {

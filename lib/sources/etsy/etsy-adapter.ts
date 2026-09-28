@@ -1,6 +1,7 @@
 // lib/sources/etsy/etsy-adapter.ts — Tier-2 marketplace adapter for Etsy.
 // Spec: docs/08-ADAPTERS.md, DEC-007 (web-search-backed targeted search, ToS-clean).
 
+import { createHash } from "node:crypto";
 import type {
   CollectInput,
   HealthStatus,
@@ -125,7 +126,9 @@ export class EtsyAdapter implements SourceAdapter {
     const items: RawSignal[] = [];
     const seen = new Set<string>();
     for (const result of organic) {
-      const link = (result.link ?? "").trim();
+      let link = (result.link ?? "").trim();
+      // Strip tracking query params to prevent duplicate signals (H-2)
+      try { const u = new URL(link); u.search = ""; u.hash = ""; link = u.toString(); } catch {}
       if (!link || seen.has(link)) continue;
       seen.add(link);
 
@@ -163,7 +166,9 @@ export class EtsyAdapter implements SourceAdapter {
       url: payload.link || null,
       title: parsed.title,
       text: payload.snippet || null,
-      author: parsed.seller ? `sha256:${Buffer.from(parsed.seller).toString("hex").slice(0, 16)}` : "anonymous",
+      author: parsed.seller
+        ? `sha256:${createHash("sha256").update(parsed.seller).digest("hex").slice(0, 16)}`
+        : "anonymous",
       timestamp: null,
       engagement: {
         price: parsed.price,

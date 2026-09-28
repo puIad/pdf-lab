@@ -259,6 +259,7 @@ export function selectDiversifiedOpportunities(
       formatCounts[chosen.format] = (formatCounts[chosen.format] || 0) + 1;
     } else {
       // If constraints exhausted but still need slots, relax format cap gradually
+      let found = false;
       for (let i = 0; i < remaining.length; i++) {
         const cand = remaining[i];
         const key = `${normalizeKey(cand.targetAudience)}::${normalizeKey(cand.problem)}::${cand.format}`;
@@ -267,9 +268,11 @@ export function selectDiversifiedOpportunities(
           selected.push(chosen);
           selectedKeys.add(key);
           formatCounts[chosen.format] = (formatCounts[chosen.format] || 0) + 1;
+          found = true;
           break;
         }
       }
+      if (!found) break; // All remaining are duplicates; exit cleanly
     }
   }
 

@@ -65,9 +65,18 @@ function parseVector(v: unknown): number[] | null {
 }
 
 export async function POST(req: Request) {
+  // Auth guard (pre-Phase 5 lightweight secret key)
+  const authHeader = req.headers.get("x-api-key");
+  if (authHeader !== process.env.INTERNAL_API_KEY) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: ClusterBody = {};
   try {
-    body = (await req.json()) as ClusterBody;
+    const rawBody = await req.json();
+    if (rawBody && typeof rawBody === "object") {
+      body = rawBody as ClusterBody;
+    }
   } catch {
     // Empty body is acceptable: clusters all analyzed signals
   }
@@ -107,7 +116,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const { data: rawRows, error: fetchErr } = await query;
+  const { data: rawRows, error: fetchErr } = await query.limit(1000);
   if (fetchErr) {
     return NextResponse.json({ error: `signals query failed: ${fetchErr.message}` }, { status: 500 });
   }

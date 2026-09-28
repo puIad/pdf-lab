@@ -11,7 +11,8 @@ export async function GET(req: Request) {
   const limitStr = searchParams.get("limit");
   const minPdfFitStr = searchParams.get("minPdfFit");
 
-  const limit = limitStr ? Math.min(50, Math.max(1, parseInt(limitStr, 10))) : 25;
+  const parsedLimit = limitStr ? parseInt(limitStr, 10) : NaN;
+  const limit = isNaN(parsedLimit) ? 25 : Math.min(50, Math.max(1, parsedLimit));
   const minPdfFit = minPdfFitStr ? parseFloat(minPdfFitStr) : 0.65;
 
   try {

@@ -186,10 +186,8 @@ export class YouTubeAdapter implements SourceAdapter {
 
       this.cache.set(cacheKey, { at: now, items: rawSignals });
       return rawSignals;
-    } catch {
-      // Graceful degradation per 08-ADAPTERS rule 3
-      const fallback = this.generateFallbackSignals(input.query, input.limit);
-      return fallback;
+    } catch (err) {
+      throw new Error(`YouTube API request failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

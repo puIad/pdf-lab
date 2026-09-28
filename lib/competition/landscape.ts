@@ -24,12 +24,16 @@ function normalizePercentages(items: Array<{ label: string; count: number }>, to
     };
   });
 
-  // Adjust difference on the item with the largest remainder to guarantee exact 100% sum
+  // Distribute rounding remainder across top-N items by largest remainder (M-4)
   const diff = Math.round((100.0 - sum) * 10) / 10;
   if (diff !== 0 && withRaw.length > 0) {
-    // Sort by remainder descending to give rounding priority
     const sorted = [...withRaw].sort((a, b) => b.remainder - a.remainder);
-    sorted[0].percentage = Math.round((sorted[0].percentage + diff) * 10) / 10;
+    const step = diff > 0 ? 0.1 : -0.1;
+    let remaining = Math.round(Math.abs(diff) * 10);
+    for (let i = 0; i < sorted.length && remaining > 0; i++) {
+      sorted[i].percentage = Math.round((sorted[i].percentage + step) * 10) / 10;
+      remaining--;
+    }
   }
 
   return withRaw.map(({ label, count, percentage }) => ({

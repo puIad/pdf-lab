@@ -96,7 +96,10 @@ export function detectTopicTrend(input: DetectTrendInput): TopicTrendAnalysis {
   // 3. Compute rates of change
   const wowDeltaPercent = Math.round((((v7d - vPrior7d) / Math.max(vPrior7d, EPSILON)) * 100) * 10) / 10;
   const momDeltaPercent = Math.round((((v30d - vPrior30d) / Math.max(vPrior30d, EPSILON)) * 100) * 10) / 10;
-  const acceleration = Math.round((wowDeltaPercent - momDeltaPercent / 4.0) * 10) / 10;
+  // Compare daily rates for meaningful acceleration (H-7)
+  const weeklyRate = v7d / 7;
+  const monthlyRate = v30d / 30;
+  const acceleration = Math.round((weeklyRate - monthlyRate) * 100) / 100;
 
   // 4. Source metrics breakdown
   const buildWindowMetrics = (window: TimeWindow, sigs: SignalRecord[], days: number, vol: number): TrendWindowMetrics => {

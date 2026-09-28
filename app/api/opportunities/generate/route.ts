@@ -19,6 +19,12 @@ interface GenerateBody {
 }
 
 export async function POST(req: Request) {
+  // Auth guard (pre-Phase 5 lightweight secret key)
+  const authHeader = req.headers.get("x-api-key");
+  if (authHeader !== process.env.INTERNAL_API_KEY) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: GenerateBody = {};
   try {
     body = (await req.json()) as GenerateBody;

@@ -296,8 +296,10 @@ export class GTrendsAdapter implements SourceAdapter {
       const second = data.points.slice(half);
       const avg = (ps: Array<{ value: number }>) =>
         ps.length > 0 ? ps.reduce((a, b) => a + b.value, 0) / ps.length : 0;
-      const direction =
-        avg(second) > avg(first) + 5
+      // Guard: single data point produces empty first slice → "flat" not false "rising" (M-3)
+      const direction = first.length === 0
+        ? "flat" as const
+        : avg(second) > avg(first) + 5
           ? "rising"
           : avg(second) < avg(first) - 5
             ? "falling"

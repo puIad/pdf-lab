@@ -19,11 +19,19 @@ interface CreateRunBody {
 const VALID_MODES = ["explore", "validate", "hunt", "deep", "monitor"] as const;
 
 export async function POST(req: Request) {
+  // Auth guard (pre-Phase 5 lightweight secret key)
+  const authHeader = req.headers.get("x-api-key");
+  if (authHeader !== process.env.INTERNAL_API_KEY) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: CreateRunBody;
   try {
-    body = (await req.json()) as CreateRunBody;
+    const rawBody = await req.json();
+    if (!rawBody || typeof rawBody !== "object") throw new Error("Invalid body");
+    body = rawBody as CreateRunBody;
   } catch {
-    return NextResponse.json({ error: "request body must be valid JSON" }, { status: 400 });
+    return NextResponse.json({ error: "request body must be valid JSON object" }, { status: 400 });
   }
 
   if (typeof body.query !== "string" || body.query.trim().length === 0) {

@@ -113,7 +113,8 @@ export function predictUpcomingSeasonalSurges(
 
   for (const pattern of KNOWN_SEASONAL_PATTERNS) {
     // Check if the pattern's surge is either active now or peaks within next 60 days
-    if (pattern.surgeMonths.includes(currentMonth) || pattern.surgeMonths.includes(nextMonth)) {
+    const thirdMonth = (currentMonth + 2) % 12;
+    if (pattern.surgeMonths.includes(currentMonth) || pattern.surgeMonths.includes(nextMonth) || pattern.surgeMonths.includes(thirdMonth)) {
       const peakMonthIndex = pattern.surgeMonths[0];
       forecasts.push({
         topicName: pattern.topicName,

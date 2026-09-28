@@ -103,7 +103,7 @@ export function EvidenceList({
 
             {/* Timestamp */}
             {item.created_at && (
-              <div className="text-[10px] text-muted-foreground/70">
+              <div className="text-[10px] text-muted-foreground/70" suppressHydrationWarning>
                 Logged {new Date(item.created_at).toLocaleDateString()} at {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             )}

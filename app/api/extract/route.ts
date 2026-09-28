@@ -50,11 +50,19 @@ interface SignalRow {
 }
 
 export async function POST(req: Request) {
+  // Auth guard (pre-Phase 5 lightweight secret key)
+  const authHeader = req.headers.get("x-api-key");
+  if (authHeader !== process.env.INTERNAL_API_KEY) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: ExtractBody;
   try {
-    body = (await req.json()) as ExtractBody;
+    const rawBody = await req.json();
+    if (!rawBody || typeof rawBody !== "object") throw new Error("Invalid body");
+    body = rawBody as ExtractBody;
   } catch {
-    return NextResponse.json({ error: "body must be JSON" }, { status: 400 });
+    return NextResponse.json({ error: "body must be valid JSON object" }, { status: 400 });
   }
 
   let limit = DEFAULT_LIMIT;

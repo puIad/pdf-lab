@@ -15,6 +15,22 @@ import {
 } from "../evidence/qc.ts";
 import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 
+const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${STEP_TIMEOUT_MS}ms`));
+    }, STEP_TIMEOUT_MS);
+    p.then((val) => {
+      clearTimeout(timer);
+      resolve(val);
+    }).catch((err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
 export interface ResearchRunOptions {
   query: string;
   mode?: "explore" | "validate" | "hunt" | "deep" | "monitor";
@@ -143,11 +159,11 @@ export async function executeResearchRun(
     // 2. COLLECTING
     tracker.transition("collecting", { message: `Collecting signals from adapters for "${query}"` });
     await deps.updateRunStatus(runId, "collecting");
-    const ingestResult = await deps.ingest({
+    const ingestResult = await withTimeout(deps.ingest({
       query,
       limit,
       sourceKeys: options.sourceKeys,
-    });
+    }), "ingest");
 
     // 3. NORMALIZING
     tracker.transition("normalizing", {
@@ -171,14 +187,14 @@ export async function executeResearchRun(
 
     const unanalyzedSignals = signals.filter((s) => !s.analysis);
     if (unanalyzedSignals.length > 0) {
-      await deps.extract(
+      await withTimeout(deps.extract(
         unanalyzedSignals.map((s) => ({
           id: s.id,
           title: s.title,
           content: s.content,
           url: s.url,
         })),
-      );
+      ), "extract");
     }
     const freshSignals = await deps.getSignals(query);
 
@@ -189,7 +205,7 @@ export async function executeResearchRun(
     });
     await deps.updateRunStatus(runId, "clustering");
 
-    const marketCandidates = await deps.clusterAndScore(freshSignals);
+    const marketCandidates = await withTimeout(deps.clusterAndScore(freshSignals), "clusterAndScore");
     const savedMarkets = await deps.saveMarkets(marketCandidates);
 
     // Write evidence for each market from its supporting signals

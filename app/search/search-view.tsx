@@ -225,7 +225,7 @@ export function SearchView({
                       {overview.mode} Mode
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-muted-foreground mt-1" suppressHydrationWarning>
                     PRD §8 Market Overview &bull; Evaluated {new Date(overview.searchedAt).toLocaleDateString()} &bull;
                     {" "}{overview.matchedMarketsCount} markets &bull; {overview.matchedSignalsCount} signals observed
                   </p>

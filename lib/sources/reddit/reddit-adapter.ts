@@ -159,8 +159,9 @@ export class RedditAdapter implements SourceAdapter {
   }
 
   private async throttle(): Promise<void> {
-    const elapsed = this.config.nowFn() - this.lastRequestAt;
-    const wait = this.config.minIntervalMs - elapsed;
+    const now = this.config.nowFn();
+    const wait = Math.max(0, this.config.minIntervalMs - (now - this.lastRequestAt));
+    this.lastRequestAt = now + wait; // Claim the slot immediately
     if (wait > 0) await sleep(wait);
   }
 

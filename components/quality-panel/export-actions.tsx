@@ -12,10 +12,12 @@ interface ExportActionsProps {
 export function ExportActions({ marketId, className = "" }: ExportActionsProps) {
   const [downloadingFormat, setDownloadingFormat] = useState<string | null>(null);
   const [downloadedFormat, setDownloadedFormat] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleDownload = async (format: "markdown" | "csv" | "json") => {
     try {
       setDownloadingFormat(format);
+      setErrorMessage(null);
       const url = `/api/export?market_id=${encodeURIComponent(marketId)}&format=${format}&download=true`;
 
       // Trigger browser download via hidden link
@@ -30,6 +32,7 @@ export function ExportActions({ marketId, className = "" }: ExportActionsProps) 
       setTimeout(() => setDownloadedFormat(null), 2500);
     } catch (e) {
       console.error("Failed to download export:", e);
+      setErrorMessage(e instanceof Error ? e.message : "Export failed. Please try again.");
     } finally {
       setDownloadingFormat(null);
     }
@@ -87,6 +90,11 @@ export function ExportActions({ marketId, className = "" }: ExportActionsProps) 
         )}
         Structured JSON (.json)
       </Button>
+      {errorMessage && (
+        <span className="w-full text-xs text-destructive" role="alert">
+          {errorMessage}
+        </span>
+      )}
     </div>
   );
 }
