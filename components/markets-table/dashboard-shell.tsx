@@ -6,6 +6,7 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Search,
+  Terminal,
   Compass,
   Flame,
   TrendingUp,
@@ -265,6 +266,12 @@ export function DashboardShell({
             <Button variant="outline" size="sm" className="gap-1.5 cursor-pointer">
               <Search className="size-4" />
               <span>Market Search</span>
+            </Button>
+          </Link>
+          <Link href="/research">
+            <Button variant="outline" size="sm" className="gap-1.5 cursor-pointer">
+              <Terminal className="size-4" />
+              <span>Ask PDF Lab</span>
             </Button>
           </Link>
           <DeepResearchDialog onSuccess={refreshMarkets} />

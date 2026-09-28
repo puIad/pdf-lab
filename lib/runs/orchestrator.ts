@@ -37,6 +37,9 @@ export interface ResearchRunOptions {
   limit?: number;
   sourceKeys?: string[];
   userId?: string | null;
+  /** Planner rule-set version + structured plan (Phase 3.4), persisted on the run row. */
+  promptVersion?: string | null;
+  plan?: unknown;
 }
 
 export interface StoredSignalForRun {
@@ -94,7 +97,13 @@ export interface OrchestratorCompetitorItem {
 }
 
 export interface OrchestratorDeps {
-  createRun: (run: { query: string; mode: string; userId?: string | null }) => Promise<{
+  createRun: (run: {
+    query: string;
+    mode: string;
+    userId?: string | null;
+    promptVersion?: string | null;
+    plan?: unknown;
+  }) => Promise<{
     id: string;
     started_at: string;
   }>;
@@ -148,7 +157,13 @@ export async function executeResearchRun(
   const limit = options.limit || 25;
 
   // 1. QUEUED
-  const runRecord = await deps.createRun({ query, mode, userId: options.userId });
+  const runRecord = await deps.createRun({
+    query,
+    mode,
+    userId: options.userId,
+    promptVersion: options.promptVersion,
+    plan: options.plan,
+  });
   const runId = runRecord.id;
   const tracker = new LifecycleTracker("queued", `Research run queued for "${query}"`);
 

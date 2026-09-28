@@ -27,7 +27,9 @@ create table research_runs (
   -- queued|collecting|normalizing|classifying|clustering|trend_analysis|
   -- competition_analysis|opportunity_generation|report_generation|completed|failed
   started_at timestamptz not null default now(),
-  completed_at timestamptz
+  completed_at timestamptz,
+  prompt_version text,  -- planner rule-set version (Phase 3.4, migration 20260928000005)
+  plan jsonb            -- structured NL query + mode + pipeline depth (PRD §26–§27)
 );
 
 -- One row per configured source (reddit, gtrends, web, etsy, gumroad, ...)

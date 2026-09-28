@@ -38,7 +38,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
   const router = getRouter();
 
   return {
-    createRun: async ({ query, mode, userId }) => {
+    createRun: async ({ query, mode, userId, promptVersion, plan }) => {
       const { data, error } = await supabase
         .from("research_runs")
         .insert({
@@ -46,6 +46,8 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           mode: mode || "deep",
           user_id: userId || null,
           status: "queued",
+          prompt_version: promptVersion ?? null,
+          plan: plan ?? null,
         })
         .select("id, started_at")
         .single();
