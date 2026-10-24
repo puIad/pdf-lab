@@ -67,6 +67,8 @@ export interface BuyerIntentData {
   strongCount: number;
   mediumCount: number;
   weakCount: number;
+  /** Unanalyzed signals counted as strong because of commercial wording ("buy", "guide"...). */
+  wordingOnlyCount?: number;
   sampleQuotes: Array<{
     quote: string;
     url?: string | null;

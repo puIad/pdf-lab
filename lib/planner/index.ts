@@ -3,3 +3,4 @@
 export * from "./types.ts";
 export * from "./parse.ts";
 export * from "./modes.ts";
+export * from "./verdict.ts";

@@ -1,7 +1,8 @@
 // lib/ai/providers/openrouter.ts — OpenRouter (OpenAI-compatible) provider.
 // Verified live 2026-09-17: key auth + :free models return usage with cost 0.
-// Default cheap model `nex-agi/nex-n2.5-pro:free` was probe-picked this part:
-// exact-JSON extraction output + correct intent label in ~2.3s at $0.
+// Default cheap model was `nex-agi/nex-n2.5-pro:free` (Part 1.3) until OpenRouter withdrew its free
+// tier on 2026-10-24. DEC-012 tried gemma and nemotron (both unavailable upstream), then settled on
+// the `openrouter/free` router: OpenRouter picks a served free model per call ($0, model varies).
 // Override with OPENROUTER_CHEAP_MODEL. Free-model availability churns —
 // breakage/retirement = decision request (§4a), never a silent swap.
 
@@ -18,8 +19,8 @@ import { AIProviderNotConfiguredError } from "../types.ts";
 
 export const OPENROUTER_KEY = "openrouter";
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-/** Verified 2026-09-17 (see DEC-free probe in Part 1.3 notes). Env overrides. */
-export const OPENROUTER_DEFAULT_CHEAP_MODEL = "nex-agi/nex-n2.5-pro:free";
+/** DEC-012 (2026-10-24). Env overrides. */
+export const OPENROUTER_DEFAULT_CHEAP_MODEL = "openrouter/free";
 /** Verified 2026-09-19: 1536 dimensions matching schema v1. Env overrides. */
 export const OPENROUTER_DEFAULT_EMBED_MODEL = "openai/text-embedding-3-small";
 

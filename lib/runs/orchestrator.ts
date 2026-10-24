@@ -15,6 +15,7 @@ import {
 } from "../evidence/qc.ts";
 import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 import { isDemandOnly } from "../sources/demand-only.ts";
+import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
 
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -134,7 +135,8 @@ export interface OrchestratorDeps {
   clusterAndScore: (signals: StoredSignalForRun[]) => Promise<OrchestratorMarketItem[]>;
   saveMarkets: (markets: OrchestratorMarketItem[]) => Promise<Array<{ id: string; name: string }>>;
   saveEvidence: (items: EvidenceInput[]) => Promise<EvidenceRow[]>;
-  generateOpportunities: (markets: OrchestratorMarketItem[]) => Promise<Array<{
+  /** `seed` is the run query: its stored quick ideas join the candidate pool (Part 3.8). */
+  generateOpportunities: (markets: OrchestratorMarketItem[], seed: string) => Promise<Array<{
     opportunity: OrchestratorOpportunityItem;
     evidence: EvidenceInput[];
   }>>;
@@ -379,7 +381,8 @@ export async function executeResearchRun(
     });
     await deps.updateRunStatus(runId, "opportunity_generation");
 
-    const generatedPairs = await deps.generateOpportunities(marketCandidates);
+    const generatedPairs = await deps.generateOpportunities(marketCandidates, query);
+    const fromIdeas = generatedPairs.filter((p) => p.evidence.some((e) => e.claim.startsWith(IDEA_CLAIM_PREFIX))).length;
     const validOpportunitiesToSave: OrchestratorOpportunityItem[] = [];
     const oppEvidenceToSave: EvidenceInput[] = [];
 
@@ -421,6 +424,7 @@ export async function executeResearchRun(
     tracker.transition("report_generation", {
       counts: {
         opportunities: savedOppsCount,
+        opportunitiesFromIdeas: fromIdeas,
         evidenceCreated: totalEvidenceCreated,
       },
       message: `Assembling research completeness panel and reconciling database counts`,

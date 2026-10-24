@@ -38,6 +38,8 @@ import {
 import type { EvidenceCitation, MarketOverview } from "@/lib/search/types";
 import type { TopicTrendAnalysis } from "@/lib/trends/types";
 import type { RunSummary } from "@/lib/runs/types";
+import type { ValidationVerdict } from "@/lib/planner/verdict";
+import { VerdictPanel } from "@/components/research/verdict-panel";
 
 export interface RecentRun {
   id: string;
@@ -51,7 +53,7 @@ export interface RecentRun {
 type ResearchResult =
   | { mode: "explore"; overview: MarketOverview | null; markets: MarketMatch[] }
   | { mode: "hunt"; totalMatches: number; markets: MarketMatch[] }
-  | { mode: "validate"; report: ValidationReport }
+  | { mode: "validate"; report: ValidationReport; verdict?: ValidationVerdict }
   | { mode: "monitor"; datedSignals: number; trend: TopicTrendAnalysis; note: string }
   | { mode: "deep"; run: RunSummary };
 
@@ -294,9 +296,10 @@ function ExploreResult({ overview, markets }: { overview: MarketOverview | null;
   );
 }
 
-function ValidateResult({ report }: { report: ValidationReport }) {
+function ValidateResult({ report, verdict }: { report: ValidationReport; verdict?: ValidationVerdict }) {
   return (
     <div className="space-y-4">
+      {verdict && <VerdictPanel verdict={verdict} />}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
         <p className="text-sm">
           <span className="text-muted-foreground">Investigating exactly: </span>
@@ -652,7 +655,7 @@ export function ResearchView({ initialPrompt, recentRuns }: { initialPrompt: str
                     empty="No evidence-backed market passes these filters yet. Loosen a filter or run Deep research on a niche."
                   />
                 )}
-                {result.mode === "validate" && <ValidateResult report={result.report} />}
+                {result.mode === "validate" && <ValidateResult report={result.report} verdict={result.verdict} />}
                 {result.mode === "monitor" && (
                   <MonitorResult trend={result.trend} datedSignals={result.datedSignals} note={result.note} />
                 )}

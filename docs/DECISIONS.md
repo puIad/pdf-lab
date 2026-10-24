@@ -247,3 +247,43 @@ patch the affected guide/phase file (link the follow-up commit).
   external id, so scans per region dedup separately. Outside the US, expect the Serper phrase blocks
   to be empty often; quick ideas there rest on Trends related queries.
 
+
+## DEC-012 — Default free OpenRouter model withdrawn; Deep runs extract nothing
+
+- Date: 2026-10-24
+- Part: Phase 3 Part 3.8 (acceptance: a Deep run on a seed with stored ideas returns 25 distinct
+  opportunities with at least one traced to an idea phrase)
+- Expected: the cheap and strong tiers default to `nex-agi/nex-n2.5-pro:free` ($0, used for the 1.3
+  and 1.5 live runs).
+- Found: OpenRouter answers 404 "This model is unavailable for free. The paid version is available
+  now". Deep run `171abdef` on "budgeting" walked all 10 states to `completed` with 91 discussion
+  signals, 0 analyzed, 0 markets, 0 opportunities and 40% completeness. Extraction failures do not
+  fail the run or reach the server log (a separate defect, logged for 6.x).
+- Options (prices from the OpenRouter models API, 2026-10-24):
+  (a) paid `nex-agi/nex-n2.5-pro`, $0.075 / M input, $0.25 / M output; about $0.01 per Deep run of
+      ~100 signals. Same model as before, so extraction quality is unchanged.
+  (b) another free model with JSON output: `google/gemma-4-31b-it:free` or
+      `nvidia/nemotron-3-super-120b-a12b:free`. $0; free models can be withdrawn again the same way,
+      and extraction quality needs a spot check.
+  (c) local Ollama (`AI_CHEAP_PROVIDER=ollama`). $0, needs a model pulled on this machine; not
+      usable from Vercel.
+  All three are env changes (`OPENROUTER_CHEAP_MODEL` / `OPENROUTER_STRONG_MODEL`, or the default in
+  `lib/ai/providers/openrouter.ts`); no Part 3.8 code depends on the choice.
+- Recommendation: (a). It costs about a cent per run and does not break again when a free tier ends.
+- Question for user: which model should the cheap and strong tiers use?
+- Resolution: 2026-10-24, (b) `google/gemma-4-31b-it:free`, set as `OPENROUTER_DEFAULT_CHEAP_MODEL`
+  (both tiers use it unless env overrides). Right after the switch, four probes over ~80 s got 429
+  "temporarily rate-limited upstream" (Google AI Studio), so extraction quality and the Part 3.8
+  Deep-run acceptance are still unverified. A later gemma probe was still 429. The user then asked
+  for `nvidia/nemotron-3-super-120b-a12b:free`: three probes over ~30 s returned 404 from the Nvidia
+  provider ("Function ... Not found for account"), so the default was left on gemma.
+  Final, same day: the user chose `openrouter/free` (OpenRouter picks a served free model per call;
+  a JSON probe routed to `dots-studio/dots-3-note-preview:free`). It is now
+  `OPENROUTER_DEFAULT_CHEAP_MODEL`. Why the named free models failed: each has one upstream provider
+  (Google AI Studio's free pool was rate-limited, Nvidia's endpoint showed status -5 and 0% uptime,
+  nex had no free endpoint). Separately, the key's account has $0 of credits purchased, so OpenRouter
+  allows 50 free calls a day (1,000 after $10 ever purchased). A Deep run makes one extraction call
+  per signal, so a ~90-signal run exhausts the day: Deep run `7feb9fb2` analyzed 17 of 91 signals
+  before the cap (57 of 50 calls used). A different key on the same account has the same limits.
+  Follow-ups: $10 of credits (or a paid model) before Deep runs are relied on; extraction failures
+  should surface in the run (6.x).

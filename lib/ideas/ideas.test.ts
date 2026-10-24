@@ -16,6 +16,7 @@ import {
   suggestionDemand,
 } from "./ideas.ts";
 import { headingFrom, suggestOutline } from "./outline.ts";
+import { TICK_THRESHOLDS, ideaTicks } from "./ticks.ts";
 import type { MarketSignal } from "../sources/types.ts";
 import { REGIONS, STARTER_SEEDS, isRegion } from "./seeds.ts";
 import { generateScanCsv, parseCsv, recountScanCsv } from "../export/csv.ts";
@@ -254,5 +255,37 @@ describe("scan CSV round-trip (2.4 recount)", () => {
     lines.splice(1, 1);
     const r = recountScanCsv(lines.join("\n"), scan);
     assert.equal(r.isRoundTripAccurate, false);
+  });
+});
+
+describe("card ticks (Part 3.8)", () => {
+  const ideas = buildIdeas("keto diet", SIGNALS).ideas;
+  const plan = ideas.find((i) => i.phrase === "keto diet plan")!;
+  const calc = ideas.find((i) => i.phrase === "keto diet calculator")!;
+
+  it("every tick carries a threshold and a count", () => {
+    const ticks = ideaTicks(plan);
+    assert.deepEqual(ticks.map((t) => t.key), ["demand", "trend", "fit", "effort", "competition"]);
+    assert.ok(ticks.every((t) => t.threshold.length > 0 && t.count.length > 0));
+  });
+
+  it("demand and fit compare against their thresholds", () => {
+    const t = Object.fromEntries(ideaTicks(plan).map((x) => [x.key, x]));
+    assert.equal(t.demand.status, plan.demand >= TICK_THRESHOLDS.demand ? "pass" : "fail");
+    assert.equal(t.trend.status, "pass"); // breakout in Trends
+    const c = Object.fromEntries(ideaTicks(calc).map((x) => [x.key, x]));
+    assert.equal(c.fit.status, "fail"); // tool search: fit < 60
+    assert.equal(c.trend.status, "blank"); // not observed is not a failure (QC Rule 2)
+  });
+
+  it("competition stays blank until a check has run (QC Rule 3)", () => {
+    assert.equal(ideaTicks(plan).at(-1)!.status, "blank");
+    assert.equal(ideaTicks(plan, { listings: 12 }).at(-1)!.status, "pass");
+    assert.equal(ideaTicks(plan, { listings: 80 }).at(-1)!.status, "fail");
+  });
+
+  it("Hard formats fail the effort tick", () => {
+    const hard = { ...plan, effort: "Hard" as const };
+    assert.equal(ideaTicks(hard).find((t) => t.key === "effort")!.status, "fail");
   });
 });

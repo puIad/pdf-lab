@@ -16,6 +16,7 @@ import { isDemandOnly } from "@/lib/sources/demand-only";
 import {
   RESEARCH_MODES,
   buildValidationReport,
+  buildVerdict,
   filterMarkets,
   planResearch,
   searchTextOf,
@@ -133,7 +134,7 @@ export async function POST(req: Request) {
       case "validate": {
         const concept = plan.query.concept ?? plan.query.raw;
         const overview = await generateMarketOverview(concept, supabase, { mode: "validate", persistRun: false });
-        result = { mode: "validate", report: buildValidationReport(concept, overview) };
+        result = { mode: "validate", report: buildValidationReport(concept, overview), verdict: buildVerdict(overview) };
         break;
       }
       case "monitor": {

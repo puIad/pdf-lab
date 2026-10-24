@@ -6,7 +6,7 @@
 
 import React, { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, Copy, Download, ExternalLink, Flame, History, ListOrdered, RefreshCw, Search, ShieldAlert, TrendingUp } from "lucide-react";
+import { ArrowLeft, CalendarClock, Copy, Download, ExternalLink, Flame, History, ListOrdered, Loader2, Microscope, RefreshCw, Search, ShieldAlert, ShieldCheck, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,9 @@ import type { IdeaFormat, IdeasResult, QuickIdea } from "@/lib/ideas/ideas";
 import { suggestOutline } from "@/lib/ideas/outline";
 import { DEFAULT_REGION, REGIONS, STARTER_SEEDS, isRegion, type RegionCode } from "@/lib/ideas/seeds";
 import { generateScanCsv } from "@/lib/export/csv";
+import { ideaTicks, type TickStatus } from "@/lib/ideas/ticks";
+import type { ValidationVerdict } from "@/lib/planner/verdict";
+import { VerdictPanel } from "@/components/research/verdict-panel";
 
 interface SourceStatus {
   key: string;
@@ -119,8 +122,50 @@ function Pill({ tone, children, title }: { tone: keyof typeof TONE; children: Re
   );
 }
 
+const KEY_NEEDED =
+  "needs the internal API key until Phase 5 auth lands. Validate is open when you run PDF Lab locally; Deep runs always need the key.";
+const TICK_MARK: Record<TickStatus, { mark: string; className: string }> = {
+  pass: { mark: "✓", className: "text-emerald-600 dark:text-emerald-400" },
+  fail: { mark: "✗", className: "text-rose-600 dark:text-rose-400" },
+  blank: { mark: "–", className: "text-muted-foreground" },
+};
+
+function Ticks({ idea }: { idea: QuickIdea }) {
+  return (
+    <ul className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]" aria-label="Checks">
+      {ideaTicks(idea).map((t) => (
+        <li key={t.key} title={`${t.label}: ${t.count} (needs ${t.threshold})`} className="flex items-center gap-1">
+          <span className={`font-bold ${TICK_MARK[t.status].className}`}>{TICK_MARK[t.status].mark}</span>
+          <span className="text-muted-foreground">{t.label}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+type Validation = { loading: boolean; verdict: ValidationVerdict | null; error: string | null };
+
 function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) {
   const [open, setOpen] = useState(false);
+  const [validation, setValidation] = useState<Validation>({ loading: false, verdict: null, error: null });
+
+  // Validate mode on the idea's phrase as the concept (PRD §27, §48); the verdict is rule-based.
+  async function validate() {
+    setValidation({ loading: true, verdict: null, error: null });
+    try {
+      const res = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: idea.phrase, mode: "validate" }),
+      });
+      const body = (await res.json()) as { result?: { verdict?: ValidationVerdict }; error?: string };
+      if (res.status === 401) setValidation({ loading: false, verdict: null, error: `Validate ${KEY_NEEDED}` });
+      else if (!res.ok || !body.result?.verdict) setValidation({ loading: false, verdict: null, error: body.error ?? `Request failed (${res.status})` });
+      else setValidation({ loading: false, verdict: body.result.verdict, error: null });
+    } catch (err) {
+      setValidation({ loading: false, verdict: null, error: err instanceof Error ? err.message : "Request failed" });
+    }
+  }
   const [format, setFormat] = useState<IdeaFormat>(idea.format);
   const [offset, setOffset] = useState(0);
   const outline = useMemo(
@@ -195,6 +240,8 @@ function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) 
           )}
         </div>
 
+        <Ticks idea={idea} />
+
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3">
           <div className="flex flex-wrap items-center gap-1">
             {idea.engines.map((e) => (
@@ -211,11 +258,37 @@ function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) 
               ) : null,
             )}
           </div>
-          <Button size="sm" variant={open ? "secondary" : "outline"} className="cursor-pointer" onClick={() => setOpen((o) => !o)}>
-            <ListOrdered />
-            Outline
-          </Button>
+          <div className="flex shrink-0 gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer"
+              disabled={validation.loading}
+              title="Run Validate mode on this exact phrase: GO / WAIT / KILL from stored counts"
+              onClick={validate}
+            >
+              {validation.loading ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+              Validate
+            </Button>
+            <Button size="sm" variant={open ? "secondary" : "outline"} className="cursor-pointer" onClick={() => setOpen((o) => !o)}>
+              <ListOrdered />
+              Outline
+            </Button>
+          </div>
         </div>
+
+        {validation.verdict && (
+          <div className="space-y-1">
+            <VerdictPanel verdict={validation.verdict} compact />
+            <Link
+              href={`/research?q=${encodeURIComponent(`validate: ${idea.phrase}`)}`}
+              className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Full Validate report
+            </Link>
+          </div>
+        )}
+        {validation.error && <p className="text-[11px] text-rose-600 dark:text-rose-400">{validation.error}</p>}
 
         {open && (
           <div className="space-y-2 rounded-lg bg-muted/50 p-3">
@@ -268,6 +341,25 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("all");
   const [sort, setSort] = useState<"opportunity" | "demand" | "az">("opportunity");
   const [shown, setShown] = useState(24);
+  const [deep, setDeep] = useState<{ loading: boolean; runId: string | null; error: string | null }>({ loading: false, runId: null, error: null });
+
+  // Deep run on the seed: its stored quick ideas join the opportunity candidate pool (Part 3.8).
+  async function deepResearch(s: string) {
+    setDeep({ loading: true, runId: null, error: null });
+    try {
+      const res = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: s, mode: "deep" }),
+      });
+      const body = (await res.json()) as { runId?: string; error?: string };
+      if (res.status === 401) setDeep({ loading: false, runId: null, error: `Deep research ${KEY_NEEDED}` });
+      else if (!res.ok) setDeep({ loading: false, runId: body.runId ?? null, error: body.error ?? `Deep run failed (${res.status})` });
+      else setDeep({ loading: false, runId: body.runId ?? null, error: null });
+    } catch (err) {
+      setDeep({ loading: false, runId: null, error: err instanceof Error ? err.message : "Request failed" });
+    }
+  }
 
   async function scan(value: string, where: RegionCode = region) {
     const s = value.trim();
@@ -329,7 +421,7 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
           <div className="hidden h-4 w-px bg-border sm:block" />
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Quick ideas</h1>
           <Badge variant="outline" className="font-mono text-xs">
-            Part 3.7
+            Part 3.8
           </Badge>
         </div>
         <p className="max-w-md text-xs text-muted-foreground">
@@ -454,7 +546,28 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
                     CSV
                   </Button>
                 )}
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="cursor-pointer"
+                  disabled={deep.loading}
+                  title="Full pipeline on this seed; its top quick ideas join the opportunity candidates. Takes a few minutes."
+                  onClick={() => deepResearch(data.seed)}
+                >
+                  {deep.loading ? <Loader2 className="animate-spin" /> : <Microscope />}
+                  {deep.loading ? "Deep research running…" : "Deep research"}
+                </Button>
               </div>
+              {deep.runId && !deep.error && (
+                <p className="text-xs">
+                  Deep run finished:{" "}
+                  <Link href="/" className="underline underline-offset-2">
+                    its opportunities are in the explorer
+                  </Link>{" "}
+                  <span className="font-mono text-muted-foreground">({deep.runId.slice(0, 8)})</span>
+                </p>
+              )}
+              {deep.error && <p className="text-xs text-rose-600 dark:text-rose-400">{deep.error}</p>}
               {data.topic.length ? (
                 data.topic.map((t) => (
                   <p key={t.evidence.source_id} className="text-xs text-muted-foreground">

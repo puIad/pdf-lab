@@ -536,6 +536,7 @@ export async function generateMarketOverview(
     let strongCount = 0;
     let mediumCount = 0;
     let weakCount = 0;
+    let wordingOnlyCount = 0;
 
     for (const s of intentSignals) {
       const intent = s.signal_analysis?.intent;
@@ -543,7 +544,10 @@ export async function generateMarketOverview(
       else if (intent === "strong") strongCount++;
       else if (intent === "medium") mediumCount++;
       else if (intent === "weak") weakCount++;
-      else strongCount++; // text matched commercial intent
+      else {
+        strongCount++; // text matched commercial intent
+        wordingOnlyCount++;
+      }
     }
 
     const sampleQuotes = intentSignals.slice(0, 4).map((s) => ({
@@ -562,6 +566,7 @@ export async function generateMarketOverview(
         strongCount,
         mediumCount,
         weakCount,
+        wordingOnlyCount,
         sampleQuotes,
       },
       rawLabel: `${intentSignals.length} buyer intent signals observed (${highIntentTotal} high/strong intent)`,
