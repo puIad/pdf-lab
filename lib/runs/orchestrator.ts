@@ -18,9 +18,10 @@ import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 // Demand measurements, not discussions: they must not go through extraction or become market evidence.
+// Serper PAA / related-search phrases (Part 3.7) live under the `web` source with a `serp:` external id.
 const DEMAND_ONLY_SOURCES = new Set(["autocomplete", "wikipedia"]);
-function discussionsOnly<T extends { source_type: string }>(rows: T[]): T[] {
-  return rows.filter((s) => !DEMAND_ONLY_SOURCES.has(s.source_type));
+function discussionsOnly<T extends { source_type: string; external_id?: string | null }>(rows: T[]): T[] {
+  return rows.filter((s) => !DEMAND_ONLY_SOURCES.has(s.source_type) && !s.external_id?.startsWith("serp:"));
 }
 function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -55,6 +56,7 @@ export interface StoredSignalForRun {
   url: string | null;
   source_id: string;
   source_type: string;
+  external_id?: string | null;
   published_at?: string | null;
   analysis?: {
     id: string;

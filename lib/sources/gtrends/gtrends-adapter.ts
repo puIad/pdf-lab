@@ -184,7 +184,8 @@ export class GTrendsAdapter implements SourceAdapter {
     const limit = Math.max(1, Math.min(MAX_LIMIT, Math.floor(input.limit) || 10));
     // `since` has no per-item meaning for trend windows (interest points carry
     // their own timestamps; related queries carry none) — accepted, unused.
-    const cacheKey = `${query}|${limit}|${this.config.geo}|${this.config.windowDays}`;
+    const geo = input.geo ? input.geo.toUpperCase() : this.config.geo;
+    const cacheKey = `${query}|${limit}|${geo}|${this.config.windowDays}`;
     const cached = this.cache.get(cacheKey);
     if (cached && this.config.nowFn() - cached.at < this.config.cacheTtlMs) {
       return cached.items;
@@ -194,7 +195,7 @@ export class GTrendsAdapter implements SourceAdapter {
     const startTime = new Date(
       endTime.getTime() - this.config.windowDays * 86400_000,
     );
-    const geoOpt = this.config.geo ? { geo: this.config.geo } : {};
+    const geoOpt = geo ? { geo } : {};
 
     const iotRaw = await this.callBackend("interestOverTime", () =>
       this.config.backend.interestOverTime({
@@ -233,7 +234,7 @@ export class GTrendsAdapter implements SourceAdapter {
     const interest: InterestOverTimePayload = {
       kind: "interest_over_time",
       keyword: query,
-      geo: this.config.geo,
+      geo,
       windowDays: this.config.windowDays,
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
@@ -244,7 +245,7 @@ export class GTrendsAdapter implements SourceAdapter {
     };
     items.push({
       source: GTRENDS_KEY,
-      externalId: `gtrends:iot:${this.config.geo || "world"}:${slug(query)}:${this.config.windowDays}d`,
+      externalId: `gtrends:iot:${geo || "world"}:${slug(query)}:${this.config.windowDays}d`,
       fetchedAt,
       payload: interest,
     });
@@ -272,12 +273,12 @@ export class GTrendsAdapter implements SourceAdapter {
           related,
           value: toNumber(entry.value),
           rising: listIndex === 1,
-          geo: this.config.geo,
+          geo,
           fetchedWindowDays: this.config.windowDays,
         };
         items.push({
           source: GTRENDS_KEY,
-          externalId: `gtrends:rq:${this.config.geo || "world"}:${shortHash(`${query.toLowerCase()}|${related.toLowerCase()}`)}`,
+          externalId: `gtrends:rq:${geo || "world"}:${shortHash(`${query.toLowerCase()}|${related.toLowerCase()}`)}`,
           fetchedAt,
           payload,
         });

@@ -225,3 +225,25 @@ patch the affected guide/phase file (link the follow-up commit).
   18. Order: 3.7 → 3.8 → 3.9 → 3.10, with 3.11 whenever the file lands.
   Filled in when built, marked `shortcut:` until 3.11: verdict and tick thresholds, the not-advice
   keyword list, the starter seed list.
+
+## DEC-011 — Per-scan region needs an optional `geo` on `CollectInput`
+
+- Date: 2026-10-24
+- Part: Phase 3 Part 3.7
+- Expected: Part 3.7 task 2 (region picker per scan) sets Trends `geo` and the suggest engines'
+  country / language parameters; `lib/sources/types.ts` says any change to the adapter shapes needs
+  an entry here.
+- Found: adapters only read their region from env at construction, so a per-scan region has no way
+  in. Live Serper check the same day: `peopleAlsoAsk` items carried only `question` (the docs example
+  also shows snippet / title / link), and `gl=gb` "budgeting" and `gl=ca` "meal prep" returned
+  neither `peopleAlsoAsk` nor `relatedSearches`.
+- Options: (a) optional `geo?: string` on `CollectInput`, passed through `runIngest`; adapters
+  without regions ignore it. (b) one adapter instance per region. (c) env-only region (no picker).
+- Recommendation: (a): additive, no existing adapter or caller changes behaviour.
+- Question for user: none. The phase file already decides the feature; this records the interface
+  change.
+- Resolution: 2026-10-24, (a). `docs/08-ADAPTERS.md` interface updated. Google Trends, autocomplete
+  and web (Serper `gl` + `hl=en`) read it; Wikipedia stays English. The region is part of each
+  external id, so scans per region dedup separately. Outside the US, expect the Serper phrase blocks
+  to be empty often; quick ideas there rest on Trends related queries.
+

@@ -117,3 +117,20 @@ describe("AutocompleteAdapter.collect", () => {
     await assert.rejects(all.collect({ query: "keto diet", limit: 10 }), /All suggest engines failed/);
   });
 });
+
+describe("AutocompleteAdapter per-scan region (Part 3.7)", () => {
+  it("puts the scan's geo in every engine URL and in the ids", async () => {
+    const urls: string[] = [];
+    const base = config();
+    const adapter = new AutocompleteAdapter({
+      ...base,
+      fetchFn: async (input, init) => (urls.push(String(input)), base.fetchFn(input, init)),
+    });
+    const items = await adapter.collect({ query: "keto diet", limit: 5, geo: "ca" });
+    assert.ok(urls.some((u) => u.includes("suggestqueries") && u.includes("gl=ca")));
+    assert.ok(urls.some((u) => u.includes("mkt=en-CA")));
+    assert.ok(urls.some((u) => u.includes("kl=ca-en")));
+    assert.ok(!urls.some((u) => u.includes("gl=us")));
+    assert.ok(items.every((i) => i.externalId.startsWith("autocomplete:ca:")));
+  });
+});

@@ -14,7 +14,7 @@ interface SourceAdapter {
   displayName: string;
   tiers: 1 | 2 | 3;               // PRD §11 priority tier
   // Collect raw items for a query/window; return NORMALIZED signals (PRD §12).
-  collect(input: { query: string; limit: number; since?: Date }): Promise<RawSignal[]>;
+  collect(input: { query: string; limit: number; since?: Date; geo?: string }): Promise<RawSignal[]>; // geo: DEC-011
   normalize(raw: RawSignal): MarketSignal;   // maps to `signals` row shape
   healthCheck(): Promise<{ ok: boolean; detail?: string }>;
 }

@@ -325,7 +325,7 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
     assert.equal(state.runStatus, "failed");
   });
 
-  it("keeps search-suggestion and pageview rows out of extraction and clustering", async () => {
+  it("keeps search-suggestion, Serper phrase and pageview rows out of extraction and clustering", async () => {
     const demandRow = (id: string, source_type: string): StoredSignalForRun => ({
       id,
       title: `Search suggestion: "${id}"`,
@@ -340,7 +340,12 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
     const base = createMockOrchestratorDeps();
     const original = await base.deps.getSignals("pc troubleshooting");
     const { deps } = createMockOrchestratorDeps({
-      getSignals: async () => [...original, demandRow("ac-1", "autocomplete"), demandRow("wk-1", "wikipedia")],
+      getSignals: async () => [
+        ...original,
+        demandRow("ac-1", "autocomplete"),
+        demandRow("wk-1", "wikipedia"),
+        { ...demandRow("paa-1", "web"), external_id: "serp:us:abc:2026-10-24" },
+      ],
       extract: async (rows) => {
         extracted.push(...rows.map((r) => r.id));
         return { analyzed: rows.length, succeeded: rows.length, failed: 0 };

@@ -156,3 +156,51 @@ describe("WebAdapter.healthCheck", () => {
     assert.equal(status.ok, true);
   });
 });
+
+// Part 3.7: phrase blocks. Shape copied from a live Serper call on 2026-10-24 (PAA items carried only
+// `question`); values are SAMPLE DATA.
+const PHRASE_BODY = {
+  organic: [{ title: "Budgeting 101", link: "https://example.com/budgeting-101", position: 1 }],
+  peopleAlsoAsk: [{ question: "What is the 50/30/20 budget rule?" }, { question: "How to budget $3,000 a month?" }],
+  relatedSearches: [{ query: "Budgeting planner" }, { query: "budgeting" }, { query: "Budgeting for students" }, { query: "budgeting planner" }],
+};
+
+describe("WebAdapter phrase blocks (Part 3.7)", () => {
+  it("keeps PAA + related searches as phrase rows from the same call", async () => {
+    const { fetchFn, calls } = stubFetch(PHRASE_BODY);
+    const adapter = new WebAdapter(testConfig(fetchFn));
+    const items = await adapter.collect({ query: "budgeting", limit: 10, geo: "gb" });
+    assert.equal(calls.length, 1, "one Serper credit for organic + phrases");
+    const phrases = items.filter((i) => i.externalId.startsWith("serp:"));
+    // seed "budgeting" dropped, "Budgeting planner" merged case-insensitively
+    assert.deepEqual(
+      phrases.map((p) => (p.payload as { phrase: string }).phrase),
+      ["what is the 50/30/20 budget rule?", "how to budget $3,000 a month?", "budgeting planner", "budgeting for students"],
+    );
+    assert.ok(phrases.every((p) => p.externalId.startsWith("serp:gb:")));
+    const n = adapter.normalize(phrases[2]!);
+    assert.equal(n.engagement.serp_blocks, "related");
+    assert.equal(n.engagement.block_count, 1);
+    assert.equal(n.engagement.blocks_total, 2);
+    assert.equal(n.engagement.best_position, 0);
+    assert.ok(n.url?.includes("gl=gb"));
+    assert.ok(n.text?.includes("Related searches #1"));
+    assert.equal(n.author, "anonymous");
+  });
+
+  it("sends gl / hl only when the scan names a region", async () => {
+    const { fetchFn, calls } = stubFetch(PHRASE_BODY);
+    const adapter = new WebAdapter(testConfig(fetchFn));
+    await adapter.collect({ query: "budgeting", limit: 10 });
+    await adapter.collect({ query: "budgeting", limit: 10, geo: "au" });
+    assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { q: "budgeting", num: 10 });
+    assert.deepEqual(JSON.parse(String(calls[1]?.init?.body)), { q: "budgeting", num: 10, gl: "au", hl: "en" });
+  });
+
+  it("returns organic rows only when both blocks are missing", async () => {
+    const { fetchFn } = stubFetch({ organic: PHRASE_BODY.organic });
+    const items = await new WebAdapter(testConfig(fetchFn)).collect({ query: "budgeting", limit: 10, geo: "gb" });
+    assert.equal(items.length, 1);
+    assert.equal(items[0]?.externalId, "https://example.com/budgeting-101");
+  });
+});
