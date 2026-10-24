@@ -2,7 +2,7 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { planResearch, searchTextOf } from "./parse.ts";
+import { planResearch, searchTextOf, seedOf } from "./parse.ts";
 import { buildValidationReport, filterMarkets, VALIDATION_BLOCKS } from "./modes.ts";
 import { PLANNER_PROMPT_VERSION } from "./types.ts";
 import { buildVerdict } from "./verdict.ts";
@@ -252,5 +252,14 @@ describe("buildVerdict (Part 3.8)", () => {
 
   test("empty overview → KILL on zero demand", () => {
     assert.equal(buildVerdict(createEmptyOverview("x", "validate", new Date().toISOString())).verdict, "KILL");
+  });
+});
+
+describe("seedOf (Part 3.8 review)", () => {
+  test("keeps the typed seed that searchTextOf would rewrite", () => {
+    assert.equal(seedOf("strength training for women"), "strength training for women");
+    assert.notEqual(searchTextOf(planResearch("strength training for women", "deep").query), "strength training for women");
+    assert.equal(seedOf("pdf-lab Moving Checklist"), "moving checklist");
+    assert.equal(seedOf("deep: packing list"), "packing list");
   });
 });

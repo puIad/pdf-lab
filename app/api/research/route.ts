@@ -20,6 +20,7 @@ import {
   filterMarkets,
   planResearch,
   searchTextOf,
+  seedOf,
   tokenize,
   type ResearchMode,
 } from "@/lib/planner";
@@ -93,6 +94,8 @@ export async function POST(req: Request) {
     const result = await executeResearchRun(
       {
         query: text,
+        // The planner's search text drops format words and "for …" spans; ideas are stored under the typed seed.
+        seed: seedOf(body.prompt),
         mode: "deep",
         limit: 25,
         userId,

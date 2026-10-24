@@ -122,8 +122,6 @@ function Pill({ tone, children, title }: { tone: keyof typeof TONE; children: Re
   );
 }
 
-const KEY_NEEDED =
-  "needs the internal API key until Phase 5 auth lands. Validate is open when you run PDF Lab locally; Deep runs always need the key.";
 const TICK_MARK: Record<TickStatus, { mark: string; className: string }> = {
   pass: { mark: "✓", className: "text-emerald-600 dark:text-emerald-400" },
   fail: { mark: "✗", className: "text-rose-600 dark:text-rose-400" },
@@ -159,8 +157,7 @@ function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) 
         body: JSON.stringify({ prompt: idea.phrase, mode: "validate" }),
       });
       const body = (await res.json()) as { result?: { verdict?: ValidationVerdict }; error?: string };
-      if (res.status === 401) setValidation({ loading: false, verdict: null, error: `Validate ${KEY_NEEDED}` });
-      else if (!res.ok || !body.result?.verdict) setValidation({ loading: false, verdict: null, error: body.error ?? `Request failed (${res.status})` });
+      if (!res.ok || !body.result?.verdict) setValidation({ loading: false, verdict: null, error: body.error ?? `Request failed (${res.status})` });
       else setValidation({ loading: false, verdict: body.result.verdict, error: null });
     } catch (err) {
       setValidation({ loading: false, verdict: null, error: err instanceof Error ? err.message : "Request failed" });
@@ -353,7 +350,7 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
         body: JSON.stringify({ prompt: s, mode: "deep" }),
       });
       const body = (await res.json()) as { runId?: string; error?: string };
-      if (res.status === 401) setDeep({ loading: false, runId: null, error: `Deep research ${KEY_NEEDED}` });
+      if (res.status === 401) setDeep({ loading: false, runId: null, error: "Deep research needs the internal API key until Phase 5 auth lands (POST /api/research with x-api-key)." });
       else if (!res.ok) setDeep({ loading: false, runId: body.runId ?? null, error: body.error ?? `Deep run failed (${res.status})` });
       else setDeep({ loading: false, runId: body.runId ?? null, error: null });
     } catch (err) {

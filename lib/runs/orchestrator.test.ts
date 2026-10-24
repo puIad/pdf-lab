@@ -228,6 +228,20 @@ function createMockOrchestratorDeps(overrides?: Partial<OrchestratorDeps>): {
 }
 
 describe("executeResearchRun (lifecycle & acceptance)", () => {
+  it("hands the typed seed, not the planner query, to opportunity generation (Part 3.8)", async () => {
+    const seeds: string[] = [];
+    const base = createMockOrchestratorDeps().deps;
+    const { deps } = createMockOrchestratorDeps({
+      generateOpportunities: async (markets, seed) => {
+        seeds.push(seed);
+        return base.generateOpportunities(markets, seed);
+      },
+    });
+    await executeResearchRun({ query: "strength training women", seed: "strength training for women", mode: "deep" }, deps);
+    await executeResearchRun({ query: "pc troubleshooting", mode: "deep" }, deps);
+    assert.deepEqual(seeds, ["strength training for women", "pc troubleshooting"]);
+  });
+
   it("full run returns COMPLETED with complete 10-state lifecycle trace", async () => {
     const { deps, state } = createMockOrchestratorDeps();
 

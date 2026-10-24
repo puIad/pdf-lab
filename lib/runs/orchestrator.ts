@@ -47,6 +47,8 @@ export interface ResearchRunOptions {
   /** Planner rule-set version + structured plan (Phase 3.4), persisted on the run row. */
   promptVersion?: string | null;
   plan?: unknown;
+  /** The seed as the user typed it; its stored quick ideas join the pool. Defaults to `query`. */
+  seed?: string;
 }
 
 export interface StoredSignalForRun {
@@ -135,7 +137,7 @@ export interface OrchestratorDeps {
   clusterAndScore: (signals: StoredSignalForRun[]) => Promise<OrchestratorMarketItem[]>;
   saveMarkets: (markets: OrchestratorMarketItem[]) => Promise<Array<{ id: string; name: string }>>;
   saveEvidence: (items: EvidenceInput[]) => Promise<EvidenceRow[]>;
-  /** `seed` is the run query: its stored quick ideas join the candidate pool (Part 3.8). */
+  /** `seed`: the stored quick ideas of this seed join the candidate pool (Part 3.8). */
   generateOpportunities: (markets: OrchestratorMarketItem[], seed: string) => Promise<Array<{
     opportunity: OrchestratorOpportunityItem;
     evidence: EvidenceInput[];
@@ -381,7 +383,7 @@ export async function executeResearchRun(
     });
     await deps.updateRunStatus(runId, "opportunity_generation");
 
-    const generatedPairs = await deps.generateOpportunities(marketCandidates, query);
+    const generatedPairs = await deps.generateOpportunities(marketCandidates, options.seed?.trim() || query);
     const fromIdeas = generatedPairs.filter((p) => p.evidence.some((e) => e.claim.startsWith(IDEA_CLAIM_PREFIX))).length;
     const validOpportunitiesToSave: OrchestratorOpportunityItem[] = [];
     const oppEvidenceToSave: EvidenceInput[] = [];
