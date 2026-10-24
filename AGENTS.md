@@ -13,9 +13,9 @@ Every task, in this order:
 
 Rules: evidence before synthesis; adapters own source code; problems halt into
 `docs/DECISIONS.md`; one part = one commit (`phase-<N>-part-<M>: <summary>`).
-Frontend rule: ALWAYS and ONLY use components, UI primitives, and directing prompts from
-`C:\Users\pulad\Desktop\frontend-ai-megalibrary` for all frontend development, UI design,
-styling, and page components in this project.
+Frontend rule: build all frontend, UI design, styling, and page components in this project
+from the components, UI primitives, and directing prompts in
+`C:\Users\pulad\Desktop\frontend-ai-megalibrary`, not from other sources.
 
 Docs freshness: `docs/03-STACK.md` + `docs/guides/*` are plans, not build-time truth —
 re-verify via Context7 (resolve library ID, then query-docs) AND the canonical doc links

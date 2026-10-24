@@ -77,11 +77,15 @@ export interface IngestDeps {
   upsertSignals: (rows: SignalRow[]) => Promise<number>;
 }
 
+/** Receives each source's normalized signals once they are stored (Part 3.6 quick ideas). */
+export type SignalSink = (adapterKey: string, signals: MarketSignal[]) => void;
+
 async function ingestOne(
   adapter: SourceAdapter,
   query: string,
   limit: number,
   deps: IngestDeps,
+  sink?: SignalSink,
 ): Promise<IngestSourceResult> {
   const base = {
     key: adapter.key,
@@ -111,6 +115,7 @@ async function ingestOne(
             normalized.map((s) => toSignalRow(sourceUuid, s)),
           )
         : 0;
+    sink?.(adapter.key, normalized);
     return {
       ...base,
       status: "ok",
@@ -131,6 +136,7 @@ async function ingestOne(
 export async function runIngest(
   input: { query: string; limit?: number; sourceKeys?: string[] },
   deps: IngestDeps,
+  sink?: SignalSink,
 ): Promise<IngestSummary> {
   const query = (input.query ?? "").trim();
   if (!query) throw new Error("ingest requires a non-empty query");
@@ -149,7 +155,7 @@ export async function runIngest(
   // instead of bursting all adapters at once.
   const sources: IngestSourceResult[] = [];
   for (const adapter of adapters) {
-    sources.push(await ingestOne(adapter, query, limit, resolved));
+    sources.push(await ingestOne(adapter, query, limit, resolved, sink));
   }
   const totals = sources.reduce(
     (acc, s) => ({

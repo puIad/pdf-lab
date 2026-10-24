@@ -3,7 +3,8 @@
 // loads `next/headers` through lib/db/client.ts. Import ONLY from server code
 // (route handlers); never from client components or unit tests.
 
-import { listAdapters } from "../sources/registry.ts";
+// index.ts, not registry.ts: importing it is what registers the adapters in this process.
+import { listAdapters } from "../sources/index.ts";
 import { createServiceSupabaseClient } from "../db/client.ts";
 import type { IngestDeps } from "./pipeline.ts";
 

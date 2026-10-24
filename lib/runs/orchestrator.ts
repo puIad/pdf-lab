@@ -16,6 +16,12 @@ import {
 import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+// Demand measurements, not discussions: they must not go through extraction or become market evidence.
+const DEMAND_ONLY_SOURCES = new Set(["autocomplete", "wikipedia"]);
+function discussionsOnly<T extends { source_type: string }>(rows: T[]): T[] {
+  return rows.filter((s) => !DEMAND_ONLY_SOURCES.has(s.source_type));
+}
 function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -191,7 +197,7 @@ export async function executeResearchRun(
     });
     await deps.updateRunStatus(runId, "normalizing");
 
-    const signals = await deps.getSignals(query);
+    const signals = discussionsOnly(await deps.getSignals(query));
 
     // 4. CLASSIFYING
     tracker.transition("classifying", {
@@ -211,7 +217,7 @@ export async function executeResearchRun(
         })),
       ), "extract");
     }
-    const freshSignals = await deps.getSignals(query);
+    const freshSignals = discussionsOnly(await deps.getSignals(query));
 
     // 5. CLUSTERING
     tracker.transition("clustering", {

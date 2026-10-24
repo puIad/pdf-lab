@@ -324,4 +324,36 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
     assert.ok(result.error?.includes("0 evidence rows"));
     assert.equal(state.runStatus, "failed");
   });
+
+  it("keeps search-suggestion and pageview rows out of extraction and clustering", async () => {
+    const demandRow = (id: string, source_type: string): StoredSignalForRun => ({
+      id,
+      title: `Search suggestion: "${id}"`,
+      content: null,
+      url: null,
+      source_id: `src-${source_type}`,
+      source_type,
+      published_at: null,
+    });
+    const extracted: string[] = [];
+    const clustered: string[] = [];
+    const base = createMockOrchestratorDeps();
+    const original = await base.deps.getSignals("pc troubleshooting");
+    const { deps } = createMockOrchestratorDeps({
+      getSignals: async () => [...original, demandRow("ac-1", "autocomplete"), demandRow("wk-1", "wikipedia")],
+      extract: async (rows) => {
+        extracted.push(...rows.map((r) => r.id));
+        return { analyzed: rows.length, succeeded: rows.length, failed: 0 };
+      },
+      clusterAndScore: async (signals) => {
+        clustered.push(...signals.map((s) => s.id));
+        return base.deps.clusterAndScore(signals);
+      },
+    });
+
+    const result = await executeResearchRun({ query: "pc troubleshooting", mode: "deep" }, deps);
+    assert.equal(result.status, "completed");
+    assert.deepEqual(extracted, [], "the only unanalyzed rows were demand rows");
+    assert.deepEqual(clustered.sort(), ["sig-1", "sig-2"]);
+  });
 });

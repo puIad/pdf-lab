@@ -56,3 +56,37 @@ Load: Phase-1/2 files + `09-UX-SPEC.md → 06-EVIDENCE-CONTRACT.md`.
 - Acceptance: one probe per §26 question returns sensible scoped runs; Validate on a
   user concept returns demand/audience/complaints/products/pricing/gaps/risks with cites.
 - Review: full checklist + Phase-3 gate.
+
+## Part 3.5 — Keyless discovery adapters (local-only autocomplete + Wikipedia)
+
+Added 2026-10-24 from the PDFMinter teardown (`docs/research/2026-10-24-pdfminter-teardown.md`)
+and DEC-008.
+
+- Deps: 1.2. Touches: `lib/sources/autocomplete/*`, `lib/sources/wikipedia/*`, `lib/sources/index.ts`.
+- Tasks:
+  1. `autocomplete` adapter: Google, YouTube, Bing, DuckDuckGo, Amazon suggest; expansion plan
+     = seed + question prefixes + modifiers (all engines) + A to Z (Google only); one signal per
+     unique phrase with engine count and best position. LOCAL-ONLY guard per DEC-008.
+  2. `wikipedia` adapter: official Action API title resolution (skip disambiguation, require
+     the seed's words in the title) + Wikimedia pageviews REST; one signal with the last 28 days
+     vs the previous 56 days (two windows, QC Rule 2). Descriptive User-Agent, no personal data.
+  3. Both: cache, throttle, `healthCheck`, `SourceNotConfiguredError` / honest failure.
+- Acceptance: unit tests on labeled fixtures (zero network); live ingest of one seed stores
+  autocomplete + wikipedia signals locally; with the guard off, autocomplete reports `skipped`.
+
+## Part 3.6 — Quick ideas + auto-outline
+
+- Deps: 3.5. Touches: `lib/ideas/*`, `lib/ingest/pipeline.ts` (optional signal sink),
+  `lib/sources/gtrends` (engagement keys), `app/api/ideas/route.ts`, `app/ideas/*`.
+- Tasks:
+  1. Seed → ingest (autocomplete, gtrends, wikipedia) → per-phrase ideas: format, title,
+     intent, demand (cites engine count + best position, QC Rule 4), PDF fit, trend only when
+     Trends rising data exists (else "not observed", QC Rule 2), effort, interest band,
+     phrase specificity. Specificity is NOT a competition claim (QC Rule 3): the UI says so.
+  2. Opportunity = weighted demand + fit + trend bonus. `shortcut:` until calibrated on the
+     user's PDFMinter CSV exports.
+  3. Auto-outline: rank related phrases (opportunity, question bonus, token overlap), drop
+     near-duplicates, phrase → heading, pad with own per-format default sections.
+  4. `POST /api/ideas` + `/ideas` page (cards, filters, outline per idea) from `components/ui`.
+- Acceptance: unit tests for scoring + outline; live seed returns ideas whose numbers trace to
+  stored signals; outline for one idea has no near-duplicate headings.

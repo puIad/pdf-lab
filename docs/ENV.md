@@ -34,6 +34,9 @@ in `.env.example` (placeholders only), in client bundles, or in chat.**
 | `OPENROUTER_API_KEY` | Server-only | Not set yet (Phase 1 Part 1.3) | Same as above, for the OpenRouter provider path. |
 | Web-search API key (ONE of Brave / Serper / Tavily / Bing — DEC-002) | Server-only | Not set yet (Phase 1 Part 1.2) | Provider picked in Part 1.2; only the winner gets a key row here. |
 | `CRON_SECRET` | Server-only | Not set yet (Phase 4 Part 4.2) | Only if Vercel Cron / scheduler path is chosen in DEC-001. |
+| `PDFLAB_UNOFFICIAL_AUTOCOMPLETE` | Server-only flag | `.env.local` ONLY. Never in Vercel. | `1` enables the local-only search-suggestion adapter (DEC-008, Part 3.5). Ignored when `NODE_ENV=production` or `VERCEL` is set; the source then reports `skipped`. |
+| `AUTOCOMPLETE_GEO` | Server-only, optional | `.env.local` | Country code for suggestions, default `us`. Amazon stays on the US marketplace. |
+| `WIKIMEDIA_USER_AGENT` | Server-only, optional | `.env.local` / Vercel | Overrides the default `PDF-Lab/0.1 (+<prod URL>)` sent to Wikimedia. Must name a contact URL; do not put a personal email here. |
 
 ## Local setup
 
