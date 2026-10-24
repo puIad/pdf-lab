@@ -13,6 +13,7 @@ import {
 } from "./web-adapter.ts";
 import type { WebAdapterConfig } from "./web-adapter.ts";
 import { SourceNotConfiguredError } from "../types.ts";
+import { isDemandOnly } from "../demand-only.ts";
 
 const FIXTURE_URL = new URL("./__fixtures__/serper-response.json", import.meta.url);
 const FIXTURE = JSON.parse(readFileSync(FIXTURE_URL, "utf8")) as {
@@ -186,6 +187,21 @@ describe("WebAdapter phrase blocks (Part 3.7)", () => {
     assert.ok(n.url?.includes("gl=gb"));
     assert.ok(n.text?.includes("Related searches #1"));
     assert.equal(n.author, "anonymous");
+    assert.equal(n.timestamp, null, "fetch time is not a publish date (QC Rule 2)");
+  });
+
+  it("marks phrase rows, autocomplete and Wikipedia as demand-only, never organic results", async () => {
+    const { fetchFn } = stubFetch(PHRASE_BODY);
+    const items = await new WebAdapter(testConfig(fetchFn)).collect({ query: "budgeting", limit: 10 });
+    const ids = items.map((i) => i.externalId);
+    assert.ok(ids.some((id) => id.startsWith("serp:")) && ids.some((id) => !id.startsWith("serp:")));
+    for (const id of ids) {
+      assert.equal(isDemandOnly({ source_type: "web", external_id: id }), id.startsWith("serp:"), id);
+    }
+    assert.equal(isDemandOnly({ source_type: "autocomplete", external_id: "autocomplete:us:x:2026-10-24" }), true);
+    assert.equal(isDemandOnly({ source_type: "wikipedia" }), true);
+    assert.equal(isDemandOnly({ source_type: "reddit", external_id: "t3_abc" }), false);
+    assert.equal(isDemandOnly({ source_type: undefined, external_id: null }), false);
   });
 
   it("sends gl / hl only when the scan names a region", async () => {

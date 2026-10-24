@@ -80,6 +80,10 @@ export function expansionPlan(seed: string, engine: Engine): string[] {
   return [seed, ...QUESTION_PREFIXES.map((q) => `${q} ${seed}`), ...MODIFIERS.map((m) => `${seed} ${m}`), ...letters];
 }
 
+// DuckDuckGo `kl` codes that aren't `<iso>-en` (duckduckgo.com/duckduckgo-help-pages/settings/params,
+// checked 2026-10-24): the UK is `uk-en`; Nigeria has none, so it asks for no region.
+const DDG_REGION: Record<string, string> = { gb: "uk-en", ng: "wt-wt" };
+
 export function suggestUrl(engine: Engine, q: string, geo: string): string {
   const e = encodeURIComponent(q);
   switch (engine) {
@@ -90,7 +94,7 @@ export function suggestUrl(engine: Engine, q: string, geo: string): string {
     case "bing":
       return `https://api.bing.com/osjson.aspx?query=${e}&mkt=en-${geo.toUpperCase()}`;
     case "ddg":
-      return `https://duckduckgo.com/ac/?q=${e}&kl=${geo}-en`;
+      return `https://duckduckgo.com/ac/?q=${e}&kl=${DDG_REGION[geo] ?? `${geo}-en`}`;
     case "amazon":
       // shortcut: US marketplace id only; map geo → marketplace id if non-US seeds matter.
       return `https://completion.amazon.com/api/2017/suggestions?mid=ATVPDKIKX0DER&alias=aps&limit=10&prefix=${e}`;
@@ -243,7 +247,7 @@ export class AutocompleteAdapter implements SourceAdapter {
         `"${p.phrase}" was suggested by ${p.engines.length} of ${p.enginesOk.length} answering engines ` +
         `(${where}) while expanding "${p.seed}" (${p.geo.toUpperCase()}).`,
       author: "anonymous",
-      timestamp: raw.fetchedAt,
+      timestamp: null, // collection time is not a publish time (QC Rule 2); it stays in collected_at
       engagement,
       market_candidates: [],
       intent: null,

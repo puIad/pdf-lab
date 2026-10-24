@@ -19,6 +19,7 @@ import type {
   UnderservedSubmarket,
   SearchHistoryItem,
 } from "./types.ts";
+import { isDemandOnly } from "../sources/demand-only.ts";
 
 export interface GenerateOverviewOptions {
   userId?: string | null;
@@ -209,6 +210,9 @@ export async function generateMarketOverview(
       console.error("Error fetching market_signals:", err);
     }
   }
+
+  // Demand-only rows (autocomplete, Wikipedia, Serper phrases) are not discussions or market evidence.
+  matchedSignals = matchedSignals.filter((s) => !isDemandOnly({ source_type: s.sources?.type, external_id: s.external_id }));
 
   const matchedSignalIds = new Set(matchedSignals.map((s) => s.id));
 

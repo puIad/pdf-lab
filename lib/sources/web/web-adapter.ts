@@ -26,6 +26,9 @@ import type {
   SourceAdapter,
 } from "../types.ts";
 import { SourceNotConfiguredError } from "../types.ts";
+import { PHRASE_ID_PREFIX } from "../demand-only.ts";
+
+export { PHRASE_ID_PREFIX };
 
 export const WEB_KEY = "web";
 export const SERPER_ENDPOINT = "https://google.serper.dev/search";
@@ -33,7 +36,6 @@ export const CACHE_TTL_MS = 60 * 60 * 1000; // 1h: SERPs drift, but reruns shoul
 export const MIN_INTERVAL_MS = 1000;
 const MAX_LIMIT = 20; // Serper `num` caps at 20 per call
 
-export const PHRASE_ID_PREFIX = "serp:";
 export const PHRASE_BLOCKS = ["paa", "related"] as const;
 export type PhraseBlock = (typeof PHRASE_BLOCKS)[number];
 
@@ -152,7 +154,7 @@ function normalizePhrase(raw: RawSignal, p: SerperPhrasePayload): MarketSignal {
     title: `Google ${p.blocks.map((b) => BLOCK_LABEL[b]).join(" + ")}: "${p.phrase}"`,
     text: `Serper returned "${p.phrase}" in ${where} for "${p.seed}" (${p.geo.toUpperCase()}).`,
     author: "anonymous",
-    timestamp: raw.fetchedAt,
+    timestamp: null, // collection time is not a publish time (QC Rule 2); it stays in collected_at
     engagement,
     market_candidates: [],
     intent: null,

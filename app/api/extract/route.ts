@@ -4,6 +4,7 @@ import { getRouter, runExtractionJob } from "@/lib/ai/index";
 import type { ExtractionInput } from "@/lib/ai/index";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { buildSearchFilter } from "@/lib/db/search";
+import { isDemandOnly } from "@/lib/sources/demand-only";
 
 // POST /api/extract — Phase 1 Part 1.3.
 // Turns STORED signals into validated `signal_analysis` rows (one per
@@ -111,7 +112,7 @@ export async function POST(req: Request) {
   } else {
     let query = supabase
       .from("signals")
-      .select("id,title,content,url,collected_at,signal_analysis!left(signal_id)")
+      .select("id,title,content,url,collected_at,external_id,sources(type),signal_analysis!left(signal_id)")
       .order("collected_at", { ascending: true })
       .limit(limit * 3); // over-fetch: missing-analysis filter applies below
     if (typeof body.query === "string" && body.query.trim().length > 0) {
@@ -122,7 +123,9 @@ export async function POST(req: Request) {
     }
     const { data, error } = await query;
     if (error) return NextResponse.json({ error: `signals lookup failed: ${error.message}` }, { status: 500 });
-    const rows = (data ?? []) as Array<SignalRow & { signal_analysis: unknown }>;
+    const rows = ((data ?? []) as Array<
+      SignalRow & { signal_analysis: unknown; external_id: string | null; sources: { type?: string } | null }
+    >).filter((r) => !isDemandOnly({ source_type: r.sources?.type, external_id: r.external_id })); // demand rows are never extracted
     const hasNoAnalysis = (sa: unknown) => sa == null || (Array.isArray(sa) && sa.length === 0);
     const missing = onlyMissing ? rows.filter((r) => hasNoAnalysis(r.signal_analysis)) : rows;
     signals = missing.slice(0, limit).map(({ id, title, content, url }) => ({ id, title, content, url }));
