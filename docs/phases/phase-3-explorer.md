@@ -90,3 +90,97 @@ and DEC-008.
   4. `POST /api/ideas` + `/ideas` page (cards, filters, outline per idea) from `components/ui`.
 - Acceptance: unit tests for scoring + outline; live seed returns ideas whose numbers trace to
   stored signals; outline for one idea has no near-duplicate headings.
+
+## Part 3.7 — Production phrase source + scan conveniences
+
+Added 2026-10-24 from the competitor sweep (`docs/research/2026-10-24-competitor-sweep.md`) and
+DEC-010. Parts 3.7 to 3.10 run in order; 3.11 runs when its input file lands.
+
+- Deps: 3.6. Touches: `lib/sources/web/*`, `lib/ideas/*`, `app/api/ideas/route.ts`, `app/ideas/*`,
+  `lib/export/*`.
+- Tasks:
+  1. Web adapter keeps Serper's `peopleAlsoAsk` and `relatedSearches` blocks as phrase signals
+     (field names re-verified via Context7 + serper.dev docs first). Quick ideas use them plus
+     Trends related queries whenever the autocomplete guard is off, which is always the case in
+     production. Demand cites which blocks returned the phrase (QC Rule 4). Serper autocomplete
+     stays a later opt-in (DEC-008 (b)).
+  2. Region picker per scan: Trends `geo` and the suggest engines' country / language parameters.
+     Wikipedia stays English.
+  3. Recent searches (local until 5.1 adds users) and starter seed groups built from PDFMakerHub's
+     categories and PDFMinter's 32 seeds. The list is `shortcut:` until the user reviews it. A seed
+     only starts a live scan; nothing pre-written is shown (QC Rule 1).
+  4. CSV export of a scan through the 2.4 export engine: every score with its evidence counts.
+  5. "Not professional advice" flag: deterministic health / money / legal keyword list
+     (`shortcut:`); flagged ideas get a badge, and their briefs (3.10) get the note.
+  6. "Timely" tag for phrases naming the current or next year, explained as "dated phrase, may
+     need a yearly refresh". Never a trend label (QC Rule 2).
+- Acceptance: with the autocomplete guard off, a live seed returns ideas from PAA / related /
+  Trends rows that exist in `signals`; a region change alters the outgoing parameters (unit) and
+  the results (live probe); CSV round-trips via the 2.4 recount; flag and Timely unit tests.
+
+## Part 3.8 — Ideas ↔ pipeline + Validate verdict
+
+- Deps: 3.7, 3.4. Touches: `app/ideas/*`, `lib/planner/*`, `app/api/research/route.ts`,
+  `lib/opportunities/*`.
+- Tasks:
+  1. Card actions: "Validate" runs Validate mode on the idea's phrase as the concept; "Deep
+     research" starts a Deep run on the seed.
+  2. Deep runs: the seed's top 20 quick ideas (by opportunity, near-duplicates dropped by token
+     overlap) join the candidate pool that makes the 50; the 25-distinct diversification rules are
+     unchanged (PRD §29, §52).
+  3. Validate verdict GO / WAIT / KILL from fixed thresholds on stored counts: demand signals,
+     buyer-intent share, observed competitors, trend windows. Each threshold is shown beside its
+     count. No LLM in the verdict (QC Rule 4). Thresholds `shortcut:` until 3.11.
+  4. Card ticks: demand, trend, PDF fit, effort, competition, each with its threshold and count.
+     The competition tick stays blank until a 3.9 check has run (QC Rule 3).
+- Acceptance: a Deep run on a seed with stored ideas has at least one candidate traced to an idea
+  phrase and still returns 25 distinct opportunities; Validate on three probe concepts returns
+  verdicts whose reasons reconcile to SQL counts; tick logic unit-tested.
+
+## Part 3.9 — On-demand competition check per idea
+
+- Deps: 3.8, 2.3. Touches: `lib/competition/*`, `app/api/ideas/*`, `app/ideas/*`.
+- Tasks:
+  1. "Check competition" on a card runs the Etsy / Gumroad / KDP adapters (DEC-007) for that
+     phrase and stores the listings as evidence.
+  2. The card shows listings found per marketplace, review counts and the price range. Raw counts
+     only: no revenue or $/month estimate.
+  3. Once a check exists, the competition label and tick switch from phrase specificity to the
+     observed counts.
+- Acceptance: a live check on two ideas stores listing rows and the card numbers reconcile with
+  them; no Serper call happens without a click (test).
+
+## Part 3.10 — Build-ready brief
+
+- Deps: 3.9, 2.2. Touches: `lib/brief/*`, brief pages under `app/`, `lib/export/*`.
+- Tasks:
+  1. Sources: a Deep-run opportunity, or a quick idea that went through Validate with verdict GO
+     or WAIT. A raw idea offers "Validate first".
+  2. Contents: title, one promise, audience, outline (deterministic headings), on-demand LLM
+     section notes per heading (cheap tier via AIRouter, each citing its evidence ids, shown as AI
+     interpretation per QC Rule 5), buyer language (verbatim, sourced), keywords, where to sell
+     (marketplaces where competitors were observed, with counts), price anchor (observed range,
+     cited), listing copy, bonus angles (add-on worksheets / trackers / checklists from related
+     phrases and review gaps), and the not-advice note when flagged.
+  3. Listing copy: Etsy title and 13 tags built from observed keywords within Etsy's limits
+     (140-character title, 20-character tags; re-verify before building); the Gumroad / Etsy
+     description drafted by the cheap LLM from cited buyer language.
+  4. Export Markdown (2.4 engine) and DOCX (library verified via Context7 before install).
+- Acceptance: one brief from an opportunity and one from a validated idea; every factual line
+  cites evidence and every LLM line sits in the AI layer; the DOCX opens and its text round-trips;
+  Etsy limits unit-tested.
+
+## Part 3.11 — Score calibration (blocked on the user's PDFMinter scan file)
+
+- Deps: 3.9 + a scan file in `docs/research/pdfminter-exports/` (instructions there; DEC-010).
+  Touches: `lib/ideas/*`, verdict and tick thresholds, `docs/research/`.
+- Tasks:
+  1. Check the Serper credit balance, then run the one-off batch: 5 seeds (budgeting, meal prep,
+     keto diet, toddler sleep, pc troubleshooting) x top 20 ideas x 3 marketplaces, about 300
+     calls, stored as evidence.
+  2. Refit demand / opportunity weights and the verdict and tick thresholds against marketplace
+     outcomes (listings with reviews, prices); remove the `shortcut:` markers the fit replaces.
+  3. Compare PDF Lab's rankings with PDFMinter's scores from the scan file and append the
+     comparison, plus what the file reveals about PDFMinter's server formulas, to the research doc.
+- Acceptance: a documented fit (method, data, before / after agreement with marketplace
+  outcomes) and the PDFMinter comparison table in `docs/research/`.

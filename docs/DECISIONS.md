@@ -160,3 +160,68 @@ patch the affected guide/phase file (link the follow-up commit).
   Live acceptance for Parts 3.5 and 3.6 then ran (results in `STATE.md`). Free-tier projects pause
   after about a week idle; expect this again until the project gets regular traffic or a paid plan.
 
+## DEC-010 — Feature scope from the competitor sweep (PDFMinter, PDFMakerHub, other tools)
+
+- Date: 2026-10-24
+- Part: new Phase 3 Parts 3.7 to 3.11, rescoped 4.1 to 4.3, new 5.4
+- Expected: competitor research only (`docs/research/2026-10-24-competitor-sweep.md`, following
+  `2026-10-24-pdfminter-teardown.md`).
+- Found: PDFMinter ends in a drag-and-drop builder, PDF export and share links; PDFMakerHub is a
+  hand-written catalog whose "live" numbers are `Math.random()`; validators (Aurify, Selar) give
+  GO / WAIT / KILL verdicts; Etsy tools (EverBee, eRank) measure competition from listings. PDF Lab
+  has deeper evidence than all of them but nothing that turns an idea into a starting document, and
+  its quick-ideas layer only works locally (DEC-008 keeps autocomplete out of production).
+  PDFMinter's signed-in scans could not be captured: Cloudflare Turnstile failed in the built-in
+  browser and in a Playwright-launched Edge window, and was not worked around.
+- Options and answers: settled with the user in a grilling session, one question per branch,
+  recommendation first. Rejected options are listed under each answer.
+- Recommendation: as answered below (the user took the recommendation everywhere except the
+  Google Doc export, the 3.11 file gate, and the 3.9 split that followed from it).
+- Question for user: none left.
+- Resolution: 2026-10-24.
+  1. Boundary: PDF Lab stops at a build-ready brief. Rejected: a template PDF export, a full
+     builder (keeps PRD §50's "no auto PDF generation"). Also out: share links, content import
+     (Designrr pattern), the trending-news feed, revenue estimates, pre-written catalog ideas.
+  2. Production phrase source: Serper `peopleAlsoAsk` + `relatedSearches` from calls PDF Lab
+     already makes, plus Trends related queries (DEC-008 option (d)). Serper autocomplete (option
+     (b)) is a later opt-in once its endpoint and price are verified. Part 3.7.
+  3. Small adds, all taken: CSV export of a scan, a region picker, a "not professional advice" flag
+     for health, money and legal ideas, recent searches and starter seed groups. Part 3.7.
+  4. Year phrases ("budget 2027"): a "Timely" tag, never a trend label (QC Rule 2). Part 3.7.
+  5. Niche catalog: PDFMakerHub's categories and PDFMinter's 32 seeds become starter seeds that
+     start a live scan; no pre-written ideas or numbers (QC Rule 1). Part 3.7.
+  6. Funnel, both ways: Validate and Deep research actions on each idea card; a seed's top 20
+     quick ideas join the 50 Deep-run candidates, 25-distinct rules unchanged. Rejected: buttons
+     only, replacing LLM candidates, hint only. Part 3.8.
+  7. Verdict: Validate ends in GO / WAIT / KILL from fixed thresholds on stored counts, each shown
+     beside its count; no LLM in the verdict (QC Rule 4). Part 3.8.
+  8. Card ticks: a PDF Lab version of PDFMinter's 5-point checklist (demand, trend, PDF fit,
+     effort, competition) with threshold and count per tick; competition blank until checked
+     (QC Rule 3); the verdict stays in Validate. Part 3.8.
+  9. Competition: an on-demand "Check competition" per idea over the Etsy / Gumroad / KDP adapters,
+     stored as evidence; raw listing, review and price counts only, no $/month estimates.
+     Rejected: auto-check of the top 10, specificity only. Part 3.9.
+  10. Brief source: Deep-run opportunities and quick ideas that went through Validate (verdict GO
+      or WAIT). Part 3.10.
+  11. Brief contents: title, promise, audience, outline, buyer language, keywords, plus all four
+      extras: where to sell, price anchor, listing copy, bonus angles. Part 3.10.
+  12. Section writer: deterministic headings plus on-demand LLM section notes (cheap tier, cited,
+      in the AI-interpretation layer, QC Rule 5). Rejected: headings only, full LLM draft. Part 3.10.
+  13. Listing copy: Etsy title and 13 tags built from observed keywords within Etsy's limits
+      (re-verified at build); the description drafted by the cheap LLM from cited buyer language.
+      Part 3.10.
+  14. Brief export: Markdown + DOCX in 3.10; "Send to Google Docs" as an app feature with PDF Lab's
+      own OAuth client and the `drive.file` scope, after auth (new Part 5.4). Rejected: building
+      OAuth before 5.1, Claude-connector-only.
+  15. Calibration target: marketplace outcomes (listings with reviews, prices); PDFMinter's scores
+      are a cross-check only. A one-off batch of about 300 Serper calls (5 seeds x top 20 ideas x 3
+      marketplaces), balance checked first. Part 3.11.
+  16. File gate: Part 3.11 waits for the user's PDFMinter scan file in
+      `docs/research/pdfminter-exports/`; calibration is split out of 3.9 so the brief is not held
+      up.
+  17. Watchlist: 4.1 holds markets, seeds and saved ideas; 4.2 re-scans seeds daily and diffs
+      snapshots ("new" and "history" trend bases, both dated); 4.3 adds an in-app weekly digest,
+      email stays optional.
+  18. Order: 3.7 → 3.8 → 3.9 → 3.10, with 3.11 whenever the file lands.
+  Filled in when built, marked `shortcut:` until 3.11: verdict and tick thresholds, the not-advice
+  keyword list, the starter seed list.

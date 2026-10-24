@@ -49,3 +49,15 @@ positioning, search keywords, customer language, evidence sources.
 - Watchlist (Phase 4.1) → scheduled re-research + change reports (4.2) → in-app alerts
   first, email/browser optional (4.3).
 - Export MVP: Markdown + CSV + JSON; PDF later; Notion/GDocs post-MVP (PRD §46).
+
+## Quick ideas, verdict, brief (Parts 3.6 to 3.10, DEC-010)
+
+- `/ideas`: seed + region → idea cards (format, title, demand, PDF fit, trend, effort, interest,
+  Timely / not-advice tags). Five ticks per card (demand, trend, PDF fit, effort, competition),
+  each showing its threshold and count; competition stays blank until "Check competition" ran.
+  Card actions: Validate, Deep research, Check competition, save, outline. Scan → CSV.
+- Validate ends in GO / WAIT / KILL, with every rule listed beside the count that decided it.
+- Brief (from an opportunity or a GO / WAIT idea): facts, AI interpretation and suggestions stay in
+  separate, labelled layers (QC Rule 5); export Markdown / DOCX, Google Docs after 5.4.
+- Never show a number without its basis. PDFMakerHub's random "live" metrics are the
+  anti-example (`docs/research/2026-10-24-competitor-sweep.md`).

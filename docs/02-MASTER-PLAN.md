@@ -40,17 +40,23 @@ recommended because the MVP gate lives there.
 | 3.4 | Natural-language research + modes (Explore/Validate/Hunt/Deep/Monitor) | 3.2, 3.3 | §26–§27 |
 | 3.5 | Keyless discovery adapters: local-only autocomplete + Wikipedia (DEC-008) | 1.2 | §9–§12 |
 | 3.6 | Quick ideas (per-phrase cards) + auto-outline | 3.5 | §7, §18 |
-| 4.1 | Saved markets / watchlist | 3.2 | §43 |
-| 4.2 | Scheduled re-research (cron/scheduler) + change detection | 4.1 | §44, §24 |
-| 4.3 | Alerts (in-app first; email/browser per PRD "optional") | 4.2 | §45 |
+| 3.7 | Production phrase source (Serper PAA + related) + scan conveniences (DEC-010) | 3.6 | §9–§12 |
+| 3.8 | Ideas ↔ pipeline + Validate verdict + card ticks | 3.7, 3.4 | §27, §29, §52 |
+| 3.9 | On-demand competition check per idea | 3.8, 2.3 | §20 |
+| 3.10 | Build-ready brief (MD + DOCX) | 3.9, 2.2 | §19, §46–§47 |
+| 3.11 | Score calibration (blocked on the user's PDFMinter scan file) | 3.9 | §16, §54 |
+| 4.1 | Watchlist: markets, idea seeds, saved ideas | 3.2, 3.7 | §43 |
+| 4.2 | Scheduled re-research (cron/scheduler) + change detection + seed re-scans | 4.1 | §44, §24 |
+| 4.3 | Alerts (in-app first; email/browser per PRD "optional") + weekly digest | 4.2 | §45 |
 | 5.1 | Auth + tiers + quotas (anon / free / paid skeleton) | 0.3 | §49 |
 | 5.2 | BYOK key vault + per-request routing + usage metering | 5.1 | §34 |
 | 5.3 | Hosted-premium path + limits UX | 5.2 | §34, §49 |
+| 5.4 | Send brief to Google Docs (own OAuth client, `drive.file`) | 5.1, 3.10 | §46 |
 | 6.1 | QC enforcement + confidence display + anti-gaming review | 2.4, 3.4 | §53–§54 |
 | 6.2 | Success-metrics instrumentation (north-star + §58 events) | 6.1 | §58–§59 |
 | 6.3 | Launch checklist: costs, abuse, legal/ToS, roadmap handoff | 6.2 | §50, §57 |
 
-Total: **24 parts** (3.5 and 3.6 added 2026-10-24 from the PDFMinter teardown). Each phase file repeats its rows with full task detail.
+Total: **33 parts** (3.5 and 3.6 added 2026-10-24 from the PDFMinter teardown; 3.7 to 3.11 and 5.4 added the same day from the competitor sweep, DEC-010; the earlier "24" was a miscount). Each phase file repeats its rows with full task detail.
 
 ## MVP cut line (PRD §51–§52, §62)
 

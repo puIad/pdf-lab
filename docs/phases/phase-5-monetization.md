@@ -42,4 +42,18 @@ Load: Phase-4 files + `07-AI-ROUTER.md → guides/ai-providers.md`.
   3. Cost-per-run dashboard (internal) from ledger.
 - Acceptance: stub upgrade → limits change; ledger shows per-run cost within documented
   bounds; no real charges possible in stub mode (assert in code + review).
+
+## Part 5.4 — Send brief to Google Docs
+
+Added 2026-10-24 (DEC-010).
+
+- Deps: 5.1, 3.10. Touches: `lib/google/*`, brief pages, env (Google OAuth client id / secret).
+- Tasks:
+  1. PDF Lab's own Google OAuth client, `drive.file` scope only (PDF Lab can see only files it
+     creates). Re-verify the scope classification and consent-screen rules in Google's docs first;
+     any verification cost or review step is a DEC entry.
+  2. "Send to Google Docs" on a brief uploads its DOCX with conversion to a Google Doc in the
+     user's Drive and links to it. Tokens stored encrypted per user, like 5.2 keys; revoke works.
+- Acceptance: a brief lands as an editable Google Doc in a test account; revoking access gives a
+  clean error; no scope beyond `drive.file` requested (asserted in code).
 - Review: full checklist + Phase-5 gate.

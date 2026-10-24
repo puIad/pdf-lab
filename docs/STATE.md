@@ -41,14 +41,19 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 
 | 3.5 | Keyless discovery adapters (local-only autocomplete + Wikipedia) | done | 00f47e6 | 10 unit tests; 186/186 tests, lint, typecheck, build green 2026-10-24. Live (no DB): autocomplete 5/5 engines answered, 50 phrases for "keto diet" and "budgeting" in ~15 s; Wikipedia matched "Intermittent fasting" (-16%) and "Budget" (+21%), honestly found no article for "keto diet" / "toddler sleep". Live DB acceptance after DEC-009 resolved: runIngest "budgeting" → autocomplete 50 inserted, wikipedia 1 inserted; rerun 0 inserted / 51 duplicates; flag off → autocomplete `skipped`; DB count: 50 autocomplete + 1 wikipedia signals, one `sources` row each (the wikipedia row was created by a connectivity check, same values the pipeline auto-inserts). Note: Deep runs without `source_keys` now also ingest Wikipedia, and autocomplete when the local flag is on. |
 | 3.6 | Quick ideas + auto-outline | done | 01ed4bd | PR #1 review fixes (follow-up commit): suggestion ids hash seed + phrase (rows stored 2026-10-24 keep the old phrase-only ids); Deep runs drop `autocomplete`/`wikipedia` rows before extraction and clustering; Wikipedia windows split by date with omitted days counted as 0; `/ideas` explains a 401. 189/189 tests. Live DB acceptance after DEC-009 resolved: `POST /api/ideas` "meal prep" (23.6 s) stored 76 signals (gtrends 25, wikipedia 1, autocomplete 50 inserted) and returned 70 ideas (12 rising, 20 questions, avg demand 54) with both topic windows; all 74 evidence ids found in `signals`; `/ideas` in Chrome against the real API: outlines for the top 6 ideas have no repeated or near-duplicate headings, 0 console errors (clipboard rejection now caught). Earlier notes: Code done: `lib/ideas` (format/intent/fit/effort/interest/specificity/demand/opportunity/confidence + outline), `POST /api/ideas`, `/ideas` page; 186/186 tests, lint, typecheck, `next build` green 2026-10-24. Verified: API validation (400 on bad seed); with the DB down the page shows every source `failed` and no ideas (no stored evidence → no idea). Real-data check without DB (live adapters → `buildIdeas`, served to the page by a Playwright route intercept, verification only): "budgeting" → 70 ideas, 10 rising, 15 questions, both topic windows (Trends falling, Wikipedia +21%); cards, outline, filters, 375 px layout (0 px overflow) render in Chrome. Spillover: (1) `lib/ingest/service-deps.ts` now imports `lib/sources/index.ts` so adapters register in every process; before, `/api/ingest` and Deep runs saw zero adapters unless `/api/sources/health` loaded first (pre-existing bug); (2) Trends adapter reserves up to half the related slots for rising queries (top list used to crowd them out); (3) `.claude/launch.json` gains `pdf-lab-dev-node` (pnpm is not on PATH here). Known limits: scores uncalibrated until the user's PDFMinter CSVs arrive; outline headings can repeat a theme ("why X is important" / "why X matters"). |
+| 3.7 | Production phrase source + scan conveniences | in_progress | — | DEC-010: Serper PAA + related + Trends related in prod; region picker, recent searches, starter seed groups, scan CSV, not-advice flag, Timely tag. Next part. |
+| 3.8 | Ideas ↔ pipeline + Validate verdict + card ticks | pending | — | DEC-010 |
+| 3.9 | On-demand competition check per idea | pending | — | DEC-010: raw counts only |
+| 3.10 | Build-ready brief (MD + DOCX) | pending | — | DEC-010 |
+| 3.11 | Score calibration | blocked | — | DEC-010: waits for the user's scan file in `docs/research/pdfminter-exports/` (instructions in its README); needs 3.9 first |
 
 ## Phase 4 — Monitoring
 
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
-| 4.1 | Watchlist | pending | — | |
-| 4.2 | Scheduled re-research + change detection | pending | — | DEC-001 decided here |
-| 4.3 | Alerts (in-app first) | pending | — | |
+| 4.1 | Watchlist | pending | — | Rescoped by DEC-010: markets, idea seeds, saved ideas |
+| 4.2 | Scheduled re-research + change detection | pending | — | DEC-001 decided here; DEC-010 adds daily seed re-scans (`new` / `history` trend bases) |
+| 4.3 | Alerts (in-app first) | pending | — | DEC-010 adds an in-app weekly digest |
 
 ## Phase 5 — Monetization
 
@@ -57,6 +62,7 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 | 5.1 | Auth + tiers + quotas | pending | — | |
 | 5.2 | BYOK vault + routing + metering | pending | — | |
 | 5.3 | Hosted-premium + limits UX | pending | — | |
+| 5.4 | Send brief to Google Docs | pending | — | DEC-010: own OAuth client, `drive.file` only |
 
 ## Phase 6 — Hardening
 
@@ -72,8 +78,11 @@ Entries point to DEC-IDs in `DECISIONS.md`.
 
 - DEC-008 (resolved 2026-10-24, (a) local-only): long-tail phrase discovery source from the
   PDFMinter teardown (`docs/research/2026-10-24-pdfminter-teardown.md`). Production autocomplete
-  needs a new decision.
+  needs a new decision; DEC-010 picked option (d) for production phrases (Part 3.7).
 - DEC-009 (resolved 2026-10-24): the free-tier Supabase project had paused; the user restored it.
   It will pause again after about a week idle.
-- Deferred: score calibration for quick ideas waits on the user's PDFMinter CSV exports (3 to 5
-  seeds, into `docs/research/`).
+- DEC-010 (resolved 2026-10-24): feature scope from the competitor sweep
+  (`docs/research/2026-10-24-competitor-sweep.md`) → Parts 3.7 to 3.11, rescoped 4.1 to 4.3, 5.4.
+- Blocked: Part 3.11 (score calibration) waits on the user's PDFMinter scan file in
+  `docs/research/pdfminter-exports/`. Signed-in capture by the agent failed on Cloudflare
+  Turnstile and was not worked around.

@@ -2,6 +2,8 @@
 
 How pdfminter.com finds PDF ideas, what other idea generators do, and what PDF Lab should copy.
 Evidence, not a plan: any build work goes through a phase part and `DECISIONS.md` (see DEC-008).
+Follow-up the same day: `2026-10-24-competitor-sweep.md` (PDFMakerHub, PDFMinter's builder, other
+tools); the scope questions this note left open are settled in DEC-010.
 
 ## Method and evidence
 
