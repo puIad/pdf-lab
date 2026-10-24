@@ -208,8 +208,9 @@ export class AutocompleteAdapter implements SourceAdapter {
       };
       return {
         source: AUTOCOMPLETE_KEY,
+        // Seed in the hash: the same phrase from two seeds carries different counts and text.
         // Day in the id: daily snapshots build history (Phase 4.2 "new since last scan").
-        externalId: `autocomplete:${this.config.geo}:${createHash("sha256").update(phrase).digest("hex").slice(0, 24)}:${day}`,
+        externalId: `autocomplete:${this.config.geo}:${createHash("sha256").update(`${seed}|${phrase}`).digest("hex").slice(0, 24)}:${day}`,
         fetchedAt,
         payload,
       };

@@ -170,17 +170,20 @@ export class WikipediaAdapter implements SourceAdapter {
         .filter((i) => typeof i.timestamp === "string" && typeof i.views === "number")
         .map((i) => ({ date: isoDay(i.timestamp as string), views: i.views as number }));
       if (points.length > 0) {
-        const recent = points.slice(-RECENT_DAYS);
-        const prior = points.slice(0, Math.max(0, points.length - RECENT_DAYS));
+        // Split by calendar date, not by point count: the API can omit zero-view days, and
+        // counting points would stretch "28 days" over a longer span. A missing day counts as 0.
+        const recentFrom = new Date(endMs - (RECENT_DAYS - 1) * 86400_000).toISOString().slice(0, 10);
+        const recent = points.filter((p) => p.date >= recentFrom);
+        const prior = points.filter((p) => p.date < recentFrom);
         const sum = (ps: typeof points) => ps.reduce((a, p) => a + p.views, 0);
         const payload: PageviewsPayload = {
           kind: "pageviews",
           query,
           article,
-          start: points[0].date,
-          end: points[points.length - 1].date,
-          recentDays: recent.length,
-          priorDays: prior.length,
+          start: new Date(startMs).toISOString().slice(0, 10),
+          end: new Date(endMs).toISOString().slice(0, 10),
+          recentDays: RECENT_DAYS,
+          priorDays: PRIOR_DAYS,
           recentViews: sum(recent),
           priorViews: sum(prior),
           points,

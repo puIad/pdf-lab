@@ -3,6 +3,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   AutocompleteAdapter,
   autocompleteConfigFromEnv,
@@ -101,6 +102,12 @@ describe("AutocompleteAdapter.collect", () => {
     assert.equal(s.engagement.engines_ok, 5);
     assert.equal(s.author, "anonymous");
     assert.match(s.source_id, /^autocomplete:us:[0-9a-f]{24}:2026-10-24$/);
+  });
+
+  it("hashes seed and phrase together, so two seeds never share a row", async () => {
+    const [first] = await new AutocompleteAdapter(config()).collect({ query: "keto diet", limit: 10 });
+    const expected = createHash("sha256").update("keto diet|keto diet plan").digest("hex").slice(0, 24);
+    assert.equal(first.externalId, `autocomplete:us:${expected}:2026-10-24`);
   });
 
   it("keeps going when one engine fails and fails when all do", async () => {

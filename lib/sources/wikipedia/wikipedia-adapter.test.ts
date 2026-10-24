@@ -72,6 +72,26 @@ describe("WikipediaAdapter", () => {
     assert.equal(calls.length, 2, "second collect is served from cache");
   });
 
+  it("counts days the API omits as zero instead of stretching the window", async () => {
+    const full = samplePageviews();
+    const gappy = { items: full.items.filter((_, i) => i < PRIOR_DAYS || i >= PRIOR_DAYS + 8) }; // 8 recent days missing
+    const adapter = new WikipediaAdapter(
+      stub(
+        [
+          [/titles=intermittent/, 200, { query: { pages: [{ title: "Intermittent fasting" }] } }],
+          [/pageviews\/per-article/, 200, gappy],
+        ],
+        [],
+      ),
+    );
+    const [raw] = await adapter.collect({ query: "intermittent fasting", limit: 5 });
+    const p = raw.payload as PageviewsPayload;
+    assert.equal(p.recentDays, RECENT_DAYS);
+    assert.equal(p.recentViews, 150 * (RECENT_DAYS - 8));
+    assert.equal(p.priorViews, 100 * PRIOR_DAYS);
+    assert.equal(adapter.normalize(raw).engagement.change_pct, 7); // 107/day vs 100/day
+  });
+
   it("skips disambiguation pages and returns nothing when no search hit matches", async () => {
     const calls: string[] = [];
     const adapter = new WikipediaAdapter(

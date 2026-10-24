@@ -221,7 +221,11 @@ export function IdeasView({ initialSeed }: { initialSeed: string }) {
         body: JSON.stringify({ seed: s }),
       });
       const body = (await res.json()) as IdeasResponse;
-      if (!res.ok) setError(body.error ?? `Request failed (${res.status})`);
+      if (res.status === 401) {
+        setError(
+          "Quick ideas need the internal API key until Phase 5 auth lands (POST /api/ideas with x-api-key). The route is open when you run PDF Lab locally.",
+        );
+      } else if (!res.ok) setError(body.error ?? `Request failed (${res.status})`);
       else {
         setData(body);
         setTab("all");
