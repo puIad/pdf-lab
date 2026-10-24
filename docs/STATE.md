@@ -52,7 +52,7 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
 | 4.1 | Watchlist | pending | — | Rescoped by DEC-010: markets, idea seeds, saved ideas |
-| 4.2 | Scheduled re-research + change detection | pending | — | DEC-001 decided here; DEC-010 adds daily seed re-scans (`new` / `history` trend bases) |
+| 4.2 | Scheduled re-research + change detection | pending | — | DEC-001 decided here (Deep runs stay local until then; Cloudflare Workflows noted as option (d)); DEC-010 adds daily seed re-scans (`new` / `history` trend bases) |
 | 4.3 | Alerts (in-app first) | pending | — | DEC-010 adds an in-app weekly digest |
 
 ## Phase 5 — Monetization

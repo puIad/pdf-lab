@@ -32,6 +32,13 @@ patch the affected guide/phase file (link the follow-up commit).
 - Recommendation: none yet — measure Phase 1–3 run durations first; decide on data.
 - Question for user: (to be asked in Phase 4) "Runs take ~X min and need Y retries — pick (a)/(b)/(c)?"
 - Resolution: _unresolved_
+- Data point (2026-10-25, from DEC-013): a Deep run on "budgeting" took 17.7 minutes, almost all of
+  it waiting on NVIDIA (about 7 signals a minute). Cloudflare Workflows on Workers Paid fits that
+  shape (unlimited wall time per step, 30 s to 5 min of CPU per step, retried and persisted steps;
+  the Workers Free plan's 10 ms CPU and 50 subrequests do not). Open risk: `google-trends-api` needs
+  Node's `https` under `nodejs_compat`. Add it as option (d) when 4.2 decides.
+- Interim (user, 2026-10-25): Deep runs stay local. Production does not run them until 4.2; the
+  `x-api-key` guard on Deep mode stays, and no NVIDIA key goes to Vercel for now.
 
 ## DEC-002 — Web-search provider pick (SEED — decide in Phase 1 Part 1.2)
 
