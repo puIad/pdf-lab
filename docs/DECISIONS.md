@@ -287,3 +287,36 @@ patch the affected guide/phase file (link the follow-up commit).
   before the cap (57 of 50 calls used). A different key on the same account has the same limits.
   Follow-ups: $10 of credits (or a paid model) before Deep runs are relied on; extraction failures
   should surface in the run (6.x).
+
+## DEC-013 — NVIDIA's hosted API as the chat provider (user-supplied key, 40 rpm)
+
+- Date: 2026-10-24
+- Part: Phase 3 Part 3.8 follow-up (DEC-012 left Deep runs capped at 50 free OpenRouter calls a day)
+- Expected: the user added `NVIDIA_API_KEY` to `.env.local` (rate limit 40 requests a minute) for
+  the cheap and strong tiers.
+- Found: `GET /v1/models` lists 85 models, but most are not deployed for this key. Chat calls returned
+  404 "Function ... Not found for account" for `nemotron-3-super-120b-a12b` (the same outage seen
+  through OpenRouter), `nemotron-nano-3-30b-a3b`, `llama-3.1-nemotron-70b-instruct`,
+  `mistral-large-2-instruct`, `mistral-nemo-12b-instruct` and `kimi-k2.6`. `gemma-4-31b-it` and
+  `deepseek-v4.1-flash` gave no headers within 60 s or more. `nemotron-3.5-lightning-30b-a3b` and
+  `openai/gpt-oss-20b` answer, but both reason first: at default effort gpt-oss spent the whole
+  500-token extraction budget and returned no content on 5 of 8 signals.
+- Options: (a) `openai/gpt-oss-20b` with `reasoning_effort: "low"`; (b) raise every max_tokens budget
+  so reasoning fits; (c) keep OpenRouter only.
+- Recommendation and resolution (2026-10-24, (a)): with `reasoning_effort: "low"` gpt-oss extracted
+  12 of 12 stored "budgeting" signals (about 8 s each at concurrency 2, schema-valid). Implementation:
+  the OpenAI-compatible provider class is reused as provider `nvidia` (`NVIDIA_API_KEY`,
+  `NVIDIA_BASE_URL`, `NVIDIA_RPM` default 40, `NVIDIA_REASONING_EFFORT` default "low",
+  `NVIDIA_CHEAP_MODEL` / `NVIDIA_STRONG_MODEL` default `openai/gpt-oss-20b`), with a request throttle
+  (60 000 / rpm ms between starts), a 60 s timeout and one retry on 429. The router order is now
+  ollama, nvidia, openrouter, openai-compatible, and the strong tier's first choice is nvidia; with no
+  NVIDIA key (Vercel today) the chain falls through to openrouter as before. Embeddings stay on
+  openrouter (no 1536-dim model on NVIDIA). Fallback health checks are cached for 60 s so they do not
+  add a request per call. Production needs `NVIDIA_API_KEY` in Vercel to use it (not set by this
+  change).
+  Measured in the Deep run: calls take 13 to 28 s when several run at once (NVIDIA queues them),
+  about 7 signals a minute at concurrency 2 or 5, so the orchestrator's fixed 5-minute extract step
+  failed twice. The extract step now budgets 10 s per unanalyzed signal (minimum 5 minutes). Deep run
+  `de881e6b` on "budgeting" then completed in 17.7 minutes with 97 of 102 signals analyzed. That
+  length does not fit a Vercel function; Deep runs in production need a background job (4.2 decides
+  the scheduler, DEC-001).

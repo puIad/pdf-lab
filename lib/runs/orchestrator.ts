@@ -18,16 +18,19 @@ import { isDemandOnly } from "../sources/demand-only.ts";
 import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
 
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+// Extraction is one model call per signal: ~7 signals/min on NVIDIA's hosted gpt-oss (DEC-013),
+// so a fixed 5 minutes fails any run over ~35 signals. Budget 10 s per signal instead.
+export const EXTRACT_MS_PER_SIGNAL = 10_000;
 
 // Demand measurements, not discussions: they must not go through extraction or become market evidence.
 function discussionsOnly<T extends { source_type: string; external_id?: string | null }>(rows: T[]): T[] {
   return rows.filter((s) => !isDemandOnly(s));
 }
-function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
+function withTimeout<T>(p: Promise<T>, label: string, ms = STEP_TIMEOUT_MS): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${STEP_TIMEOUT_MS}ms`));
-    }, STEP_TIMEOUT_MS);
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
     p.then((val) => {
       clearTimeout(timer);
       resolve(val);
@@ -220,7 +223,7 @@ export async function executeResearchRun(
           content: s.content,
           url: s.url,
         })),
-      ), "extract");
+      ), "extract", Math.max(STEP_TIMEOUT_MS, unanalyzedSignals.length * EXTRACT_MS_PER_SIGNAL));
     }
     const freshSignals = discussionsOnly(await deps.getSignals(query));
 
