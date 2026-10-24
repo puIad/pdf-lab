@@ -72,6 +72,20 @@ describe("GTrendsAdapter.collect (labeled fixture)", () => {
     assert.equal(items.length, 2);
   });
 
+  it("keeps room for rising queries when the top list is full", async () => {
+    const many = (prefix: string) => Array.from({ length: 10 }, (_, i) => ({ query: `${prefix} ${i}`, value: 50 }));
+    const backend: TrendsBackend = {
+      ...stubBackend([]),
+      relatedQueries: async () =>
+        JSON.stringify({ default: { rankedList: [{ rankedKeyword: many("top") }, { rankedKeyword: many("rise") }] } }),
+    };
+    const adapter = new GTrendsAdapter({ ...testConfig(), backend });
+    const items = await adapter.collect({ query: "pc troubleshooting", limit: 9 });
+    const rising = items.filter((i) => (i.payload as { rising?: boolean }).rising === true);
+    assert.equal(items.length, 9);
+    assert.equal(rising.length, 4); // 8 related slots: 4 top + 4 rising
+  });
+
   it("serves repeats from the 24h cache without new upstream calls", async () => {
     const calls: string[] = [];
     const adapter = new GTrendsAdapter({

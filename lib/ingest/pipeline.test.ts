@@ -136,6 +136,18 @@ describe("runIngest", () => {
   it("rejects an empty query", async () => {
     await assert.rejects(runIngest({ query: "   " }, fakeDeps([])), /non-empty query/);
   });
+
+  it("hands stored signals to the sink, and nothing from failed sources", async () => {
+    const deps = fakeDeps([
+      fakeAdapter("alpha", [{ externalId: "a1" }, { externalId: "a2" }]),
+      fakeAdapter("broken", [], { fail: "upstream 500" }),
+    ]);
+    const got: Record<string, string[]> = {};
+    await runIngest({ query: "q", limit: 5 }, deps, (key, signals) => {
+      got[key] = signals.map((s) => s.source_id);
+    });
+    assert.deepEqual(got, { alpha: ["a1", "a2"] });
+  });
 });
 
 describe("toSignalRow", () => {

@@ -256,10 +256,13 @@ export class GTrendsAdapter implements SourceAdapter {
     };
     const lists = rq?.default?.rankedList ?? [];
     const seen = new Set<string>([query.toLowerCase()]);
+    // Rising queries get up to half the related slots; otherwise a full top list crowds them out (Part 3.6).
+    const slots = limit - items.length;
+    const topQuota = slots - Math.min(lists[1]?.rankedKeyword?.length ?? 0, Math.floor(slots / 2));
     // rankedList[0] = top, [1] = rising (when present).
     lists.forEach((list, listIndex) => {
       for (const entry of list?.rankedKeyword ?? []) {
-        if (items.length >= limit) break;
+        if (items.length >= limit || (listIndex === 0 && items.length - 1 >= topQuota)) break;
         const related = (entry.query ?? "").trim();
         if (!related || seen.has(related.toLowerCase())) continue;
         seen.add(related.toLowerCase());
@@ -305,6 +308,7 @@ export class GTrendsAdapter implements SourceAdapter {
             ? "falling"
             : "flat";
       const engagement: SignalEngagement = {
+        seed: data.keyword,
         avg_interest: data.average,
         max_interest: data.max,
         min_interest: data.min,
@@ -330,6 +334,8 @@ export class GTrendsAdapter implements SourceAdapter {
       };
     }
     const engagement: SignalEngagement = {
+      seed: data.keyword,
+      related_query: data.related,
       interest_value: data.value,
       rising: data.rising,
       window_days: data.fetchedWindowDays,
