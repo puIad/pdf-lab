@@ -179,3 +179,22 @@ describe("GTrendsAdapter.healthCheck", () => {
     assert.ok(status.detail?.length);
   });
 });
+
+describe("GTrendsAdapter per-scan region (Part 3.7)", () => {
+  it("sends the scan's geo upper-cased and keys ids by it", async () => {
+    const geos: Array<string | undefined> = [];
+    const calls: string[] = [];
+    const base = stubBackend(calls);
+    const backend: TrendsBackend = {
+      ...base,
+      interestOverTime: async (o) => (geos.push(o.geo), base.interestOverTime(o)),
+      relatedQueries: async (o) => (geos.push(o.geo), base.relatedQueries(o)),
+    };
+    const adapter = new GTrendsAdapter(testConfig({ backend }));
+    const world = await adapter.collect({ query: "pc troubleshooting", limit: 3 });
+    const gb = await adapter.collect({ query: "pc troubleshooting", limit: 3, geo: "gb" });
+    assert.deepEqual(geos, [undefined, undefined, "GB", "GB"]);
+    assert.ok(world[0]?.externalId.startsWith("gtrends:iot:world:"));
+    assert.ok(gb[0]?.externalId.startsWith("gtrends:iot:GB:"));
+  });
+});

@@ -89,7 +89,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
       let queryBuilder = supabase
         .from("signals")
         .select(`
-          id, title, content, url, source_id, published_at,
+          id, title, content, url, source_id, external_id, published_at,
           sources ( type ),
           signal_analysis (
             id, audience, problem, intent, urgency, pdf_relevance, embedding
@@ -112,6 +112,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         content: string | null;
         url: string | null;
         source_id: string;
+        external_id: string | null;
         published_at: string | null;
         sources?: { type: string } | null;
         signal_analysis?: Array<{
@@ -142,6 +143,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           url: r.url,
           source_id: r.source_id,
           source_type: r.sources?.type || "web",
+          external_id: r.external_id,
           published_at: r.published_at,
           analysis: sa
             ? {

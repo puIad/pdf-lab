@@ -7,6 +7,8 @@ export interface CollectInput {
   query: string;
   limit: number;
   since?: Date;
+  /** Lower-case country code for this scan (Part 3.7 region picker, DEC-011). Adapters without regions ignore it. */
+  geo?: string;
 }
 
 /** Result of `SourceAdapter.healthCheck`. Never throws — failure is `{ ok: false }`. */

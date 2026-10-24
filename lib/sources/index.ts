@@ -25,6 +25,8 @@ registerAdapter(new WikipediaAdapter(wikipediaConfigFromEnv()));
 registerAdapter(new AutocompleteAdapter(autocompleteConfigFromEnv()));
 
 export { adapterKeys, getAdapter, listAdapters, registerAdapter } from "./registry.ts";
+/** Whether the local-only autocomplete guard is open in this process (DEC-008). */
+export const autocompleteEnabled = (): boolean => autocompleteConfigFromEnv().enabled;
 export type {
   CollectInput,
   HealthStatus,

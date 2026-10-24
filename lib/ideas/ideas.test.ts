@@ -4,7 +4,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  adviceFlag,
   buildIdeas,
+  isTimely,
   classifyFormat,
   classifyIntent,
   ideaTitle,
@@ -15,6 +17,8 @@ import {
 } from "./ideas.ts";
 import { headingFrom, suggestOutline } from "./outline.ts";
 import type { MarketSignal } from "../sources/types.ts";
+import { REGIONS, STARTER_SEEDS, isRegion } from "./seeds.ts";
+import { generateScanCsv, parseCsv, recountScanCsv } from "../export/csv.ts";
 
 function sig(source: string, id: string, engagement: MarketSignal["engagement"]): MarketSignal {
   return {
@@ -142,5 +146,113 @@ describe("suggestOutline", () => {
     assert.equal(a.length, 4);
     assert.notDeepEqual(a, b);
     assert.equal(headingFrom("is keto safe?"), "Is keto safe?");
+  });
+});
+
+// Part 3.7 — Serper phrase rows (shape of the web adapter's normalize output, SAMPLE DATA).
+const serp = (phrase: string, blocks: string, best: number) =>
+  sig("web", `serp:us:${phrase}`, { seed: "budgeting", phrase, geo: "us", serp_blocks: blocks, block_count: blocks.split(",").length, blocks_total: 2, best_position: best });
+
+describe("Serper phrases as the production phrase source", () => {
+  const result = buildIdeas(
+    "budgeting",
+    [
+      serp("how to budget $3,000 a month?", "paa", 2),
+      serp("budgeting planner", "paa,related", 0),
+      sig("gtrends", "gt:rq:b", { seed: "budgeting", related_query: "budget planner 2027", interest_value: 300, rising: true }),
+      sig("web", "https://example.com/organic", { position: 1 }),
+    ],
+    new Date("2026-10-24T00:00:00Z"),
+  );
+
+  it("cites which blocks returned the phrase (QC Rule 4)", () => {
+    const planner = result.ideas.find((i) => i.phrase === "budgeting planner")!;
+    assert.equal(planner.demand, suggestionDemand(2, 2, 0));
+    assert.equal(planner.demandBasis, "in 2 of 2 Google result blocks (People also ask, Related searches), best position #1");
+    assert.deepEqual(planner.engines, ["paa", "related"]);
+    const q = result.ideas.find((i) => i.phrase.startsWith("how to budget"))!;
+    assert.match(q.demandBasis, /1 of 2 Google result blocks \(People also ask\), best position #3/);
+  });
+
+  it("ignores organic result rows and keeps Trends related queries", () => {
+    assert.equal(result.ideas.length, 3);
+    assert.equal(result.ideas.find((i) => i.phrase === "budget planner 2027")?.trend, "rising");
+  });
+});
+
+describe("not-professional-advice flag", () => {
+  it("flags health, money and legal phrases", () => {
+    assert.equal(adviceFlag("keto diet for beginners"), "health");
+    assert.equal(adviceFlag("intermittent fasting schedule"), "health");
+    assert.equal(adviceFlag("how to pay off credit card debt"), "money");
+    assert.equal(adviceFlag("budgeting for students"), "money");
+    assert.equal(adviceFlag("what is the 70/20/10 money rule?"), "money");
+    assert.equal(adviceFlag("divorce checklist"), "legal");
+    assert.equal(adviceFlag("llc operating agreement template"), "legal");
+  });
+  it("leaves other phrases alone (word boundaries)", () => {
+    assert.equal(adviceFlag("packing list for beach vacation"), null);
+    assert.equal(adviceFlag("toddler sleep schedule"), null);
+    assert.equal(adviceFlag("pursue your hobbies"), null, "'sue' only as a word");
+    assert.equal(adviceFlag("lawn care calendar"), null, "'law' only as a word");
+  });
+});
+
+describe("Timely tag", () => {
+  const now = new Date("2026-10-24T00:00:00Z");
+  it("marks phrases naming the current or next year", () => {
+    assert.equal(isTimely("budget planner 2026", now), true);
+    assert.equal(isTimely("2027 wedding planning checklist", now), true);
+  });
+  it("is not set for past, far-future or non-year numbers", () => {
+    assert.equal(isTimely("tax changes 2025", now), false);
+    assert.equal(isTimely("vision 2030 planner", now), false);
+    assert.equal(isTimely("how to budget $3,000 a month", now), false);
+    assert.equal(isTimely("12026 steps", now), false);
+  });
+  it("never sets a trend label by itself (QC Rule 2)", () => {
+    const r = buildIdeas("budget", [serp("budget planner 2027", "related", 1)], now);
+    assert.equal(r.ideas[0]?.timely, true);
+    assert.equal(r.ideas[0]?.trend, null);
+    assert.equal(r.ideas[0]?.advice, "money");
+  });
+});
+
+describe("regions and starter seeds", () => {
+  it("validates region codes", () => {
+    assert.ok(isRegion("us") && isRegion("gb"));
+    assert.ok(!isRegion("US") && !isRegion("xx") && !isRegion(undefined));
+    assert.equal(new Set(REGIONS.map((r) => r.code)).size, REGIONS.length);
+  });
+  it("holds PDFMakerHub's 21 categories and PDFMinter's 32 seeds, no duplicates", () => {
+    assert.equal(STARTER_SEEDS.length, 21);
+    const all = STARTER_SEEDS.flatMap((g) => g.seeds);
+    assert.equal(new Set(all).size, all.length);
+    for (const s of ["keto diet", "budgeting", "toddler sleep", "resume writing", "decluttering", "anxiety relief", "etsy shop", "moving checklist"]) {
+      assert.ok(all.includes(s), s);
+    }
+    assert.ok(all.length >= 32);
+  });
+});
+
+describe("scan CSV round-trip (2.4 recount)", () => {
+  const scan = buildIdeas("keto diet", SIGNALS, new Date("2026-10-24T00:00:00Z"));
+  it("recounts rows and evidence ids exactly", () => {
+    const csv = generateScanCsv(scan, { region: "us", scannedAt: "2026-10-24T00:00:00.000Z" });
+    const r = recountScanCsv(csv, scan);
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.isRoundTripAccurate, true);
+    assert.equal(r.recounted.opportunitiesCount, scan.ideas.length);
+    assert.equal(r.recounted.evidenceCount, scan.ideas.reduce((a, i) => a + i.evidence.length, 0));
+  });
+  it("keeps commas, quotes and line breaks inside fields", () => {
+    assert.deepEqual(parseCsv('a,"b, ""c""",d\r\n"x\ny",2\n'), [["a", 'b, "c"', "d"], ["x\ny", "2"]]);
+  });
+  it("catches a tampered evidence count", () => {
+    const csv = generateScanCsv(scan, { region: "us", scannedAt: "t" });
+    const lines = csv.split("\n");
+    lines.splice(1, 1);
+    const r = recountScanCsv(lines.join("\n"), scan);
+    assert.equal(r.isRoundTripAccurate, false);
   });
 });

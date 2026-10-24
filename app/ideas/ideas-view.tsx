@@ -1,12 +1,12 @@
 "use client";
 
-// app/ideas/ideas-view.tsx — Quick ideas console (Phase 3 Part 3.6).
+// app/ideas/ideas-view.tsx — Quick ideas console (Phase 3 Parts 3.6 + 3.7).
 // Facts (demand basis, trend basis, sources) are shown next to every score; the specificity
 // badge describes the phrase and is labeled as not a competition claim (QC Rules 3–5).
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, ExternalLink, Flame, ListOrdered, RefreshCw, Search, TrendingUp } from "lucide-react";
+import { ArrowLeft, CalendarClock, Copy, Download, ExternalLink, Flame, History, ListOrdered, RefreshCw, Search, ShieldAlert, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +14,8 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IdeaFormat, IdeasResult, QuickIdea } from "@/lib/ideas/ideas";
 import { suggestOutline } from "@/lib/ideas/outline";
+import { DEFAULT_REGION, REGIONS, STARTER_SEEDS, isRegion, type RegionCode } from "@/lib/ideas/seeds";
+import { generateScanCsv } from "@/lib/export/csv";
 
 interface SourceStatus {
   key: string;
@@ -25,7 +27,50 @@ interface SourceStatus {
   error?: string;
 }
 
-type IdeasResponse = IdeasResult & { sources: SourceStatus[]; scannedAt: string; error?: string };
+type IdeasResponse = IdeasResult & {
+  sources: SourceStatus[];
+  scannedAt: string;
+  region: RegionCode;
+  phraseSource: "autocomplete" | "web";
+  error?: string;
+};
+type Recent = { seed: string; region: RegionCode };
+
+// Recent searches stay in this browser until Phase 5.1 adds accounts. Storage can be blocked: never fatal.
+const RECENT_KEY = "pdflab.ideas.recent";
+const RECENT_EVENT = "pdflab-recent";
+function recentRaw(): string {
+  try {
+    return localStorage.getItem(RECENT_KEY) ?? "[]";
+  } catch {
+    return "[]";
+  }
+}
+function parseRecent(raw: string): Recent[] {
+  try {
+    const list = JSON.parse(raw) as Recent[];
+    return Array.isArray(list) ? list.filter((r) => typeof r?.seed === "string" && isRegion(r.region)).slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+}
+function subscribeRecent(onChange: () => void) {
+  window.addEventListener(RECENT_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(RECENT_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+function pushRecent(item: Recent) {
+  const next = [item, ...parseRecent(recentRaw()).filter((x) => !(x.seed === item.seed && x.region === item.region))].slice(0, 8);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    return; // storage blocked: the list is not kept
+  }
+  window.dispatchEvent(new Event(RECENT_EVENT));
+}
 
 const FORMATS: IdeaFormat[] = ["Guide", "Checklist", "Planner", "Worksheet", "Cheat sheet", "Ebook", "Report"];
 const TABS = [
@@ -35,7 +80,9 @@ const TABS = [
   { key: "buyer", label: "Buyer intent", test: (i: QuickIdea) => i.intent === "buyer" || i.engines.includes("amazon") },
   { key: "rising", label: "Rising", test: (i: QuickIdea) => i.trend !== null },
 ] as const;
-const ENGINE_LABEL: Record<string, string> = { google: "G", youtube: "YT", bing: "B", ddg: "DDG", amazon: "A" };
+const ENGINE_LABEL: Record<string, string> = { google: "G", youtube: "YT", bing: "B", ddg: "DDG", amazon: "A", paa: "PAA", related: "Related" };
+const ENGINE_TITLE: Record<string, string> = { paa: "In Google's People also ask block", related: "In Google's related searches" };
+const ADVICE_LABEL = { health: "Health topic", money: "Money topic", legal: "Legal topic" };
 const SPECIFICITY_LABEL = { broad: "Broad phrase", mid: "Mid-tail phrase", long_tail: "Long-tail phrase" };
 const TONE = {
   good: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -44,7 +91,7 @@ const TONE = {
   neutral: "border-border bg-muted text-muted-foreground",
 };
 const LOADING_STEPS = [
-  "Expanding the topic across 5 suggest engines…",
+  "Collecting search phrases for the topic…",
   "Reading Google Trends related queries…",
   "Checking Wikipedia pageviews…",
   "Storing evidence and scoring ideas…",
@@ -133,12 +180,25 @@ function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) 
           <Pill tone="neutral" title="Describes the search phrase only. Competitors were not observed for it (QC Rule 3).">
             {SPECIFICITY_LABEL[idea.specificity]}
           </Pill>
+          {idea.advice && (
+            <Pill tone="mid" title="Health, money and legal guides need trusted sources and a short 'not professional advice' note.">
+              <ShieldAlert className="mr-1 size-3" />
+              {ADVICE_LABEL[idea.advice]}: not professional advice
+            </Pill>
+          )}
+          {/* A year in the phrase is not growth: neutral tone, never a trend label (QC Rule 2). */}
+          {idea.timely && (
+            <Pill tone="neutral" title="Dated phrase, may need a yearly refresh. This is not a trend measurement.">
+              <CalendarClock className="mr-1 size-3" />
+              Timely
+            </Pill>
+          )}
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3">
           <div className="flex flex-wrap items-center gap-1">
             {idea.engines.map((e) => (
-              <span key={e} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]" title={`Suggested by ${e}`}>
+              <span key={e} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]" title={ENGINE_TITLE[e] ?? `Suggested by ${e}`}>
                 {ENGINE_LABEL[e] ?? e}
               </span>
             ))}
@@ -196,8 +256,11 @@ function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) 
   );
 }
 
-export function IdeasView({ initialSeed }: { initialSeed: string }) {
+export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string; initialRegion: string }) {
   const [seed, setSeed] = useState(initialSeed);
+  const [region, setRegion] = useState<RegionCode>(isRegion(initialRegion) ? initialRegion : DEFAULT_REGION);
+  const recentJson = useSyncExternalStore(subscribeRecent, recentRaw, () => "[]");
+  const recent = useMemo(() => parseRecent(recentJson), [recentJson]);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(0);
   const [data, setData] = useState<IdeasResponse | null>(null);
@@ -206,9 +269,11 @@ export function IdeasView({ initialSeed }: { initialSeed: string }) {
   const [sort, setSort] = useState<"opportunity" | "demand" | "az">("opportunity");
   const [shown, setShown] = useState(24);
 
-  async function scan(value: string) {
+  async function scan(value: string, where: RegionCode = region) {
     const s = value.trim();
     if (s.length < 2 || loading) return;
+    setSeed(s);
+    setRegion(where);
     setLoading(true);
     setError(null);
     setData(null);
@@ -218,7 +283,7 @@ export function IdeasView({ initialSeed }: { initialSeed: string }) {
       const res = await fetch("/api/ideas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seed: s }),
+        body: JSON.stringify({ seed: s, region: where }),
       });
       const body = (await res.json()) as IdeasResponse;
       if (res.status === 401) {
@@ -230,7 +295,8 @@ export function IdeasView({ initialSeed }: { initialSeed: string }) {
         setData(body);
         setTab("all");
         setShown(24);
-        window.history.replaceState(null, "", `/ideas?q=${encodeURIComponent(s)}`);
+        window.history.replaceState(null, "", `/ideas?q=${encodeURIComponent(s)}&region=${where}`);
+        pushRecent({ seed: s.toLowerCase(), region: where });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
@@ -263,7 +329,7 @@ export function IdeasView({ initialSeed }: { initialSeed: string }) {
           <div className="hidden h-4 w-px bg-border sm:block" />
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Quick ideas</h1>
           <Badge variant="outline" className="font-mono text-xs">
-            Part 3.6
+            Part 3.7
           </Badge>
         </div>
         <p className="max-w-md text-xs text-muted-foreground">
@@ -290,10 +356,57 @@ export function IdeasView({ initialSeed }: { initialSeed: string }) {
             className="h-12 w-full bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
           />
         </div>
+        <NativeSelect value={region} onChange={(e) => setRegion(e.target.value as RegionCode)} aria-label="Region" className="h-12 sm:w-44">
+          {REGIONS.map((r) => (
+            <NativeSelectOption key={r.code} value={r.code}>
+              {r.label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
         <Button type="submit" size="lg" className="h-12 cursor-pointer px-6" disabled={loading || seed.trim().length < 2}>
           {loading ? "Scanning…" : "Find ideas"}
         </Button>
       </form>
+
+      {recent.length > 0 && !loading && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <History className="size-3.5 text-muted-foreground" aria-hidden />
+          <span className="text-muted-foreground">Recent:</span>
+          {recent.map((x) => (
+            <Button key={`${x.seed}|${x.region}`} size="xs" variant="outline" className="cursor-pointer" onClick={() => void scan(x.seed, x.region)}>
+              {x.seed}
+              <span className="font-mono text-[10px] uppercase opacity-60">{x.region}</span>
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {!data && !loading && (
+        <section className="space-y-3" aria-label="Starter topics">
+          <p className="text-xs text-muted-foreground">
+            Not sure where to start? Pick a topic: it runs a live scan, nothing here is pre-written.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {STARTER_SEEDS.map((g) => (
+              <div key={g.group} className="space-y-1.5 rounded-lg border border-border p-3">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{g.group}</h3>
+                <div className="flex flex-wrap gap-1">
+                  {g.seeds.map((x) => (
+                    <button
+                      key={x}
+                      type="button"
+                      onClick={() => void scan(x)}
+                      className="cursor-pointer rounded-full border border-border px-2 py-0.5 text-xs hover:border-foreground/40 hover:bg-muted"
+                    >
+                      {x}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {loading && (
         <div className="space-y-4">
@@ -319,7 +432,29 @@ export function IdeasView({ initialSeed }: { initialSeed: string }) {
         <section className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
             <div className="space-y-2">
-              <h2 className="text-lg font-semibold capitalize">{data.seed}</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-semibold capitalize">{data.seed}</h2>
+                <Badge variant="outline" className="font-mono text-[10px] uppercase">{data.region}</Badge>
+                {ideas.length > 0 && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="cursor-pointer"
+                    title="Every idea with its scores, bases and evidence ids"
+                    onClick={() => {
+                      const csv = generateScanCsv(data, { region: data.region, scannedAt: data.scannedAt });
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+                      a.download = `pdf-lab-ideas-${data.seed.replace(/[^a-z0-9]+/g, "-")}-${data.region}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    }}
+                  >
+                    <Download />
+                    CSV
+                  </Button>
+                )}
+              </div>
               {data.topic.length ? (
                 data.topic.map((t) => (
                   <p key={t.evidence.source_id} className="text-xs text-muted-foreground">

@@ -9,6 +9,7 @@ import {
   autocompleteConfigFromEnv,
   expansionPlan,
   parseSuggestions,
+  suggestUrl,
 } from "./autocomplete-adapter.ts";
 import type { AutocompleteAdapterConfig, SuggestionPayload } from "./autocomplete-adapter.ts";
 import { SourceNotConfiguredError } from "../types.ts";
@@ -101,6 +102,7 @@ describe("AutocompleteAdapter.collect", () => {
     assert.equal(s.engagement.engine_count, 5);
     assert.equal(s.engagement.engines_ok, 5);
     assert.equal(s.author, "anonymous");
+    assert.equal(s.timestamp, null, "fetch time is not a publish date (QC Rule 2)");
     assert.match(s.source_id, /^autocomplete:us:[0-9a-f]{24}:2026-10-24$/);
   });
 
@@ -115,5 +117,29 @@ describe("AutocompleteAdapter.collect", () => {
     assert.deepEqual((partial[0].payload as SuggestionPayload).enginesOk, ["google", "youtube", "bing", "ddg"]);
     const all = new AutocompleteAdapter(config({}, ["google", "youtube", "bing", "ddg", "amazon"]));
     await assert.rejects(all.collect({ query: "keto diet", limit: 10 }), /All suggest engines failed/);
+  });
+});
+
+describe("AutocompleteAdapter per-scan region (Part 3.7)", () => {
+  it("puts the scan's geo in every engine URL and in the ids", async () => {
+    const urls: string[] = [];
+    const base = config();
+    const adapter = new AutocompleteAdapter({
+      ...base,
+      fetchFn: async (input, init) => (urls.push(String(input)), base.fetchFn(input, init)),
+    });
+    const items = await adapter.collect({ query: "keto diet", limit: 5, geo: "ca" });
+    assert.ok(urls.some((u) => u.includes("suggestqueries") && u.includes("gl=ca")));
+    assert.ok(urls.some((u) => u.includes("mkt=en-CA")));
+    assert.ok(urls.some((u) => u.includes("kl=ca-en")));
+    assert.ok(!urls.some((u) => u.includes("gl=us")));
+    assert.ok(items.every((i) => i.externalId.startsWith("autocomplete:ca:")));
+  });
+
+  it("uses DuckDuckGo's own region codes where they differ from ISO", () => {
+    assert.ok(suggestUrl("ddg", "budgeting", "gb").endsWith("&kl=uk-en"));
+    assert.ok(suggestUrl("ddg", "budgeting", "ng").endsWith("&kl=wt-wt"), "no DDG region for Nigeria");
+    assert.ok(suggestUrl("ddg", "budgeting", "us").endsWith("&kl=us-en"));
+    assert.ok(suggestUrl("google", "budgeting", "gb").includes("gl=gb"), "other engines keep the ISO code");
   });
 });

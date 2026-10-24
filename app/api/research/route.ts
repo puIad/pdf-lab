@@ -12,6 +12,7 @@ import { executeResearchRun } from "@/lib/runs/orchestrator";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { OPPORTUNITY_PROMPT_VERSION } from "@/lib/opportunities";
+import { isDemandOnly } from "@/lib/sources/demand-only";
 import {
   RESEARCH_MODES,
   buildValidationReport,
@@ -39,6 +40,7 @@ interface MonitorSignalRow {
   title: string | null;
   content: string | null;
   published_at: string | null;
+  external_id: string | null;
   engagement: Record<string, unknown> | null;
   sources: { type?: string } | { type?: string }[] | null;
   signal_analysis: { intent?: string | null; urgency?: string | null } | { intent?: string | null; urgency?: string | null }[] | null;
@@ -140,7 +142,7 @@ export async function POST(req: Request) {
         }
         const { data, error } = await supabase
           .from("signals")
-          .select("id, title, content, published_at, engagement, sources ( type ), signal_analysis ( intent, urgency )")
+          .select("id, title, content, published_at, external_id, engagement, sources ( type ), signal_analysis ( intent, urgency )")
           .not("published_at", "is", null) // QC Rule 2: collection time is not temporal evidence
           .order("published_at", { ascending: false })
           .limit(1000);
@@ -149,6 +151,7 @@ export async function POST(req: Request) {
         const tokens = tokenize(text).map((t) => t.replace(/s$/, ""));
         const signals: SignalRecord[] = ((data ?? []) as MonitorSignalRow[])
           .filter((s) => {
+            if (isDemandOnly({ source_type: one(s.sources)?.type, external_id: s.external_id })) return false; // not discussions
             const hay = `${s.title ?? ""} ${s.content ?? ""}`.toLowerCase();
             return tokens.some((t) => hay.includes(t));
           })

@@ -86,6 +86,7 @@ async function ingestOne(
   limit: number,
   deps: IngestDeps,
   sink?: SignalSink,
+  geo?: string,
 ): Promise<IngestSourceResult> {
   const base = {
     key: adapter.key,
@@ -96,7 +97,7 @@ async function ingestOne(
     duplicates: 0,
   };
   try {
-    const raw = await adapter.collect({ query, limit });
+    const raw = await adapter.collect({ query, limit, ...(geo ? { geo } : {}) });
     const normalized: MarketSignal[] = [];
     for (const item of raw) normalized.push(adapter.normalize(item));
     const sourceUuid = await deps.resolveSourceId(adapter.key);
@@ -134,7 +135,7 @@ async function ingestOne(
 }
 
 export async function runIngest(
-  input: { query: string; limit?: number; sourceKeys?: string[] },
+  input: { query: string; limit?: number; sourceKeys?: string[]; geo?: string },
   deps: IngestDeps,
   sink?: SignalSink,
 ): Promise<IngestSummary> {
@@ -155,7 +156,7 @@ export async function runIngest(
   // instead of bursting all adapters at once.
   const sources: IngestSourceResult[] = [];
   for (const adapter of adapters) {
-    sources.push(await ingestOne(adapter, query, limit, resolved, sink));
+    sources.push(await ingestOne(adapter, query, limit, resolved, sink, input.geo));
   }
   const totals = sources.reduce(
     (acc, s) => ({

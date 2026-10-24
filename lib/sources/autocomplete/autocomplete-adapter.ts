@@ -80,6 +80,10 @@ export function expansionPlan(seed: string, engine: Engine): string[] {
   return [seed, ...QUESTION_PREFIXES.map((q) => `${q} ${seed}`), ...MODIFIERS.map((m) => `${seed} ${m}`), ...letters];
 }
 
+// DuckDuckGo `kl` codes that aren't `<iso>-en` (duckduckgo.com/duckduckgo-help-pages/settings/params,
+// checked 2026-10-24): the UK is `uk-en`; Nigeria has none, so it asks for no region.
+const DDG_REGION: Record<string, string> = { gb: "uk-en", ng: "wt-wt" };
+
 export function suggestUrl(engine: Engine, q: string, geo: string): string {
   const e = encodeURIComponent(q);
   switch (engine) {
@@ -90,7 +94,7 @@ export function suggestUrl(engine: Engine, q: string, geo: string): string {
     case "bing":
       return `https://api.bing.com/osjson.aspx?query=${e}&mkt=en-${geo.toUpperCase()}`;
     case "ddg":
-      return `https://duckduckgo.com/ac/?q=${e}&kl=${geo}-en`;
+      return `https://duckduckgo.com/ac/?q=${e}&kl=${DDG_REGION[geo] ?? `${geo}-en`}`;
     case "amazon":
       // shortcut: US marketplace id only; map geo → marketplace id if non-US seeds matter.
       return `https://completion.amazon.com/api/2017/suggestions?mid=ATVPDKIKX0DER&alias=aps&limit=10&prefix=${e}`;
@@ -136,8 +140,8 @@ export class AutocompleteAdapter implements SourceAdapter {
     this.config = config;
   }
 
-  private async fetchOne(engine: Engine, q: string): Promise<string[]> {
-    const res = await this.config.fetchFn(suggestUrl(engine, q, this.config.geo), {
+  private async fetchOne(engine: Engine, q: string, geo = this.config.geo): Promise<string[]> {
+    const res = await this.config.fetchFn(suggestUrl(engine, q, geo), {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
     });
     if (!res.ok) throw new Error(`${engine} suggest HTTP ${res.status}`);
@@ -145,12 +149,12 @@ export class AutocompleteAdapter implements SourceAdapter {
   }
 
   /** Run one engine's plan sequentially (throttled). Returns null if the engine never answered. */
-  private async scanEngine(engine: Engine, seed: string, hits: Map<string, Hit>): Promise<string | null> {
+  private async scanEngine(engine: Engine, seed: string, geo: string, hits: Map<string, Hit>): Promise<string | null> {
     let answered = false;
     let lastError = "";
     for (const q of expansionPlan(seed, engine)) {
       try {
-        const list = await this.fetchOne(engine, q);
+        const list = await this.fetchOne(engine, q, geo);
         answered = true;
         const probe = clean(q);
         list.forEach((raw, pos) => {
@@ -175,12 +179,13 @@ export class AutocompleteAdapter implements SourceAdapter {
     const seed = clean(input.query);
     if (!seed) throw new Error("Autocomplete collect requires a non-empty query");
     const limit = Math.max(1, Math.min(MAX_LIMIT, Math.floor(input.limit) || 25));
-    const cacheKey = `${seed}|${limit}|${this.config.geo}`;
+    const geo = (input.geo || this.config.geo).toLowerCase();
+    const cacheKey = `${seed}|${limit}|${geo}`;
     const cached = this.cache.get(cacheKey);
     if (cached && this.config.nowFn() - cached.at < this.config.cacheTtlMs) return cached.items;
 
     const hits = new Map<string, Hit>();
-    const errors = await Promise.all(ENGINES.map((e) => this.scanEngine(e, seed, hits)));
+    const errors = await Promise.all(ENGINES.map((e) => this.scanEngine(e, seed, geo, hits)));
     const enginesOk = ENGINES.filter((_, i) => errors[i] === null);
     if (enginesOk.length === 0) {
       throw new Error(`All suggest engines failed: ${errors.filter(Boolean).join("; ")}`);
@@ -200,7 +205,7 @@ export class AutocompleteAdapter implements SourceAdapter {
         kind: "suggestion",
         seed,
         phrase,
-        geo: this.config.geo,
+        geo,
         engines: ENGINES.filter((e) => h.engines.has(e)),
         positions: h.positions,
         enginesOk,
@@ -210,7 +215,7 @@ export class AutocompleteAdapter implements SourceAdapter {
         source: AUTOCOMPLETE_KEY,
         // Seed in the hash: the same phrase from two seeds carries different counts and text.
         // Day in the id: daily snapshots build history (Phase 4.2 "new since last scan").
-        externalId: `autocomplete:${this.config.geo}:${createHash("sha256").update(`${seed}|${phrase}`).digest("hex").slice(0, 24)}:${day}`,
+        externalId: `autocomplete:${geo}:${createHash("sha256").update(`${seed}|${phrase}`).digest("hex").slice(0, 24)}:${day}`,
         fetchedAt,
         payload,
       };
@@ -242,7 +247,7 @@ export class AutocompleteAdapter implements SourceAdapter {
         `"${p.phrase}" was suggested by ${p.engines.length} of ${p.enginesOk.length} answering engines ` +
         `(${where}) while expanding "${p.seed}" (${p.geo.toUpperCase()}).`,
       author: "anonymous",
-      timestamp: raw.fetchedAt,
+      timestamp: null, // collection time is not a publish time (QC Rule 2); it stays in collected_at
       engagement,
       market_candidates: [],
       intent: null,

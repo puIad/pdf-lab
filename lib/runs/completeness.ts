@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResearchCompleteness } from "./types.ts";
 import { buildSearchFilter } from "../db/search.ts";
+import { isDemandOnly } from "../sources/demand-only.ts";
 
 export interface CompletenessRawCounts {
   sourcesCovered: number;
@@ -70,7 +71,7 @@ export async function fetchRunCompleteness(
   query: string,
 ): Promise<ResearchCompleteness> {
   const filter = buildSearchFilter(query);
-  let queryBuilder = supabase.from("signals").select("id, source_id");
+  let queryBuilder = supabase.from("signals").select("id, source_id, external_id, sources ( type )");
   if (filter) {
     queryBuilder = queryBuilder.or(filter);
   }
@@ -80,9 +81,17 @@ export async function fetchRunCompleteness(
     throw new Error(`Failed to count signals for completeness: ${sigErr.message}`);
   }
 
-  const signalRows = signals ?? [];
+  const allRows = (signals ?? []) as unknown as Array<{
+    id: string;
+    source_id: string;
+    external_id: string | null;
+    sources: { type?: string } | null;
+  }>;
+  // Every source that answered counts as covered; only discussion rows count as signals to analyze
+  // (demand-only rows are never extracted, so they would read as permanently unanalyzed).
+  const distinctSources = new Set(allRows.map((s) => s.source_id)).size;
+  const signalRows = allRows.filter((s) => !isDemandOnly({ source_type: s.sources?.type, external_id: s.external_id }));
   const signalIds = signalRows.map((s) => s.id);
-  const distinctSources = new Set(signalRows.map((s) => s.source_id)).size;
 
   let analyzedCount = 0;
   let marketIds: string[] = [];

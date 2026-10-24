@@ -5,6 +5,8 @@
 //   - a trend label exists only when Google Trends lists the phrase as rising (QC Rule 2),
 //     otherwise it is null ("not observed"), never a default "evergreen";
 //   - specificity describes the phrase only. It is NOT a competition claim (QC Rule 3).
+// Part 3.7: Serper PAA / related-search phrases count like suggestions (demand cites the blocks),
+// plus a not-professional-advice flag and a "Timely" tag that is never a trend label (QC Rule 2).
 // Pure functions over MarketSignal engagement fields; no adapter imports (08-ADAPTERS rule 1).
 
 import type { MarketSignal } from "../sources/types.ts";
@@ -12,6 +14,7 @@ import type { MarketSignal } from "../sources/types.ts";
 export type IdeaFormat = "Guide" | "Checklist" | "Planner" | "Worksheet" | "Cheat sheet" | "Ebook" | "Report";
 export type IdeaIntent = "howto" | "compare" | "buyer" | "question" | "info";
 export type IdeaTrend = "breakout" | "rising" | null;
+export type AdviceArea = "health" | "money" | "legal";
 
 export interface IdeaEvidence {
   source: string;
@@ -38,7 +41,12 @@ export interface QuickIdea {
   opportunity: number;
   /** 0-1: independent sources behind the idea (each engine, plus Google Trends) out of 5. */
   confidence: number;
+  /** Where the phrase was observed: suggest engines, or Serper blocks `paa` / `related`. */
   engines: string[];
+  /** Health / money / legal topic: the card shows a badge and the brief (3.10) a not-advice note. */
+  advice: AdviceArea | null;
+  /** Names the current or next year: a dated phrase that may need a yearly refresh. Not a trend. */
+  timely: boolean;
   evidence: IdeaEvidence[];
 }
 
@@ -163,6 +171,26 @@ export function ideaTitle(phrase: string, format: IdeaFormat, intent: IdeaIntent
   }
 }
 
+// shortcut: hand-written keyword list, misses synonyms and other languages; replace with a reviewed list or classifier when briefs ship (3.10).
+const ADVICE_RULES: Array<[AdviceArea, RegExp]> = [
+  ["health", /\b(diets?|keto|fasting|weight loss|calories|nutrition|anxiety|depression|adhd|autism|diabetes|pregnan(t|cy)|postpartum|symptoms?|medications?|medicines?|supplements?|vitamins?|therapy|mental health|blood pressure|cholesterol|disease|cancer|injur(y|ies)|pain relief|insomnia|fertility|breastfeeding|weaning)\b/],
+  ["money", /\b(money|financ(e|es|ial)|budget(s|ing)?|debts?|credit (score|cards?|report)|loans?|mortgages?|invest(ing|ment|ments)?|stocks?|crypto|retirement|401k|ira|tax(es)?|savings|saving money|insurance|bankruptcy|personal finance)\b/],
+  ["legal", /\b(legal|laws?|lawyers?|attorneys?|contracts?|divorce|custody|last will|estate planning|power of attorney|visas?|immigration|lawsuits?|sue|copyright|trademarks?|llc|tenant rights|eviction)\b/],
+];
+
+export function adviceFlag(phrase: string): AdviceArea | null {
+  const p = phrase.toLowerCase();
+  return ADVICE_RULES.find(([, re]) => re.test(p))?.[0] ?? null;
+}
+
+/** True when the phrase names the current or next calendar year (UTC), e.g. "budget planner 2027". */
+export function isTimely(phrase: string, now: Date = new Date()): boolean {
+  const year = now.getUTCFullYear();
+  return (phrase.match(/\b20\d\d\b/g) ?? []).some((y) => Number(y) === year || Number(y) === year + 1);
+}
+
+const BLOCK_LABEL: Record<string, string> = { paa: "People also ask", related: "Related searches" };
+
 /**
  * Demand 0-100 from suggestion evidence: share of answering engines that suggested the
  * phrase, and its best list position.
@@ -203,7 +231,7 @@ interface PhraseAcc {
 }
 
 /** Build ranked quick ideas for one seed from the signals its ingest just stored. */
-export function buildIdeas(seed: string, signals: MarketSignal[]): IdeasResult {
+export function buildIdeas(seed: string, signals: MarketSignal[], now: Date = new Date()): IdeasResult {
   const seedKey = seed.trim().toLowerCase();
   const byPhrase = new Map<string, PhraseAcc>();
   const topic: TopicTrendLine[] = [];
@@ -222,16 +250,20 @@ export function buildIdeas(seed: string, signals: MarketSignal[]): IdeasResult {
     const phrase = str(e.phrase);
     const related = str(e.related_query);
     if (phrase) {
-      const engines = (str(e.engines) ?? "").split(",").filter(Boolean);
-      const count = num(e.engine_count) ?? engines.length;
-      const ok = num(e.engines_ok) ?? count;
+      // Serper phrase rows carry `serp_blocks`; suggestion rows carry `engines`. Same demand formula.
+      const blocks = str(e.serp_blocks);
+      const engines = (blocks ?? str(e.engines) ?? "").split(",").filter(Boolean);
+      const count = num(blocks ? e.block_count : e.engine_count) ?? engines.length;
+      const ok = num(blocks ? e.blocks_total : e.engines_ok) ?? count;
       const best = num(e.best_position) ?? 9;
       const acc = get(phrase);
       const d = suggestionDemand(count, ok, best);
-      acc.engines = engines;
+      acc.engines = [...new Set([...acc.engines, ...engines])];
       if (d >= acc.demand) {
         acc.demand = d;
-        acc.demandBasis = `suggested by ${count} of ${ok} engines, best position #${best + 1}`;
+        acc.demandBasis = blocks
+          ? `in ${count} of ${ok} Google result blocks (${engines.map((b) => BLOCK_LABEL[b] ?? b).join(", ")}), best position #${best + 1}`
+          : `suggested by ${count} of ${ok} engines, best position #${best + 1}`;
       }
       acc.evidence.push(ev(s));
     } else if (related) {
@@ -285,6 +317,8 @@ export function buildIdeas(seed: string, signals: MarketSignal[]): IdeasResult {
         opportunity: opportunity(a.demand, fit, a.trend),
         confidence: Math.min(1, (a.engines.length + (a.evidence.some((x) => x.source === "gtrends") ? 1 : 0)) / 5),
         engines: a.engines,
+        advice: adviceFlag(a.phrase),
+        timely: isTimely(a.phrase, now),
         evidence: a.evidence,
       } satisfies QuickIdea;
     })
