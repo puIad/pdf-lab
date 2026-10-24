@@ -102,3 +102,61 @@ patch the affected guide/phase file (link the follow-up commit).
 - Question for user: None required as plan specifies "(or web-backed where APIs absent), log approach per source in DECISIONS — §4c".
 - Resolution: Resolved 2026-09-20 — implemented EtsyAdapter, GumroadAdapter, and KdpAdapter using targeted site-filtered search over Serper. Extracted products provide verified URLs, titles, price points, and review snippets without ToS violations or scraper fragility.
 
+## DEC-008 — Long-tail phrase discovery (autocomplete) source, from the PDFMinter teardown
+
+- Date: 2026-10-24
+- Part: unassigned (proposed new part after the teardown; nothing built)
+- Expected: competitor research only. `docs/research/2026-10-24-pdfminter-teardown.md`.
+- Found: PDFMinter's core signal is keyless autocomplete expansion (question + modifier + A to Z)
+  over Google, YouTube, Bing, DuckDuckGo and Amazon suggest endpoints. Its own readme calls them
+  "unofficial public endpoints" that can block servers. PDF Lab has no phrase-level discovery
+  source today, and `lib/sources/web` drops the `peopleAlsoAsk` / `relatedSearches` fields of
+  Serper responses (no match in `lib/`; field names per Serper docs, re-verify at build time).
+- Options:
+  (a) Call the unofficial suggest endpoints directly, as PDFMinter does. Free and the widest
+  coverage (5 engines incl. Amazon buyer intent). Conflicts with 08-ADAPTERS rule 2 and the
+  DEC-007 precedent (Amazon Conditions of Use bar robots and data mining); breakage and IP
+  blocks are expected.
+  (b) Serper's autocomplete endpoint. Reuses `SERPER_API_KEY` (DEC-002), vendor-licensed, Google
+  only, costs credits per expansion query (an A to Z + question plan is roughly 30 to 40 calls per
+  seed). Endpoint and credit price seen only in a third-party listing so far.
+  (c) DataForSEO autocomplete + Amazon keyword APIs. Covers Google and Amazon, paid per call, new
+  vendor account.
+  (d) Keep the `peopleAlsoAsk` and `relatedSearches` blocks from Serper calls PDF Lab already makes,
+  and add Trends related queries per phrase. Zero new cost or vendor; fewer phrases than (a)-(c).
+- Recommendation: (d) now, (b) as the opt-in expansion once its endpoint and price are verified
+  via Context7 + serper.dev docs. Reject (a) for production for the same reason as DEC-007; it is
+  acceptable only as a local, never-deployed experiment if the user wants a like-for-like replica.
+  The Wikipedia pageviews adapter (official Wikimedia API) needs no decision.
+- Question for user: Which discovery source should the replication part use: (d), (d)+(b), (c), or (a) local-only?
+- Resolution: 2026-10-24, user chose (a) local-only: a like-for-like replica on the unofficial
+  suggest endpoints that never runs in production. Enforced in code: the `autocomplete` adapter
+  throws `SourceNotConfiguredError` (reported `skipped`) unless `PDFLAB_UNOFFICIAL_AUTOCOMPLETE=1`
+  AND `NODE_ENV !== "production"` AND `VERCEL` is unset. Scope picked with it: quick-ideas layer,
+  Wikipedia pageviews adapter, auto-outline (Phase 3 Parts 3.5 and 3.6). Not picked: PDF builder.
+  The user will export PDFMinter CSVs for 3 to 5 seeds to calibrate the idea scores later.
+  Shipping autocomplete to production needs a new decision (options (b) to (d) above).
+
+## DEC-009 — Supabase project unreachable (DNS gone), live acceptance blocked
+
+- Date: 2026-10-24
+- Part: Phase 3 Part 3.5 (live ingest acceptance), Part 3.6 (live ideas acceptance)
+- Expected: `.env.local` Supabase project `pdf-lab` (ref `cjboiijclrwumgmgzvcl`) accepts signal
+  upserts, as in Parts 0.2 to 3.4.
+- Found: `getaddrinfo ENOTFOUND cjboiijclrwumgmgzvcl.supabase.co`; `nslookup` via 1.1.1.1 says
+  "Non-existent domain" while `supabase.co` resolves. Production
+  `GET https://pdf-lab-puiads-projects.vercel.app/api/health` returns
+  `{"ok":true,"schemaVersion":1,"db":{"configured":true,"error":"unreachable"}}`. Last recorded
+  DB activity was 2026-09-28; free-tier projects pause after a week without activity, which
+  matches. Not confirmed from the dashboard.
+- Options: (a) user restores the project in the Supabase dashboard (Project → Restore), then the
+  agent reruns the live ingest probes; (b) create a new free project and re-apply migrations 1 to
+  5 (new keys in `.env.local` and Vercel); (c) keep building, accept unit tests only for now.
+- Recommendation: (a). It keeps the data from Parts 1.1 to 3.4 and needs no key changes. Do (c)
+  meanwhile; both parts stay open until the live checks pass.
+- Question for user: Can you restore the `pdf-lab` project in the Supabase dashboard?
+- Resolution: 2026-10-24, option (a): the user restored the project. The host resolves again and
+  production `/api/health` returns `{"ok":true,"schemaVersion":1,"db":{"configured":true,"sources":6}}`.
+  Live acceptance for Parts 3.5 and 3.6 then ran (results in `STATE.md`). Free-tier projects pause
+  after about a week idle; expect this again until the project gets regular traffic or a paid plan.
+

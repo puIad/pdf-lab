@@ -9,6 +9,8 @@ import { EtsyAdapter, etsyConfigFromEnv } from "./etsy/index.ts";
 import { GumroadAdapter, gumroadConfigFromEnv } from "./gumroad/index.ts";
 import { KdpAdapter, kdpConfigFromEnv } from "./kdp/index.ts";
 import { YouTubeAdapter, youtubeConfigFromEnv } from "./youtube/index.ts";
+import { WikipediaAdapter, wikipediaConfigFromEnv } from "./wikipedia/index.ts";
+import { AutocompleteAdapter, autocompleteConfigFromEnv } from "./autocomplete/index.ts";
 import { registerAdapter } from "./registry.ts";
 
 registerAdapter(new RedditAdapter(redditConfigFromEnv()));
@@ -18,6 +20,9 @@ registerAdapter(new EtsyAdapter(etsyConfigFromEnv()));
 registerAdapter(new GumroadAdapter(gumroadConfigFromEnv()));
 registerAdapter(new KdpAdapter(kdpConfigFromEnv()));
 registerAdapter(new YouTubeAdapter(youtubeConfigFromEnv()));
+registerAdapter(new WikipediaAdapter(wikipediaConfigFromEnv()));
+// Local-only (DEC-008): reports `skipped` unless PDFLAB_UNOFFICIAL_AUTOCOMPLETE=1 outside production.
+registerAdapter(new AutocompleteAdapter(autocompleteConfigFromEnv()));
 
 export { adapterKeys, getAdapter, listAdapters, registerAdapter } from "./registry.ts";
 export type {

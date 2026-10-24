@@ -38,6 +38,8 @@ recommended because the MVP gate lives there.
 | 3.2 | Market search + market overview page | 3.1 | §8, §41–§42 |
 | 3.3 | Find Trending Markets engine + Market Radar | 3.1 | §9, §22–§25 |
 | 3.4 | Natural-language research + modes (Explore/Validate/Hunt/Deep/Monitor) | 3.2, 3.3 | §26–§27 |
+| 3.5 | Keyless discovery adapters: local-only autocomplete + Wikipedia (DEC-008) | 1.2 | §9–§12 |
+| 3.6 | Quick ideas (per-phrase cards) + auto-outline | 3.5 | §7, §18 |
 | 4.1 | Saved markets / watchlist | 3.2 | §43 |
 | 4.2 | Scheduled re-research (cron/scheduler) + change detection | 4.1 | §44, §24 |
 | 4.3 | Alerts (in-app first; email/browser per PRD "optional") | 4.2 | §45 |
@@ -48,7 +50,7 @@ recommended because the MVP gate lives there.
 | 6.2 | Success-metrics instrumentation (north-star + §58 events) | 6.1 | §58–§59 |
 | 6.3 | Launch checklist: costs, abuse, legal/ToS, roadmap handoff | 6.2 | §50, §57 |
 
-Total: **22 parts.** Each phase file repeats its rows with full task detail.
+Total: **24 parts** (3.5 and 3.6 added 2026-10-24 from the PDFMinter teardown). Each phase file repeats its rows with full task detail.
 
 ## MVP cut line (PRD §51–§52, §62)
 
