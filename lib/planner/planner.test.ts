@@ -2,9 +2,10 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { planResearch, searchTextOf } from "./parse.ts";
+import { planResearch, searchTextOf, seedOf } from "./parse.ts";
 import { buildValidationReport, filterMarkets, VALIDATION_BLOCKS } from "./modes.ts";
 import { PLANNER_PROMPT_VERSION } from "./types.ts";
+import { buildVerdict } from "./verdict.ts";
 import { createEmptyOverview } from "../search/overview.ts";
 import type { MarketRowData } from "../markets/types.ts";
 import type { MarketOverview } from "../search/types.ts";
@@ -193,5 +194,72 @@ describe("buildValidationReport (PRD §48)", () => {
     assert.match(r.blocks.pricing.summary, /\$5–\$12/);
     assert.equal(r.blocks.products.items[0].citations[0].url, "https://etsy/1");
     assert.doesNotMatch(r.blocks.risks.items.map((i) => i.text).join(" "), /Thin evidence/);
+  });
+});
+
+describe("buildVerdict (Part 3.8)", () => {
+  const metric = <T>(value: T) => ({ observed: true, value, rawLabel: "", evidence: [] });
+  function ov(discussions: number, strong: number, intentTotal: number, competitors: number, direction: "stable" | "declining" | "unknown", windows: number): MarketOverview {
+    return {
+      ...createEmptyOverview("x", "validate", new Date().toISOString()),
+      discussionCounts: metric({ total: discussions, bySource: { reddit: discussions } }),
+      buyerIntentSignals: metric({ totalIntentSignals: intentTotal, veryStrongCount: 0, strongCount: strong, mediumCount: 0, weakCount: intentTotal - strong, sampleQuotes: [] }),
+      competitiveDensity: metric({ densityRating: "moderate" as const, score: 40, competitorsObserved: competitors }),
+      trendDirection: metric({ direction, timeWindowsEvaluated: windows, historicalSignalsCount: 10 }),
+    };
+  }
+  const status = (v: ReturnType<typeof buildVerdict>, key: string) => v.checks.find((c) => c.key === key)!.status;
+
+  test("GO: demand and intent pass, nothing fails; every check shows its count and threshold", () => {
+    const v = buildVerdict(ov(12, 4, 10, 5, "stable", 3));
+    assert.equal(v.verdict, "GO");
+    assert.ok(v.checks.every((c) => c.count && c.threshold));
+    assert.equal(v.checks[0].count, "12 discussions");
+    assert.match(v.checks[1].count, /4 of 10 analyzed strong \(40%\)/);
+  });
+
+  test("intent: wording-only matches are left out, and a tiny sample cannot pass", () => {
+    const base = ov(12, 4, 10, 5, "stable", 3);
+    const bi = base.buyerIntentSignals.value!;
+    base.buyerIntentSignals = metric({ ...bi, strongCount: 8, totalIntentSignals: 14, wordingOnlyCount: 4 });
+    assert.match(buildVerdict(base).checks[1].count, /4 of 10 analyzed/);
+    const tiny = buildVerdict(ov(12, 1, 1, 5, "stable", 3));
+    assert.equal(status(tiny, "intent"), "weak"); // 100% of 1 is not proof
+    assert.equal(tiny.verdict, "WAIT");
+  });
+
+  test("KILL: demand below the floor regardless of the rest", () => {
+    const v = buildVerdict(ov(2, 2, 2, 5, "stable", 3));
+    assert.equal(v.verdict, "KILL");
+    assert.match(v.reason, /Only 2 discussions/);
+  });
+
+  test("KILL: two failed checks (crowded and declining)", () => {
+    const v = buildVerdict(ov(12, 4, 10, 45, "declining", 3));
+    assert.equal(status(v, "competition"), "fail");
+    assert.equal(status(v, "trend"), "fail");
+    assert.equal(v.verdict, "KILL");
+  });
+
+  test("WAIT: unobserved counts never pass (QC Rules 2–3)", () => {
+    const v = buildVerdict(ov(5, 0, 0, 0, "unknown", 0));
+    assert.equal(status(v, "demand"), "weak");
+    assert.equal(status(v, "intent"), "not_observed");
+    assert.equal(status(v, "competition"), "not_observed");
+    assert.equal(status(v, "trend"), "not_observed");
+    assert.equal(v.verdict, "WAIT");
+  });
+
+  test("empty overview → KILL on zero demand", () => {
+    assert.equal(buildVerdict(createEmptyOverview("x", "validate", new Date().toISOString())).verdict, "KILL");
+  });
+});
+
+describe("seedOf (Part 3.8 review)", () => {
+  test("keeps the typed seed that searchTextOf would rewrite", () => {
+    assert.equal(seedOf("strength training for women"), "strength training for women");
+    assert.notEqual(searchTextOf(planResearch("strength training for women", "deep").query), "strength training for women");
+    assert.equal(seedOf("pdf-lab Moving Checklist"), "moving checklist");
+    assert.equal(seedOf("deep: packing list"), "packing list");
   });
 });

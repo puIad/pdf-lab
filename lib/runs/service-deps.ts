@@ -11,7 +11,8 @@ import { writeEvidence } from "../evidence/writer.ts";
 import { createServerEvidenceDeps } from "../evidence/service-deps.ts";
 import { fetchRunCompleteness } from "./completeness.ts";
 import { buildSearchFilter } from "../db/search.ts";
-import { generate25Opportunities, type OpportunityMarketInput } from "../opportunities/index.ts";
+import { generate25Opportunities, ideaCandidates, type OpportunityMarketInput } from "../opportunities/index.ts";
+import { loadStoredIdeas } from "../ideas/stored.ts";
 import type { OrchestratorDeps, OrchestratorCompetitorItem } from "./orchestrator.ts";
 import { parseMarketplaceProduct } from "../sources/marketplace-helper.ts";
 
@@ -299,7 +300,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
       return writeEvidence(items, evidenceDeps);
     },
 
-    generateOpportunities: async (markets) => {
+    generateOpportunities: async (markets, seed) => {
       const marketInputs: OpportunityMarketInput[] = markets.map((m) => ({
         id: m.id,
         name: m.name,
@@ -324,10 +325,16 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         })),
       }));
 
+      // The seed's quick ideas (stored phrase rows) join the pool; a failed lookup only loses them.
+      const stored = await loadStoredIdeas(supabase, seed).catch((err) => {
+        console.error("Quick ideas skipped for Deep run:", err instanceof Error ? err.message : err);
+        return null;
+      });
       const res = await generate25Opportunities(marketInputs, {
         targetCount: 25,
         router,
         tier: "strong",
+        extraCandidates: stored ? ideaCandidates(seed, stored.result.ideas, marketInputs, stored.refs) : [],
       });
 
       return res.opportunities.map((opp) => ({

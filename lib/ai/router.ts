@@ -28,6 +28,7 @@ import {
   OPENROUTER_DEFAULT_CHEAP_MODEL,
   OPENROUTER_DEFAULT_EMBED_MODEL,
 } from "./providers/openrouter.ts";
+import { NVIDIA_DEFAULT_CHAT_MODEL } from "./providers/openai-compatible.ts";
 
 export interface TierSelection {
   tier: TaskTier;
@@ -53,11 +54,13 @@ const TIER_ENV: Record<TaskTier, { providerVar: string; modelVar: string }> = {
 
 const TIER_DEFAULT_PROVIDER: Record<TaskTier, string> = {
   cheap: "ollama", // local-first per 07-AI-ROUTER; falls through when absent
-  strong: "openrouter",
+  strong: "nvidia",
   embed: "openrouter",
 };
 
-const FALLBACK_ORDER = ["ollama", "openrouter", "openai-compatible"];
+// nvidia sits before openrouter: with NVIDIA_API_KEY set it takes the cheap and strong tiers;
+// without it (e.g. on Vercel) the chain falls through to openrouter as before.
+const FALLBACK_ORDER = ["ollama", "nvidia", "openrouter", "openai-compatible"];
 
 function defaultModelFor(provider: string, tier: TaskTier, env: NodeJS.ProcessEnv): string {
   const override = env[TIER_ENV[tier].modelVar];
@@ -71,6 +74,12 @@ function defaultModelFor(provider: string, tier: TaskTier, env: NodeJS.ProcessEn
   if (provider === "openrouter") {
     if (tier === "cheap") return env.OPENROUTER_CHEAP_MODEL || OPENROUTER_DEFAULT_CHEAP_MODEL;
     return env.OPENROUTER_STRONG_MODEL || OPENROUTER_DEFAULT_CHEAP_MODEL;
+  }
+  if (provider === "nvidia") {
+    // No 1536-dim embed model on NVIDIA's API: embeddings stay on openrouter.
+    if (tier === "embed") return "";
+    if (tier === "cheap") return env.NVIDIA_CHEAP_MODEL || NVIDIA_DEFAULT_CHAT_MODEL;
+    return env.NVIDIA_STRONG_MODEL || NVIDIA_DEFAULT_CHAT_MODEL;
   }
   if (provider === "openai-compatible") {
     if (tier === "cheap") return env.OPENAI_CHEAP_MODEL || "gpt-4o-mini";
@@ -99,6 +108,8 @@ export class AIRouter {
   private readonly providers = new Map<string, AIProvider>();
   private readonly env: NodeJS.ProcessEnv;
   private readonly nowFn: () => number;
+  /** Fallback health per provider, cached 60 s so each call does not add a request (rate limits). */
+  private readonly health = new Map<string, { ok: boolean; at: number }>();
 
   constructor(env: NodeJS.ProcessEnv = process.env, opts: AIRouterOptions = {}) {
     this.env = env;
@@ -178,7 +189,12 @@ export class AIRouter {
       if (!provider || !provider.isConfigured) continue;
       // Skip providers that are provisioned but provably down (fast fail).
       if (name !== sel.provider) {
-        const h = await provider.healthCheck().catch(() => ({ ok: false as const }));
+        let h = this.health.get(name);
+        if (!h || this.nowFn() - h.at > 60_000) {
+          const r = await provider.healthCheck().catch(() => ({ ok: false as const }));
+          h = { ok: r.ok, at: this.nowFn() };
+          this.health.set(name, h);
+        }
         if (!h.ok) continue;
       }
       const t0 = this.nowFn();

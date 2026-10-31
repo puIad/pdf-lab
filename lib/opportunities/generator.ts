@@ -24,6 +24,8 @@ export interface GenerateOpportunitiesOptions {
   router?: AIRouter;
   tier?: "strong";
   promptVersion?: string;
+  /** Extra candidates for the pool, e.g. the seed's quick ideas (Part 3.8). Selection rules are unchanged. */
+  extraCandidates?: GeneratedOpportunity[];
 }
 
 export interface GenerationResult {
@@ -61,7 +63,7 @@ const DIVERSE_AUDIENCE_TEMPLATES = [
   "Small Business Owners Managing In-House PCs",
 ] as const;
 
-const FORMAT_PRICE_TIERS: Record<OpportunityFormat, { priceRange: string; sophistication: SophisticationLevel }> = {
+export const FORMAT_PRICE_TIERS: Record<OpportunityFormat, { priceRange: string; sophistication: SophisticationLevel }> = {
   checklist: { priceRange: "$7–$12", sophistication: "beginner" },
   cheat_sheet: { priceRange: "$7–$12", sophistication: "beginner" },
   quick_reference: { priceRange: "$9–$15", sophistication: "intermediate" },
@@ -333,6 +335,8 @@ export async function generate25Opportunities(
   } else {
     candidatePool = generateCandidatePool(markets);
   }
+
+  candidatePool.push(...(options.extraCandidates ?? []));
 
   // Step 2: Select diversified set of exactly targetCount
   const finalOpportunities = selectDiversifiedOpportunities(candidatePool, targetCount);

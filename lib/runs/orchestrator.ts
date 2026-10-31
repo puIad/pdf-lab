@@ -15,18 +15,22 @@ import {
 } from "../evidence/qc.ts";
 import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 import { isDemandOnly } from "../sources/demand-only.ts";
+import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
 
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+// Extraction is one model call per signal: ~7 signals/min on NVIDIA's hosted gpt-oss (DEC-013),
+// so a fixed 5 minutes fails any run over ~35 signals. Budget 10 s per signal instead.
+export const EXTRACT_MS_PER_SIGNAL = 10_000;
 
 // Demand measurements, not discussions: they must not go through extraction or become market evidence.
 function discussionsOnly<T extends { source_type: string; external_id?: string | null }>(rows: T[]): T[] {
   return rows.filter((s) => !isDemandOnly(s));
 }
-function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
+function withTimeout<T>(p: Promise<T>, label: string, ms = STEP_TIMEOUT_MS): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${STEP_TIMEOUT_MS}ms`));
-    }, STEP_TIMEOUT_MS);
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
     p.then((val) => {
       clearTimeout(timer);
       resolve(val);
@@ -46,6 +50,8 @@ export interface ResearchRunOptions {
   /** Planner rule-set version + structured plan (Phase 3.4), persisted on the run row. */
   promptVersion?: string | null;
   plan?: unknown;
+  /** The seed as the user typed it; its stored quick ideas join the pool. Defaults to `query`. */
+  seed?: string;
 }
 
 export interface StoredSignalForRun {
@@ -134,7 +140,8 @@ export interface OrchestratorDeps {
   clusterAndScore: (signals: StoredSignalForRun[]) => Promise<OrchestratorMarketItem[]>;
   saveMarkets: (markets: OrchestratorMarketItem[]) => Promise<Array<{ id: string; name: string }>>;
   saveEvidence: (items: EvidenceInput[]) => Promise<EvidenceRow[]>;
-  generateOpportunities: (markets: OrchestratorMarketItem[]) => Promise<Array<{
+  /** `seed`: the stored quick ideas of this seed join the candidate pool (Part 3.8). */
+  generateOpportunities: (markets: OrchestratorMarketItem[], seed: string) => Promise<Array<{
     opportunity: OrchestratorOpportunityItem;
     evidence: EvidenceInput[];
   }>>;
@@ -216,7 +223,7 @@ export async function executeResearchRun(
           content: s.content,
           url: s.url,
         })),
-      ), "extract");
+      ), "extract", Math.max(STEP_TIMEOUT_MS, unanalyzedSignals.length * EXTRACT_MS_PER_SIGNAL));
     }
     const freshSignals = discussionsOnly(await deps.getSignals(query));
 
@@ -379,7 +386,8 @@ export async function executeResearchRun(
     });
     await deps.updateRunStatus(runId, "opportunity_generation");
 
-    const generatedPairs = await deps.generateOpportunities(marketCandidates);
+    const generatedPairs = await deps.generateOpportunities(marketCandidates, options.seed?.trim() || query);
+    const fromIdeas = generatedPairs.filter((p) => p.evidence.some((e) => e.claim.startsWith(IDEA_CLAIM_PREFIX))).length;
     const validOpportunitiesToSave: OrchestratorOpportunityItem[] = [];
     const oppEvidenceToSave: EvidenceInput[] = [];
 
@@ -421,6 +429,7 @@ export async function executeResearchRun(
     tracker.transition("report_generation", {
       counts: {
         opportunities: savedOppsCount,
+        opportunitiesFromIdeas: fromIdeas,
         evidenceCreated: totalEvidenceCreated,
       },
       message: `Assembling research completeness panel and reconciling database counts`,

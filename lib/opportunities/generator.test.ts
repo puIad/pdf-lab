@@ -5,10 +5,14 @@ import assert from "node:assert/strict";
 import {
   generate25Opportunities,
   generateCandidatePool,
+  IDEA_CLAIM_PREFIX,
+  ideaCandidates,
   OPPORTUNITY_PROMPT_VERSION,
+  pickDistinctIdeas,
   type OpportunityMarketInput,
 } from "./index.ts";
 import { QCViolationError } from "../evidence/qc.ts";
+import { buildIdeas } from "../ideas/ideas.ts";
 
 function createMockMarkets(): OpportunityMarketInput[] {
   return [
@@ -242,5 +246,56 @@ test("25-Opportunity Generator — Core Specification & Acceptance Gates", async
       assert.equal(resA.opportunities[i].targetAudience, resB.opportunities[i].targetAudience);
       assert.equal(resA.opportunities[i].opportunityScore, resB.opportunities[i].opportunityScore);
     }
+  });
+});
+
+test("Part 3.8: quick ideas join the Deep-run candidate pool", async (t) => {
+  const markets = createMockMarkets();
+  // SAMPLE DATA shaped like stored Serper phrase rows (fixture rule).
+  const phrase = (p: string, best: number) => ({
+    source: "web",
+    source_id: `serp:us:${p}`,
+    url: `https://www.google.com/search?q=${encodeURIComponent(p)}`,
+    title: p,
+    text: null,
+    author: null,
+    timestamp: null,
+    engagement: { seed: "pc troubleshooting", phrase: p, serp_blocks: "paa", block_count: 1, blocks_total: 2, best_position: best },
+    market_candidates: [],
+    intent: null,
+    pain_points: [],
+  });
+  const ideas = buildIdeas("pc troubleshooting", [
+    phrase("how to fix a pc that won't boot", 0),
+    phrase("how to fix pc that won't boot", 1), // near-duplicate of the first
+    phrase("pc troubleshooting checklist", 2),
+    phrase("why does my gpu crash", 3),
+  ]).ideas;
+  const refs = new Map(ideas.flatMap((i) => i.evidence).map((e) => [e.source_id, { sourceUuid: "src-web", excerpt: e.title }]));
+
+  await t.test("near-duplicates dropped by token overlap; at most 20 kept", () => {
+    const picked = pickDistinctIdeas(ideas);
+    assert.equal(picked.length, 3);
+    assert.ok(pickDistinctIdeas([...ideas, ...ideas], 2).length <= 2);
+  });
+
+  await t.test("each candidate cites its phrase rows and maps to a known market", () => {
+    const cands = ideaCandidates("pc troubleshooting", ideas, markets, refs);
+    const ids = new Set(markets.map((m) => m.id));
+    for (const c of cands) {
+      assert.ok(ids.has(c.marketId));
+      assert.ok(c.evidence.length > 0);
+      assert.ok(c.evidence.every((e) => e.entityId === c.id && e.claim.startsWith(IDEA_CLAIM_PREFIX) && e.sourceId === "src-web"));
+    }
+    assert.equal(ideaCandidates("x", ideas, [], refs).length, 0); // no market, no candidate
+  });
+
+  await t.test("still 25 distinct, PRD §29 rules unchanged, at least one traced to a phrase", async () => {
+    const res = await generate25Opportunities(markets, { targetCount: 25, extraCandidates: ideaCandidates("pc troubleshooting", ideas, markets, refs) });
+    assert.equal(res.opportunities.length, 25);
+    const keys = new Set(res.opportunities.map((o) => `${o.targetAudience}::${o.problem}::${o.format}`));
+    assert.equal(keys.size, 25);
+    for (const n of Object.values(res.diversification.formatCounts)) assert.ok(n <= 9);
+    assert.ok(res.opportunities.some((o) => o.evidence.some((e) => e.claim.startsWith(IDEA_CLAIM_PREFIX))));
   });
 });

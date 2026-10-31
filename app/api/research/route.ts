@@ -16,9 +16,11 @@ import { isDemandOnly } from "@/lib/sources/demand-only";
 import {
   RESEARCH_MODES,
   buildValidationReport,
+  buildVerdict,
   filterMarkets,
   planResearch,
   searchTextOf,
+  seedOf,
   tokenize,
   type ResearchMode,
 } from "@/lib/planner";
@@ -92,6 +94,8 @@ export async function POST(req: Request) {
     const result = await executeResearchRun(
       {
         query: text,
+        // The planner's search text drops format words and "for …" spans; ideas are stored under the typed seed.
+        seed: seedOf(body.prompt),
         mode: "deep",
         limit: 25,
         userId,
@@ -133,7 +137,7 @@ export async function POST(req: Request) {
       case "validate": {
         const concept = plan.query.concept ?? plan.query.raw;
         const overview = await generateMarketOverview(concept, supabase, { mode: "validate", persistRun: false });
-        result = { mode: "validate", report: buildValidationReport(concept, overview) };
+        result = { mode: "validate", report: buildValidationReport(concept, overview), verdict: buildVerdict(overview) };
         break;
       }
       case "monitor": {

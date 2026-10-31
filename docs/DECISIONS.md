@@ -32,6 +32,13 @@ patch the affected guide/phase file (link the follow-up commit).
 - Recommendation: none yet — measure Phase 1–3 run durations first; decide on data.
 - Question for user: (to be asked in Phase 4) "Runs take ~X min and need Y retries — pick (a)/(b)/(c)?"
 - Resolution: _unresolved_
+- Data point (2026-10-25, from DEC-013): a Deep run on "budgeting" took 17.7 minutes, almost all of
+  it waiting on NVIDIA (about 7 signals a minute). Cloudflare Workflows on Workers Paid fits that
+  shape (unlimited wall time per step, 30 s to 5 min of CPU per step, retried and persisted steps;
+  the Workers Free plan's 10 ms CPU and 50 subrequests do not). Open risk: `google-trends-api` needs
+  Node's `https` under `nodejs_compat`. Add it as option (d) when 4.2 decides.
+- Interim (user, 2026-10-25): Deep runs stay local. Production does not run them until 4.2; the
+  `x-api-key` guard on Deep mode stays, and no NVIDIA key goes to Vercel for now.
 
 ## DEC-002 — Web-search provider pick (SEED — decide in Phase 1 Part 1.2)
 
@@ -247,3 +254,76 @@ patch the affected guide/phase file (link the follow-up commit).
   external id, so scans per region dedup separately. Outside the US, expect the Serper phrase blocks
   to be empty often; quick ideas there rest on Trends related queries.
 
+
+## DEC-012 — Default free OpenRouter model withdrawn; Deep runs extract nothing
+
+- Date: 2026-10-24
+- Part: Phase 3 Part 3.8 (acceptance: a Deep run on a seed with stored ideas returns 25 distinct
+  opportunities with at least one traced to an idea phrase)
+- Expected: the cheap and strong tiers default to `nex-agi/nex-n2.5-pro:free` ($0, used for the 1.3
+  and 1.5 live runs).
+- Found: OpenRouter answers 404 "This model is unavailable for free. The paid version is available
+  now". Deep run `171abdef` on "budgeting" walked all 10 states to `completed` with 91 discussion
+  signals, 0 analyzed, 0 markets, 0 opportunities and 40% completeness. Extraction failures do not
+  fail the run or reach the server log (a separate defect, logged for 6.x).
+- Options (prices from the OpenRouter models API, 2026-10-24):
+  (a) paid `nex-agi/nex-n2.5-pro`, $0.075 / M input, $0.25 / M output; about $0.01 per Deep run of
+      ~100 signals. Same model as before, so extraction quality is unchanged.
+  (b) another free model with JSON output: `google/gemma-4-31b-it:free` or
+      `nvidia/nemotron-3-super-120b-a12b:free`. $0; free models can be withdrawn again the same way,
+      and extraction quality needs a spot check.
+  (c) local Ollama (`AI_CHEAP_PROVIDER=ollama`). $0, needs a model pulled on this machine; not
+      usable from Vercel.
+  All three are env changes (`OPENROUTER_CHEAP_MODEL` / `OPENROUTER_STRONG_MODEL`, or the default in
+  `lib/ai/providers/openrouter.ts`); no Part 3.8 code depends on the choice.
+- Recommendation: (a). It costs about a cent per run and does not break again when a free tier ends.
+- Question for user: which model should the cheap and strong tiers use?
+- Resolution: 2026-10-24, (b) `google/gemma-4-31b-it:free`, set as `OPENROUTER_DEFAULT_CHEAP_MODEL`
+  (both tiers use it unless env overrides). Right after the switch, four probes over ~80 s got 429
+  "temporarily rate-limited upstream" (Google AI Studio), so extraction quality and the Part 3.8
+  Deep-run acceptance are still unverified. A later gemma probe was still 429. The user then asked
+  for `nvidia/nemotron-3-super-120b-a12b:free`: three probes over ~30 s returned 404 from the Nvidia
+  provider ("Function ... Not found for account"), so the default was left on gemma.
+  Final, same day: the user chose `openrouter/free` (OpenRouter picks a served free model per call;
+  a JSON probe routed to `dots-studio/dots-3-note-preview:free`). It is now
+  `OPENROUTER_DEFAULT_CHEAP_MODEL`. Why the named free models failed: each has one upstream provider
+  (Google AI Studio's free pool was rate-limited, Nvidia's endpoint showed status -5 and 0% uptime,
+  nex had no free endpoint). Separately, the key's account has $0 of credits purchased, so OpenRouter
+  allows 50 free calls a day (1,000 after $10 ever purchased). A Deep run makes one extraction call
+  per signal, so a ~90-signal run exhausts the day: Deep run `7feb9fb2` analyzed 17 of 91 signals
+  before the cap (57 of 50 calls used). A different key on the same account has the same limits.
+  Follow-ups: $10 of credits (or a paid model) before Deep runs are relied on; extraction failures
+  should surface in the run (6.x).
+
+## DEC-013 — NVIDIA's hosted API as the chat provider (user-supplied key, 40 rpm)
+
+- Date: 2026-10-24
+- Part: Phase 3 Part 3.8 follow-up (DEC-012 left Deep runs capped at 50 free OpenRouter calls a day)
+- Expected: the user added `NVIDIA_API_KEY` to `.env.local` (rate limit 40 requests a minute) for
+  the cheap and strong tiers.
+- Found: `GET /v1/models` lists 85 models, but most are not deployed for this key. Chat calls returned
+  404 "Function ... Not found for account" for `nemotron-3-super-120b-a12b` (the same outage seen
+  through OpenRouter), `nemotron-nano-3-30b-a3b`, `llama-3.1-nemotron-70b-instruct`,
+  `mistral-large-2-instruct`, `mistral-nemo-12b-instruct` and `kimi-k2.6`. `gemma-4-31b-it` and
+  `deepseek-v4.1-flash` gave no headers within 60 s or more. `nemotron-3.5-lightning-30b-a3b` and
+  `openai/gpt-oss-20b` answer, but both reason first: at default effort gpt-oss spent the whole
+  500-token extraction budget and returned no content on 5 of 8 signals.
+- Options: (a) `openai/gpt-oss-20b` with `reasoning_effort: "low"`; (b) raise every max_tokens budget
+  so reasoning fits; (c) keep OpenRouter only.
+- Recommendation and resolution (2026-10-24, (a)): with `reasoning_effort: "low"` gpt-oss extracted
+  12 of 12 stored "budgeting" signals (about 8 s each at concurrency 2, schema-valid). Implementation:
+  the OpenAI-compatible provider class is reused as provider `nvidia` (`NVIDIA_API_KEY`,
+  `NVIDIA_BASE_URL`, `NVIDIA_RPM` default 40, `NVIDIA_REASONING_EFFORT` default "low",
+  `NVIDIA_CHEAP_MODEL` / `NVIDIA_STRONG_MODEL` default `openai/gpt-oss-20b`), with a request throttle
+  (60 000 / rpm ms between starts), a 60 s timeout and one retry on 429. The router order is now
+  ollama, nvidia, openrouter, openai-compatible, and the strong tier's first choice is nvidia; with no
+  NVIDIA key (Vercel today) the chain falls through to openrouter as before. Embeddings stay on
+  openrouter (no 1536-dim model on NVIDIA). Fallback health checks are cached for 60 s so they do not
+  add a request per call. Production needs `NVIDIA_API_KEY` in Vercel to use it (not set by this
+  change).
+  Measured in the Deep run: calls take 13 to 28 s when several run at once (NVIDIA queues them),
+  about 7 signals a minute at concurrency 2 or 5, so the orchestrator's fixed 5-minute extract step
+  failed twice. The extract step now budgets 10 s per unanalyzed signal (minimum 5 minutes). Deep run
+  `de881e6b` on "budgeting" then completed in 17.7 minutes with 97 of 102 signals analyzed. That
+  length does not fit a Vercel function; Deep runs in production need a background job (4.2 decides
+  the scheduler, DEC-001).

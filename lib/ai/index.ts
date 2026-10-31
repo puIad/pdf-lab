@@ -7,6 +7,7 @@ import { OllamaProvider, ollamaConfigFromEnv } from "./providers/ollama.ts";
 import { OpenRouterProvider, openRouterConfigFromEnv } from "./providers/openrouter.ts";
 import {
   OpenAICompatProvider,
+  nvidiaConfigFromEnv,
   openAICompatConfigFromEnv,
 } from "./providers/openai-compatible.ts";
 
@@ -17,6 +18,7 @@ export function createRouter(env: NodeJS.ProcessEnv = process.env): AIRouter {
   router.register(new OllamaProvider(ollamaConfigFromEnv(env)));
   router.register(new OpenRouterProvider(openRouterConfigFromEnv(env)));
   router.register(new OpenAICompatProvider(openAICompatConfigFromEnv(env)));
+  router.register(new OpenAICompatProvider(nvidiaConfigFromEnv(env)));
   return router;
 }
 
