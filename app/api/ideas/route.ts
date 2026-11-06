@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { runIngest } from "@/lib/ingest/pipeline";
 import { getServiceDeps } from "@/lib/ingest/service-deps";
 import { buildIdeas } from "@/lib/ideas/ideas";
-import { DEFAULT_REGION, isRegion } from "@/lib/ideas/seeds";
+import { DEFAULT_REGION, isRegion, scanSourceKeys } from "@/lib/ideas/seeds";
+import { loadCompetitionChecks, normalizePhrase } from "@/lib/competition/check";
+import { createServiceSupabaseClient } from "@/lib/db/client";
 import { autocompleteEnabled } from "@/lib/sources";
 import type { MarketSignal } from "@/lib/sources/types";
 
@@ -42,11 +44,16 @@ export async function POST(req: Request) {
 
   try {
     const stored: MarketSignal[] = [];
-    const summary = await runIngest({ query: seed.trim(), limit: 50, sourceKeys: [phraseSource, "gtrends", "wikipedia"], geo: region }, getServiceDeps(), (_key, signals) =>
+    const summary = await runIngest({ query: seed.trim(), limit: 50, sourceKeys: scanSourceKeys(phraseSource), geo: region }, getServiceDeps(), (_key, signals) =>
       stored.push(...signals),
     );
+    const ideas = buildIdeas(seed, stored);
+    // Earlier competition checks (Part 3.9) are read from the DB; a scan never runs one.
+    const checks = await loadCompetitionChecks(createServiceSupabaseClient(), ideas.ideas.map((i) => i.phrase));
+    const competition = Object.fromEntries(ideas.ideas.flatMap((i) => (checks[normalizePhrase(i.phrase)] ? [[i.id, checks[normalizePhrase(i.phrase)]]] : [])));
     return NextResponse.json({
-      ...buildIdeas(seed, stored),
+      ...ideas,
+      competition,
       region,
       phraseSource,
       sources: summary.sources.map(({ key, displayName, status, collected, inserted, duplicates, error }) => ({

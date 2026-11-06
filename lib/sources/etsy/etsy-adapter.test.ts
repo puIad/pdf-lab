@@ -133,3 +133,41 @@ describe("EtsyAdapter", () => {
     assert.equal(status2.ok, true);
   });
 });
+
+describe("EtsyAdapter Serper star fields and goto links (Part 3.9)", () => {
+  it("keeps rating/ratingCount over the snippet and does not collapse Google goto links", async () => {
+    const adapter = new EtsyAdapter({
+      apiKey: "k",
+      minIntervalMs: 0,
+      fetchFn: stubFetch({
+        organic: [
+          { title: "Budget Sheet - Etsy", link: "https://www.etsy.com/listing/1/budget?ref=x", snippet: "Digital Download · $3.50", rating: 4.7, ratingCount: 22, position: 1 },
+          { title: "A", link: "https://www.google.com/goto?url=AAA", snippet: "x", position: 2 },
+          { title: "B", link: "https://www.google.com/goto?url=BBB", snippet: "y", position: 3 },
+        ],
+      }),
+    });
+    const items = await adapter.collect({ query: "budget", limit: 10 });
+    assert.deepEqual(items.map((i) => i.externalId), [
+      "https://www.etsy.com/listing/1/budget",
+      "https://www.google.com/goto?url=AAA",
+      "https://www.google.com/goto?url=BBB",
+    ]);
+    const s = adapter.normalize(items[0]);
+    assert.equal(s.engagement.review_count, 22);
+    assert.equal(s.engagement.rating, 4.7);
+    assert.equal(s.engagement.price, "$3.50");
+    assert.equal(adapter.extractCompetitors(items)[0].reviewCount, 22);
+  });
+});
+
+describe("marketplace price parsing (Part 3.9)", () => {
+  it("does not read 'Free Cash Flow' or 'Debt Free' as a price", async () => {
+    const { parsePrice } = await import("../marketplace-helper.ts");
+    assert.equal(parsePrice("the Free Cash Flow approach to capital budgeting").priceStr, null);
+    assert.equal(parsePrice("How to Be Debt Free: a simple plan").priceStr, null);
+    assert.equal(parsePrice("Free printable budget sheet").priceStr, "Free");
+    assert.deepEqual(parsePrice("Free"), { priceStr: "Free", priceNumeric: 0 }); // stored competitors.price (export)
+    assert.equal(parsePrice("Budget planner $4.50, free shipping").priceStr, "$4.50");
+  });
+});

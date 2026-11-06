@@ -20,7 +20,9 @@ export interface ParsedMarketplaceItem {
 export function parsePrice(text?: string | null): { priceStr: string | null; priceNumeric: number | null } {
   if (!text) return { priceStr: null, priceNumeric: null };
 
-  if (/\bfree\b/i.test(text)) {
+  // A bare "Free" (the stored competitors.price value) or "free" beside a product word. Blurbs say
+  // "Free Cash Flow", "Debt Free", "free shipping": those are not prices.
+  if (/^\s*free\s*$|\bfree\s+(?:download|digital download|pdf|printable|ebook|e-book|template|guide|checklist|planner|workbook|worksheet)s?\b/i.test(text)) {
     return { priceStr: "Free", priceNumeric: 0 };
   }
 
@@ -166,16 +168,35 @@ export function extractReviewSnippets(snippet: string): string[] {
   return reviews.slice(0, 3);
 }
 
+/**
+ * Strips tracking params so one listing dedups to one row (H-2). Google `goto` redirects carry the
+ * target only in the query string, so they keep it: stripped, every one collapsed to the same key.
+ */
+export function cleanListingLink(link: string): string {
+  try {
+    const u = new URL(link);
+    if (/(^|\.)google\.[a-z.]+$/i.test(u.hostname)) return link;
+    u.search = "";
+    u.hash = "";
+    return u.toString();
+  } catch {
+    return link;
+  }
+}
+
 export function parseMarketplaceProduct(
   platform: "etsy" | "gumroad" | "amazon_kdp" | "web",
-  raw: { title?: string; link?: string; snippet?: string },
+  raw: { title?: string; link?: string; snippet?: string; rating?: number; ratingCount?: number },
 ): CompetitorProduct {
   const title = (raw.title || "Untitled Product").replace(/\s*[-|·]\s*(?:Etsy|Gumroad|Amazon(?:\.com)?).*$/i, "").trim();
   const url = (raw.link || "").trim() || null;
   const snippet = raw.snippet || "";
 
   const { priceStr, priceNumeric } = parsePrice(snippet + " " + title);
-  const { rating, reviewCount } = parseRatingAndReviews(snippet);
+  // Serper's structured star fields beat parsing the snippet, which rarely carries them.
+  const fromSnippet = parseRatingAndReviews(snippet);
+  const rating = typeof raw.rating === "number" ? raw.rating : fromSnippet.rating;
+  const reviewCount = typeof raw.ratingCount === "number" ? raw.ratingCount : fromSnippet.reviewCount;
   const format = detectProductFormat(title + " " + snippet);
   const seller = extractSeller(platform, url, snippet);
   const { positioning, promises } = extractPromisesAndPositioning(title, snippet);
