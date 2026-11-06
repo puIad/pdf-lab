@@ -7,9 +7,9 @@
 
 import React, { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, Copy, Download, ExternalLink, Flame, History, ListOrdered, Loader2, Microscope, RefreshCw, Search, Store, ShieldAlert, ShieldCheck, TrendingUp } from "lucide-react";
+import { ArrowLeft, CalendarClock, Copy, Download, ExternalLink, FileText, Flame, History, ListOrdered, Loader2, Microscope, RefreshCw, Search, Store, ShieldAlert, ShieldCheck, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -191,7 +191,7 @@ function CompetitionPanel({ state }: { state: CheckState }) {
   );
 }
 
-function IdeaCard({ idea, related, initialCheck }: { idea: QuickIdea; related: QuickIdea[]; initialCheck: CompetitionCheck | null }) {
+function IdeaCard({ seed, idea, related, initialCheck }: { seed: string; idea: QuickIdea; related: QuickIdea[]; initialCheck: CompetitionCheck | null }) {
   const [open, setOpen] = useState(false);
   const [comp, setComp] = useState<CheckState>({ loading: false, check: initialCheck, failed: [], error: null });
 
@@ -353,6 +353,29 @@ function IdeaCard({ idea, related, initialCheck }: { idea: QuickIdea; related: Q
               {validation.loading ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
               Validate
             </Button>
+            {/* Briefs only for validated ideas (DEC-010 item 10): GO or WAIT opens one, KILL gets none. */}
+            {validation.verdict && validation.verdict.verdict !== "KILL" ? (
+              <Link
+                href={`/briefs/idea?seed=${encodeURIComponent(seed)}&phrase=${encodeURIComponent(idea.phrase)}`}
+                className={buttonVariants({ size: "sm", variant: "outline" })}
+                title="Open the build-ready brief for this validated idea"
+              >
+                <FileText />
+                Brief
+              </Link>
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="cursor-pointer"
+                disabled={validation.loading || validation.verdict?.verdict === "KILL"}
+                title={validation.verdict ? "Validate said KILL: no brief" : "A brief needs a GO or WAIT verdict: runs Validate first"}
+                onClick={validate}
+              >
+                <FileText />
+                {validation.verdict ? "No brief (KILL)" : "Validate first"}
+              </Button>
+            )}
             <Button size="sm" variant={open ? "secondary" : "outline"} className="cursor-pointer" onClick={() => setOpen((o) => !o)}>
               <ListOrdered />
               Outline
@@ -732,7 +755,7 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {visible.slice(0, shown).map((idea) => (
-                  <IdeaCard key={idea.id} idea={idea} related={related} initialCheck={data.competition?.[idea.id] ?? null} />
+                  <IdeaCard key={idea.id} seed={data.seed} idea={idea} related={related} initialCheck={data.competition?.[idea.id] ?? null} />
                 ))}
               </div>
               {visible.length > shown && (

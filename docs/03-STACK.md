@@ -15,6 +15,7 @@ upgrade/downgrade.
 | Deployment | Vercel (free tier), production + preview envs | Env vars via dashboard/CLI; Next.js zero-config target | https://vercel.com/docs |
 | AI layer | Model-agnostic `AIProvider` (OpenAI-compatible / Gemini / Bedrock / Ollama-local / OpenRouter). App calls generateText/generateObject-style methods behind our router | Cheap model = classification/tagging/dedup/intent/extraction; strong model = synthesis/reports/opportunities; embedding model = search/cluster/dedup (PRD §33). Free-quota/local-first in dev | Provider docs + `docs/07-AI-ROUTER.md` |
 | Tier-1 sources | Reddit (read-only JSON/OAuth) + Google Trends (unofficial API — handle with care) + web search (Brave/Serper/Tavily/Bing — pick ONE free-tier in Phase 1 Part 1.2) | Reddit: authenticated scripts preferred over anon scraping; Trends: unofficial libs break — isolate behind adapter + cache aggressively | `docs/08-ADAPTERS.md` + `docs/guides/sources-reddit-trends-search.md` |
+| Brief DOCX export (Part 3.10) | `docx` (dolanmiu), pinned | **docx 9.13.0** (published 2026-10-19; 9.15.2 is latest but under two weeks old on 2026-11-06). API used: `Document`, `Paragraph` (`heading`, `bullet`, `indent`), `TextRun`, `ExternalHyperlink`, `Packer.toBuffer`; checked on Context7 `/dolanmiu/docx` | https://docx.js.org + https://github.com/dolanmiu/docx |
 | Package manager | pnpm (matches shadcn + Next docs' primary examples) | `pnpm create next-app@latest`, `pnpm dev` | https://nextjs.org/docs/app/getting-started/installation |
 
 ## Scaffold commands (exact, from official docs)

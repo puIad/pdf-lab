@@ -127,7 +127,10 @@ export async function runCompetitionCheck(phrase: string, deps: CheckDeps): Prom
 }
 
 interface EvidenceRead {
+  id: string;
   entity_id: string;
+  claim: string;
+  excerpt: string | null;
   url: string | null;
   created_at: string;
   sources: { type?: string } | { type?: string }[] | null;
@@ -157,13 +160,27 @@ export function batchByLength(items: string[], maxChars: number): string[][] {
 
 const typeOf = (s: EvidenceRead["sources"]) => (Array.isArray(s) ? s[0]?.type : s?.type) ?? "unknown";
 
-/** Stored checks for these phrases, keyed by normalized phrase. DB reads only, no adapter call. */
-export async function loadCompetitionChecks(supabase: SupabaseClient, phrases: string[]): Promise<Record<string, CompetitionCheck>> {
+export interface StoredListing extends Listing {
+  evidenceId: string;
+  excerpt: string | null;
+}
+
+export interface StoredCheck {
+  phrase: string;
+  checkedAt: string;
+  /** Marketplaces that answered, in CHECK_SOURCES order, with the ids of their "0 listings" rows. */
+  platforms: string[];
+  zeroRows: { platform: string; evidenceId: string; claim: string }[];
+  listings: StoredListing[];
+}
+
+/** Stored check rows per phrase, listing by listing, keyed by normalized phrase. DB reads only. */
+export async function loadStoredChecks(supabase: SupabaseClient, phrases: string[]): Promise<Record<string, StoredCheck>> {
   const byId = new Map(phrases.map((p) => [checkEntityId(p), normalizePhrase(p)]));
   if (byId.size === 0) return {};
   const { data: ev, error } = await supabase
     .from("evidence")
-    .select("entity_id, url, created_at, sources ( type )")
+    .select("id, entity_id, claim, excerpt, url, created_at, sources ( type )")
     .eq("entity_type", "competition")
     .in("entity_id", [...byId.keys()]);
   if (error) throw new Error(`failed to load competition checks: ${error.message}`);
@@ -183,25 +200,50 @@ export async function loadCompetitionChecks(supabase: SupabaseClient, phrases: s
     for (const r of (data ?? []) as SignalRead[]) signals.set(`${typeOf(r.sources)}|${r.external_id}`, r);
   }
 
-  const out: Record<string, CompetitionCheck> = {};
+  const out: Record<string, StoredCheck> = {};
   for (const [id, phrase] of byId) {
     const rows = evidence.filter((e) => e.entity_id === id);
     if (rows.length === 0) continue;
     const platforms = [...new Set(rows.map((r) => typeOf(r.sources)))].sort(
       (a, b) => CHECK_SOURCES.indexOf(a as never) - CHECK_SOURCES.indexOf(b as never),
     );
-    const listings: Listing[] = rows
-      .filter((r) => r.url)
-      .map((r) => {
-        const platform = typeOf(r.sources);
-        const eng = signals.get(`${platform}|${r.url}`)?.engagement ?? null;
-        return { platform, url: r.url as string, price: eng?.price ?? null, reviews: eng?.review_count ?? null };
-      });
     out[phrase] = {
       phrase,
       checkedAt: rows.map((r) => r.created_at).sort().at(-1) as string,
-      listings: listings.length,
-      marketplaces: summarizeListings(platforms, listings),
+      platforms,
+      zeroRows: rows.filter((r) => !r.url).map((r) => ({ platform: typeOf(r.sources), evidenceId: r.id, claim: r.claim })),
+      listings: rows
+        .filter((r) => r.url)
+        .map((r) => {
+          const platform = typeOf(r.sources);
+          const eng = signals.get(`${platform}|${r.url}`)?.engagement ?? null;
+          return {
+            platform,
+            url: r.url as string,
+            price: eng?.price ?? null,
+            reviews: eng?.review_count ?? null,
+            evidenceId: r.id,
+            excerpt: r.excerpt,
+          };
+        }),
+    };
+  }
+  return out;
+}
+
+/** Stored checks for these phrases, keyed by normalized phrase. DB reads only, no adapter call. */
+export async function loadCompetitionChecks(supabase: SupabaseClient, phrases: string[]): Promise<Record<string, CompetitionCheck>> {
+  const stored = await loadStoredChecks(supabase, phrases);
+  const out: Record<string, CompetitionCheck> = {};
+  for (const [phrase, c] of Object.entries(stored)) {
+    out[phrase] = {
+      phrase,
+      checkedAt: c.checkedAt,
+      listings: c.listings.length,
+      marketplaces: summarizeListings(
+        c.platforms,
+        c.listings.map(({ platform, url, price, reviews }) => ({ platform, url, price, reviews })),
+      ),
     };
   }
   return out;
