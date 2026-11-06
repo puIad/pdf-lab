@@ -169,6 +169,11 @@ DEC-010. Parts 3.7 to 3.10 run in order; 3.11 runs when its input file lands.
 - Acceptance: one brief from an opportunity and one from a validated idea; every factual line
   cites evidence and every LLM line sits in the AI layer; the DOCX opens and its text round-trips;
   Etsy limits unit-tested.
+- Verified 2026-11-06 (built): Etsy title ≤ 140 characters, `%` `:` `&` `+` once each, characters per
+  the Open API v3 `title` regex; 13 tags of ≤ 20 characters, characters per the `tags` regex, no
+  case-insensitive duplicates (Etsy Open API spec + Etsy Help). DOCX via `docx` 9.13.0
+  (`docs/03-STACK.md`). Pages: `/briefs/opportunity/[id]`, `/briefs/idea?seed=&phrase=`; APIs:
+  `POST /api/briefs/notes`, `POST /api/briefs/export`.
 
 ## Part 3.11 — Score calibration (blocked on the user's PDFMinter scan file)
 

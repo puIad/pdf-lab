@@ -127,6 +127,13 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
           </div>
 
           <div className="flex items-center gap-2">
+            <Link
+              href={`/briefs/opportunity/${opp.id}`}
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-border px-2.5 text-[0.8rem] font-medium transition-colors hover:bg-muted"
+            >
+              <FileText className="size-3.5" />
+              Build brief
+            </Link>
             <EvidenceDialog
               title="Opportunity Evidence Citations"
               subtitle={`${directEvidence.length} direct evidence items backing this specific product spec`}
