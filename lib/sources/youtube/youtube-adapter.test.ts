@@ -7,6 +7,7 @@ import {
   YOUTUBE_KEY,
   DEFAULT_AUTHOR_SALT,
 } from "./youtube-adapter.ts";
+import { SourceNotConfiguredError } from "../types.ts";
 
 test("hashYouTubeAuthor hashes username with salt without leaking raw identity", () => {
   const hash = hashYouTubeAuthor("TechExplorer42", DEFAULT_AUTHOR_SALT);
@@ -19,32 +20,25 @@ test("hashYouTubeAuthor hashes username with salt without leaking raw identity",
   assert.equal(hashYouTubeAuthor("[deleted]"), "anonymous");
 });
 
-test("YouTubeAdapter collects fallback signals when unauthenticated", async () => {
+test("YouTubeAdapter without an API key is skipped, never returns template comments", async () => {
+  let fetched = false;
   const adapter = new YouTubeAdapter({
     authorSalt: "test-salt",
+    fetchFn: async () => {
+      fetched = true;
+      return new Response("{}");
+    },
   });
 
   const health = await adapter.healthCheck();
-  assert.equal(health.ok, true);
-  assert.match(health.detail || "", /unauthenticated/);
+  assert.equal(health.ok, false);
+  assert.match(health.detail || "", /YOUTUBE_API_KEY/);
 
-  const rawSignals = await adapter.collect({
-    query: "pc troubleshooting",
-    limit: 3,
-  });
-
-  assert.equal(rawSignals.length, 3);
-  assert.equal(rawSignals[0].source, YOUTUBE_KEY);
-  assert.ok(rawSignals[0].externalId.startsWith("yt_fallback_"));
-
-  // Normalize check
-  const normalized = adapter.normalize(rawSignals[0]);
-  assert.equal(normalized.source, YOUTUBE_KEY);
-  assert.match(normalized.author || "", /^sha256:/);
-  assert.ok(normalized.title && normalized.title.length > 0);
-  assert.ok(normalized.text && normalized.text.length > 0);
-  assert.ok(typeof normalized.engagement.upvotes === "number");
-  assert.ok(typeof normalized.engagement.comments === "number");
+  await assert.rejects(
+    adapter.collect({ query: "pc troubleshooting", limit: 3 }),
+    (err: unknown) => err instanceof SourceNotConfiguredError && /YOUTUBE_API_KEY/.test(err.message),
+  );
+  assert.equal(fetched, false);
 });
 
 test("YouTubeAdapter normalizes explicit requests with high intent", async () => {

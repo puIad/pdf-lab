@@ -6,6 +6,10 @@
 //
 // Privacy: author names are NEVER stored raw; authors are hashed as `sha256:<hex>`
 // using `YOUTUBE_AUTHOR_SALT` or default salt.
+//
+// No YOUTUBE_API_KEY → collect() throws SourceNotConfiguredError and healthCheck()
+// reports ok:false; ingest records the source as `skipped`. It never returns
+// made-up comments (06-EVIDENCE-CONTRACT: no market claim without a real observation).
 
 import { createHash } from "node:crypto";
 import type {
@@ -16,6 +20,7 @@ import type {
   SignalEngagement,
   SourceAdapter,
 } from "../types.ts";
+import { SourceNotConfiguredError } from "../types.ts";
 
 export const YOUTUBE_KEY = "youtube";
 export const ANONYMOUS_AUTHOR = "anonymous";
@@ -77,6 +82,13 @@ export function hashYouTubeAuthor(
   return `sha256:${hex}`;
 }
 
+function missingKeyError(): SourceNotConfiguredError {
+  return new SourceNotConfiguredError(
+    "YouTube comments are not configured: set YOUTUBE_API_KEY. " +
+      "Runs continue without this source and the completeness panel says so.",
+  );
+}
+
 export class YouTubeAdapter implements SourceAdapter {
   readonly key = YOUTUBE_KEY;
   readonly displayName = "YouTube Comments & Inquiries";
@@ -99,27 +111,19 @@ export class YouTubeAdapter implements SourceAdapter {
 
   async healthCheck(): Promise<HealthStatus> {
     if (!this.config.apiKey) {
-      return {
-        ok: true,
-        detail: "unauthenticated (no YOUTUBE_API_KEY; using fallback / mock responses)",
-      };
+      return { ok: false, detail: missingKeyError().message };
     }
     return { ok: true, detail: "configured with YOUTUBE_API_KEY" };
   }
 
   async collect(input: CollectInput): Promise<RawSignal[]> {
+    if (!this.config.apiKey) throw missingKeyError();
+
     const cacheKey = `${input.query}:${input.limit}:${input.since?.toISOString() || ""}`;
     const cached = this.cache.get(cacheKey);
     const now = this.config.nowFn();
     if (cached && now - cached.at < this.config.cacheTtlMs) {
       return cached.items;
-    }
-
-    if (!this.config.apiKey) {
-      // In dev / unauthenticated mode, return structured fallback educational signals
-      const fallbackSignals = this.generateFallbackSignals(input.query, input.limit);
-      this.cache.set(cacheKey, { at: now, items: fallbackSignals });
-      return fallbackSignals;
     }
 
     await this.throttle();
@@ -250,58 +254,5 @@ export class YouTubeAdapter implements SourceAdapter {
       await new Promise((resolve) => setTimeout(resolve, this.config.minIntervalMs - elapsed));
     }
     this.lastRequestAt = this.config.nowFn();
-  }
-
-  private generateFallbackSignals(query: string, limit: number): RawSignal[] {
-    const templates = [
-      {
-        text: `Is there a comprehensive step-by-step PDF checklist for ${query}? The video skipped how to configure the initial parameters.`,
-        likes: 42,
-        replies: 7,
-      },
-      {
-        text: `I'm completely stuck on step 3 for ${query}. Every tutorial assumes you already know this. Would pay for a clear diagnostic flowchart.`,
-        likes: 89,
-        replies: 14,
-      },
-      {
-        text: `Where can I find a quick reference cheat sheet for ${query} commands and error codes?`,
-        likes: 27,
-        replies: 3,
-      },
-      {
-        text: `Can someone make a printable workbook / roadmap for learning ${query}?`,
-        likes: 65,
-        replies: 11,
-      },
-      {
-        text: `Great overview of ${query}, but you didn't explain the common pitfalls and edge cases.`,
-        likes: 18,
-        replies: 4,
-      },
-    ];
-
-    const results: RawSignal[] = [];
-    const now = this.config.nowFn();
-
-    for (let i = 0; i < Math.min(limit, templates.length); i++) {
-      const t = templates[i];
-      results.push({
-        source: this.key,
-        externalId: `yt_fallback_${i}_${query.replace(/\s+/g, "_")}`,
-        fetchedAt: new Date(now).toISOString(),
-        payload: {
-          commentId: `fallback_${i}`,
-          videoId: "dQw4w9WgXcQ",
-          text: t.text,
-          author: `user_${i}`,
-          likeCount: t.likes,
-          replyCount: t.replies,
-          publishedAt: new Date(now - (i + 1) * 86_400_000 * 2).toISOString(),
-        },
-      });
-    }
-
-    return results;
   }
 }
