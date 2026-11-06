@@ -167,6 +167,7 @@ describe("marketplace price parsing (Part 3.9)", () => {
     assert.equal(parsePrice("the Free Cash Flow approach to capital budgeting").priceStr, null);
     assert.equal(parsePrice("How to Be Debt Free: a simple plan").priceStr, null);
     assert.equal(parsePrice("Free printable budget sheet").priceStr, "Free");
+    assert.deepEqual(parsePrice("Free"), { priceStr: "Free", priceNumeric: 0 }); // stored competitors.price (export)
     assert.equal(parsePrice("Budget planner $4.50, free shipping").priceStr, "$4.50");
   });
 });

@@ -20,8 +20,9 @@ export interface ParsedMarketplaceItem {
 export function parsePrice(text?: string | null): { priceStr: string | null; priceNumeric: number | null } {
   if (!text) return { priceStr: null, priceNumeric: null };
 
-  // "Free" only beside a product word: blurbs say "Free Cash Flow", "Debt Free", "free shipping".
-  if (/\bfree\s+(?:download|digital download|pdf|printable|ebook|e-book|template|guide|checklist|planner|workbook|worksheet)s?\b/i.test(text)) {
+  // A bare "Free" (the stored competitors.price value) or "free" beside a product word. Blurbs say
+  // "Free Cash Flow", "Debt Free", "free shipping": those are not prices.
+  if (/^\s*free\s*$|\bfree\s+(?:download|digital download|pdf|printable|ebook|e-book|template|guide|checklist|planner|workbook|worksheet)s?\b/i.test(text)) {
     return { priceStr: "Free", priceNumeric: 0 };
   }
 
