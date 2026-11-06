@@ -30,12 +30,6 @@ const PLATFORM_LABEL: Record<string, string> = { etsy: "Etsy", gumroad: "Gumroad
 /** Sources whose text is a person talking: the only ones quoted as buyer language. */
 const DISCUSSION = new Set(["reddit", "youtube"]);
 
-// shortcut: the YouTube adapter stores template comments as signals when it has no API key
-// (`yt_fallback_*`, video dQw4w9WgXcQ); they are not observations, so briefs skip them until the
-// adapter stops writing them and the stored rows are deleted.
-export function isTemplateRow(r: { external_id?: string | null; url?: string | null }): boolean {
-  return !!r.external_id?.startsWith("yt_fallback_") || /[?&]lc=fallback_/.test(r.url ?? "");
-}
 const IDEA_PHRASE_RE = new RegExp(`${IDEA_CLAIM_PREFIX} "([^"]+)"`);
 
 const FORMAT: Record<string, IdeaFormat> = {
@@ -53,7 +47,7 @@ const cite = (e: IdeaEvidence): BriefCite => ({ id: e.source_id, source: e.sourc
 
 function citeOf(c: EvidenceCitation, fallbackSource = "signal"): BriefCite | null {
   const id = c.id ?? c.url;
-  return id && !isTemplateRow({ url: c.url }) ? { id, source: c.source ?? fallbackSource, url: c.url ?? null } : null;
+  return id ? { id, source: c.source ?? fallbackSource, url: c.url ?? null } : null;
 }
 
 function dedupeFacts(facts: BriefFact[], max: number): BriefFact[] {
@@ -72,12 +66,12 @@ function overviewFacts(ov: MarketOverview) {
   for (const q of ov.buyerIntentSignals.value?.sampleQuotes ?? []) {
     const c = q.url ? { id: q.url, source: q.source ?? "signal", url: q.url } : null;
     // The overview falls back to a placeholder when a row has no text: not a quote.
-    if (c && q.quote && q.quote !== "Customer intent statement" && DISCUSSION.has(c.source) && !isTemplateRow(c)) quotes.push({ text: `“${verbatim(q.quote)}”`, cites: [c] });
+    if (c && q.quote && q.quote !== "Customer intent statement" && DISCUSSION.has(c.source)) quotes.push({ text: `“${verbatim(q.quote)}”`, cites: [c] });
   }
   for (const p of pains) {
     for (const c of p.citations) {
       const bc = citeOf(c);
-      if (bc && c.excerpt && DISCUSSION.has(bc.source) && !isTemplateRow(bc)) quotes.push({ text: `“${verbatim(c.excerpt)}”`, cites: [bc] });
+      if (bc && c.excerpt && DISCUSSION.has(bc.source)) quotes.push({ text: `“${verbatim(c.excerpt)}”`, cites: [bc] });
     }
   }
   const byAudience = new Map<string, { n: number; cites: BriefCite[] }>();
@@ -202,7 +196,7 @@ export async function loadOpportunityBriefInput(supabase: SupabaseClient, id: st
 
   const signals = ((ms ?? []) as unknown as { signals: SignalRowRead | SignalRowRead[] | null }[])
     .map((r) => one(r.signals))
-    .filter((s): s is SignalRowRead => !!s && !isTemplateRow(s) && !isDemandOnly({ source_type: one(s.sources)?.type, external_id: s.external_id }));
+    .filter((s): s is SignalRowRead => !!s && !isDemandOnly({ source_type: one(s.sources)?.type, external_id: s.external_id }));
   const sigCite = (s: SignalRowRead): BriefCite => ({ id: s.id, source: one(s.sources)?.type ?? "signal", url: s.url });
 
   // Phrases: quick-idea phrases traced into this opportunity's evidence, then analyzed problems.
@@ -227,7 +221,7 @@ export async function loadOpportunityBriefInput(supabase: SupabaseClient, id: st
   const quotes: BriefFact[] = [
     ...[...byPhrase.values()].filter((p) => p.opportunity === 60).map((p) => ({ text: `Searched: “${p.phrase}”`, cites: p.cites })),
     ...evidence
-      .filter((e) => e.excerpt && DISCUSSION.has(one(e.sources)?.type ?? "") && !isTemplateRow(e))
+      .filter((e) => e.excerpt && DISCUSSION.has(one(e.sources)?.type ?? ""))
       .map((e) => ({ text: `“${verbatim(e.excerpt!)}”`, cites: [evCite(e)] })),
     ...signals
       .filter((s) => s.content && DISCUSSION.has(one(s.sources)?.type ?? ""))
