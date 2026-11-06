@@ -10,7 +10,7 @@ import type {
   SourceAdapter,
 } from "../types.ts";
 import { SourceNotConfiguredError } from "../types.ts";
-import { parseMarketplaceProduct } from "../marketplace-helper.ts";
+import { cleanListingLink, parseMarketplaceProduct } from "../marketplace-helper.ts";
 import type { CompetitorProduct } from "../../competition/types.ts";
 
 export const GUMROAD_KEY = "gumroad";
@@ -25,6 +25,9 @@ export interface GumroadOrganicResult {
   snippet?: string;
   date?: string;
   position?: number;
+  /** Serper rich-result fields, when Google shows stars for the listing. */
+  rating?: number;
+  ratingCount?: number;
 }
 
 export interface GumroadAdapterConfig {
@@ -127,8 +130,7 @@ export class GumroadAdapter implements SourceAdapter {
     const seen = new Set<string>();
     for (const result of organic) {
       let link = (result.link ?? "").trim();
-      // Strip tracking query params to prevent duplicate signals (H-2)
-      try { const u = new URL(link); u.search = ""; u.hash = ""; link = u.toString(); } catch {}
+      link = cleanListingLink(link);
       if (!link || seen.has(link)) continue;
       seen.add(link);
 
@@ -140,6 +142,8 @@ export class GumroadAdapter implements SourceAdapter {
           title: result.title ?? "",
           link,
           snippet: result.snippet ?? "",
+          ...(typeof result.rating === "number" ? { rating: result.rating } : {}),
+          ...(typeof result.ratingCount === "number" ? { ratingCount: result.ratingCount } : {}),
           date: result.date ?? "",
           position: result.position ?? items.length + 1,
         } satisfies GumroadOrganicResult,
@@ -158,6 +162,8 @@ export class GumroadAdapter implements SourceAdapter {
       title: payload.title,
       link: payload.link,
       snippet: payload.snippet,
+      rating: payload.rating,
+      ratingCount: payload.ratingCount,
     });
 
     return {
@@ -190,6 +196,8 @@ export class GumroadAdapter implements SourceAdapter {
         title: p.title,
         link: p.link,
         snippet: p.snippet,
+        rating: p.rating,
+        ratingCount: p.ratingCount,
       });
     });
   }

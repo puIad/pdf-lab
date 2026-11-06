@@ -31,6 +31,12 @@ text (content), author (hashed/anonymous — NEVER store raw usernames in MVP), 
   (pain/complaints/questions/requests/real language) + Google/Bing web search
   (competitors/products/articles/terminology).
 - **Tier 2 (Phase 2 Part 2.3):** Etsy, Gumroad, Amazon KDP marketplace signals.
+  Serper `site:` searches (DEC-007), at most 10 results per call. Part 3.9 (verified live
+  2026-11-06): Serper organic items carry `rating` and `ratingCount` when Google shows stars, and
+  these win over snippet parsing for `engagement.rating` / `review_count`. Google `goto` redirect
+  links keep their query string (it is the only place the target lives). "Free" is a price only
+  beside a product word ("free printable"), never in "Free Cash Flow". Part 3.9 also runs these
+  three on demand per quick idea (`lib/competition/check.ts`); scans never call them.
 - **Tier 3 (post-MVP):** YouTube, Pinterest, TikTok, Product Hunt, Hacker News.
   TikTok integration/scraping explicitly OUT for MVP (PRD §50).
 

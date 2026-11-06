@@ -22,6 +22,11 @@ export function isRegion(v: unknown): v is RegionCode {
   return REGIONS.some((r) => r.code === v);
 }
 
+/** Adapters a scan runs. Marketplaces are left out: they cost Serper credits and run only on a click (Part 3.9). */
+export function scanSourceKeys(phraseSource: "autocomplete" | "web"): string[] {
+  return [phraseSource, "gtrends", "wikipedia"];
+}
+
 /**
  * Groups are PDFMakerHub's 21 catalog categories (pdfmakerhub.com/ideas.js, read 2026-10-24).
  * Seeds: PDFMinter's 32 suggested seeds (pdfminter.com home, read 2026-10-24), each placed in the

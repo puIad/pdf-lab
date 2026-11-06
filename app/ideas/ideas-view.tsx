@@ -2,11 +2,12 @@
 
 // app/ideas/ideas-view.tsx — Quick ideas console (Phase 3 Parts 3.6 + 3.7).
 // Facts (demand basis, trend basis, sources) are shown next to every score; the specificity
-// badge describes the phrase and is labeled as not a competition claim (QC Rules 3–5).
+// badge describes the phrase and is labeled as not a competition claim (QC Rules 3–5) until a
+// Part 3.9 competition check stores observed listings; then the label and tick show those counts.
 
 import React, { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, Copy, Download, ExternalLink, Flame, History, ListOrdered, Loader2, Microscope, RefreshCw, Search, ShieldAlert, ShieldCheck, TrendingUp } from "lucide-react";
+import { ArrowLeft, CalendarClock, Copy, Download, ExternalLink, Flame, History, ListOrdered, Loader2, Microscope, RefreshCw, Search, Store, ShieldAlert, ShieldCheck, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +20,7 @@ import { generateScanCsv } from "@/lib/export/csv";
 import { ideaTicks, type TickStatus } from "@/lib/ideas/ticks";
 import type { ValidationVerdict } from "@/lib/planner/verdict";
 import { VerdictPanel } from "@/components/research/verdict-panel";
+import type { CompetitionCheck, MarketplaceCount } from "@/lib/competition/check";
 
 interface SourceStatus {
   key: string;
@@ -35,6 +37,8 @@ type IdeasResponse = IdeasResult & {
   scannedAt: string;
   region: RegionCode;
   phraseSource: "autocomplete" | "web";
+  /** Stored Part 3.9 checks, keyed by idea id. */
+  competition: Record<string, CompetitionCheck>;
   error?: string;
 };
 type Recent = { seed: string; region: RegionCode };
@@ -128,10 +132,10 @@ const TICK_MARK: Record<TickStatus, { mark: string; className: string }> = {
   blank: { mark: "–", className: "text-muted-foreground" },
 };
 
-function Ticks({ idea }: { idea: QuickIdea }) {
+function Ticks({ idea, check }: { idea: QuickIdea; check: CompetitionCheck | null }) {
   return (
     <ul className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]" aria-label="Checks">
-      {ideaTicks(idea).map((t) => (
+      {ideaTicks(idea, check ? { listings: check.listings, reviewed: check.marketplaces.reduce((a, m) => a + m.withReviews, 0) } : null).map((t) => (
         <li key={t.key} title={`${t.label}: ${t.count} (needs ${t.threshold})`} className="flex items-center gap-1">
           <span className={`font-bold ${TICK_MARK[t.status].className}`}>{TICK_MARK[t.status].mark}</span>
           <span className="text-muted-foreground">{t.label}</span>
@@ -142,9 +146,73 @@ function Ticks({ idea }: { idea: QuickIdea }) {
 }
 
 type Validation = { loading: boolean; verdict: ValidationVerdict | null; error: string | null };
+type CheckSource = { key: string; status: "ok" | "skipped" | "failed"; error?: string };
+type CheckState = { loading: boolean; check: CompetitionCheck | null; failed: CheckSource[]; error: string | null };
 
-function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) {
+function money(v: number, currency: string | null): string {
+  return v === 0 ? "free" : `${currency ?? ""}${Number.isInteger(v) ? v : v.toFixed(2)}`;
+}
+
+function marketplaceLine(m: MarketplaceCount): string {
+  if (m.listings === 0) return "0 listings";
+  const parts = [`${m.listings} listing${m.listings === 1 ? "" : "s"}`];
+  parts.push(m.withReviews ? `${m.reviews.toLocaleString()} reviews on ${m.withReviews}` : "no review counts shown");
+  if (m.priceMin !== null && m.priceMax !== null) {
+    parts.push(m.priceMin === m.priceMax ? money(m.priceMin, m.currency) : `${money(m.priceMin, m.currency)} to ${money(m.priceMax, m.currency)}`);
+  } else parts.push("no prices shown");
+  return parts.join(" · ");
+}
+
+function CompetitionPanel({ state }: { state: CheckState }) {
+  const { check, failed } = state;
+  if (!check) return null;
+  return (
+    <div className="space-y-1 rounded-lg border border-border p-2.5 text-[11px]">
+      <p className="font-medium">
+        {check.listings} marketplace listings observed{" "}
+        <span className="font-normal text-muted-foreground">· checked {new Date(check.checkedAt).toLocaleDateString()}</span>
+      </p>
+      <ul className="space-y-0.5">
+        {check.marketplaces.map((m) => (
+          <li key={m.platform} className="grid grid-cols-[4.5rem_1fr] gap-2">
+            <span className="text-muted-foreground">{m.label}</span>
+            <span className="tabular-nums">{marketplaceLine(m)}</span>
+          </li>
+        ))}
+        {failed.map((f) => (
+          <li key={f.key} className="grid grid-cols-[4.5rem_1fr] gap-2" title={f.error}>
+            <span className="text-muted-foreground">{f.key}</span>
+            <span className="text-rose-600 dark:text-rose-400">{f.status}, not counted</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-muted-foreground">Counts of Google results on each marketplace, up to 10 per site. Not sales or revenue.</p>
+    </div>
+  );
+}
+
+function IdeaCard({ idea, related, initialCheck }: { idea: QuickIdea; related: QuickIdea[]; initialCheck: CompetitionCheck | null }) {
   const [open, setOpen] = useState(false);
+  const [comp, setComp] = useState<CheckState>({ loading: false, check: initialCheck, failed: [], error: null });
+
+  // One click = one check: three Serper searches (Etsy, Gumroad, KDP), stored as evidence (Part 3.9).
+  async function checkCompetition() {
+    setComp((c) => ({ ...c, loading: true, error: null }));
+    try {
+      const res = await fetch("/api/ideas/competition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phrase: idea.phrase }),
+      });
+      const body = (await res.json()) as { check?: CompetitionCheck | null; sources?: CheckSource[]; error?: string };
+      const failed = (body.sources ?? []).filter((s) => s.status !== "ok");
+      if (res.status === 401) setComp((c) => ({ ...c, loading: false, error: "Competition checks need the internal API key until Phase 5 auth lands." }));
+      else if (!res.ok || !body.check) setComp((c) => ({ ...c, loading: false, error: body.error ?? `Request failed (${res.status})` }));
+      else setComp({ loading: false, check: body.check, failed, error: null });
+    } catch (err) {
+      setComp((c) => ({ ...c, loading: false, error: err instanceof Error ? err.message : "Request failed" }));
+    }
+  }
   const [validation, setValidation] = useState<Validation>({ loading: false, verdict: null, error: null });
 
   // Validate mode on the idea's phrase as the concept (PRD §27, §48); the verdict is rule-based.
@@ -218,10 +286,17 @@ function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) 
           <Pill tone={interestTone[idea.interest]} title="Band on the demand score">
             {idea.interest} interest
           </Pill>
-          {/* Neutral on purpose: a color would read as a competition verdict nobody observed (QC Rule 3). */}
-          <Pill tone="neutral" title="Describes the search phrase only. Competitors were not observed for it (QC Rule 3).">
-            {SPECIFICITY_LABEL[idea.specificity]}
-          </Pill>
+          {comp.check ? (
+            <Pill tone="neutral" title="Observed marketplace listings from the last competition check (Etsy, Gumroad, KDP)">
+              <Store className="mr-1 size-3" />
+              {comp.check.listings} listings observed
+            </Pill>
+          ) : (
+            /* Neutral on purpose: a color would read as a competition verdict nobody observed (QC Rule 3). */
+            <Pill tone="neutral" title="Describes the search phrase only. Competitors were not observed for it (QC Rule 3).">
+              {SPECIFICITY_LABEL[idea.specificity]}
+            </Pill>
+          )}
           {idea.advice && (
             <Pill tone="mid" title="Health, money and legal guides need trusted sources and a short 'not professional advice' note.">
               <ShieldAlert className="mr-1 size-3" />
@@ -237,9 +312,9 @@ function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) 
           )}
         </div>
 
-        <Ticks idea={idea} />
+        <Ticks idea={idea} check={comp.check} />
 
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
           <div className="flex flex-wrap items-center gap-1">
             {idea.engines.map((e) => (
               <span key={e} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]" title={ENGINE_TITLE[e] ?? `Suggested by ${e}`}>
@@ -255,7 +330,18 @@ function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) 
               ) : null,
             )}
           </div>
-          <div className="flex shrink-0 gap-1">
+          <div className="flex flex-wrap justify-end gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer"
+              disabled={comp.loading}
+              title="Search Etsy, Gumroad and Amazon KDP for this phrase (3 Serper searches) and store the listings found"
+              onClick={checkCompetition}
+            >
+              {comp.loading ? <Loader2 className="animate-spin" /> : <Store />}
+              {comp.check ? "Recheck" : "Competition"}
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -273,6 +359,9 @@ function IdeaCard({ idea, related }: { idea: QuickIdea; related: QuickIdea[] }) 
             </Button>
           </div>
         </div>
+
+        <CompetitionPanel state={comp} />
+        {comp.error && <p className="text-[11px] text-rose-600 dark:text-rose-400">{comp.error}</p>}
 
         {validation.verdict && (
           <div className="space-y-1">
@@ -418,7 +507,7 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
           <div className="hidden h-4 w-px bg-border sm:block" />
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Quick ideas</h1>
           <Badge variant="outline" className="font-mono text-xs">
-            Part 3.8
+            Part 3.9
           </Badge>
         </div>
         <p className="max-w-md text-xs text-muted-foreground">
@@ -643,7 +732,7 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {visible.slice(0, shown).map((idea) => (
-                  <IdeaCard key={idea.id} idea={idea} related={related} />
+                  <IdeaCard key={idea.id} idea={idea} related={related} initialCheck={data.competition?.[idea.id] ?? null} />
                 ))}
               </div>
               {visible.length > shown && (
@@ -654,8 +743,8 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
                 </div>
               )}
               <p className="text-[11px] text-muted-foreground">
-                Phrase specificity is not a competition measure: competitors were not observed for these phrases (QC Rule 3). Run Deep
-                research on a phrase for observed marketplace competition.
+                Phrase specificity is not a competition measure (QC Rule 3). Use Competition on a card to count observed Etsy, Gumroad
+                and Amazon KDP listings for that phrase; until then the competition tick stays blank.
               </p>
             </>
           )}

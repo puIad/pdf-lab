@@ -16,10 +16,13 @@ export interface IdeaTick {
 /** Observed listings from a 3.9 competition check; absent until one has run. */
 export interface CompetitionCount {
   listings: number;
+  /** Listings Google shows a review count for: established sellers, not just any result. */
+  reviewed: number;
 }
 
-// shortcut: uncalibrated thresholds; refit in Part 3.11.
-export const TICK_THRESHOLDS = { demand: 50, fit: 60, listingsMax: 30 } as const;
+// shortcut: uncalibrated thresholds; refit in Part 3.11. The competition tick counts reviewed listings
+// because a check reads at most 10 results per marketplace, so the raw listing count saturates at 30.
+export const TICK_THRESHOLDS = { demand: 50, fit: 60, reviewedMax: 10 } as const;
 
 export function ideaTicks(idea: QuickIdea, competition: CompetitionCount | null = null): IdeaTick[] {
   const T = TICK_THRESHOLDS;
@@ -56,9 +59,9 @@ export function ideaTicks(idea: QuickIdea, competition: CompetitionCount | null 
     {
       key: "competition",
       label: "Competition",
-      status: competition === null ? "blank" : competition.listings <= T.listingsMax ? "pass" : "fail",
-      count: competition === null ? "not checked yet" : `${competition.listings} listings observed`,
-      threshold: `≤ ${T.listingsMax} listings`,
+      status: competition === null ? "blank" : competition.reviewed <= T.reviewedMax ? "pass" : "fail",
+      count: competition === null ? "not checked yet" : `${competition.reviewed} of ${competition.listings} listings show reviews`,
+      threshold: `≤ ${T.reviewedMax} listings with reviews`,
     },
   ];
 }
