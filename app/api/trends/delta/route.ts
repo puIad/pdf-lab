@@ -2,7 +2,8 @@
 // Calculates velocity, maturity, and trajectory deltas between two time windows.
 
 import { NextResponse } from "next/server";
-import { trendingRadarService } from "@/lib/trends/service";
+import { createServiceSupabaseClient } from "@/lib/db/client";
+import { getTrendingRadarService } from "@/lib/trends/load";
 import type { TimeWindow } from "@/lib/trends/types";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,8 @@ export async function GET(req: Request) {
   }
 
   try {
-    const delta = trendingRadarService.getTopicDelta(marketId, base, target);
+    const radar = await getTrendingRadarService(createServiceSupabaseClient());
+    const delta = radar.getTopicDelta(marketId, base, target);
     if (!delta) {
       return NextResponse.json(
         { error: `Market with ID '${marketId}' not found` },
