@@ -7,7 +7,8 @@ import { ETSY_TAG_MAX, ETSY_TAGS_MAX, ETSY_TITLE_MAX, etsyProblems, etsyTags, et
 import { acceptNotes, briefCites, buildBrief, priceAnchor, verbatim, type BriefInput } from "./build.ts";
 import { briefBlocks, plainText } from "./blocks.ts";
 import { noteEvidence, noteValidator, writeBriefNote } from "./notes.ts";
-import { docxParagraphs, generateBriefDocx, generateBriefMarkdown } from "../export/brief.ts";
+import { generateBriefDocx, generateBriefMarkdown } from "../export/brief.ts";
+import { docxParagraphs } from "./brief.test-helpers.ts";
 import type { AIRouter } from "../ai/router.ts";
 
 const c = (id: string, source = "web") => ({ id, source, url: `https://example.com/${id}` });
@@ -179,7 +180,8 @@ describe("AI notes", () => {
     assert.equal(tier, "cheap");
     assert.equal(n.citeIds.length, 2);
     assert.ok(n.citeIds.every((id) => briefCites(brief).has(id)));
-    await assert.rejects(() => writeBriefNote(router, brief, "Not a heading"), /no outline section/);
+    // A bad key is the client's error (400), not an AI failure (502).
+    await assert.rejects(() => writeBriefNote(router, brief, "Not a heading"), (e: { status?: number; message: string }) => e.status === 400 && /no outline section/.test(e.message));
   });
 
   it("keeps client-sent notes only when every cite belongs to the brief", () => {

@@ -10,10 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VerdictPanel } from "@/components/research/verdict-panel";
-import type { Brief, BriefAiNote, BriefCite, BriefFact } from "@/lib/brief/types";
+import { DESCRIPTION_KEY, type Brief, type BriefAiNote, type BriefCite, type BriefFact } from "@/lib/brief/types";
 import { ETSY_TAGS_MAX, ETSY_TITLE_MAX } from "@/lib/brief/etsy";
-
-const DESCRIPTION_KEY = "description";
 
 type Layer = "fact" | "suggestion" | "ai";
 const LAYER: Record<Layer, { label: string; className: string }> = {

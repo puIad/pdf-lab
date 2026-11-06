@@ -68,3 +68,13 @@ export interface Brief {
 }
 
 export const DESCRIPTION_KEY = "description";
+
+/** No brief for this source (not found, no evidence, Validate said KILL) or a bad request; carries the HTTP status. */
+export class BriefUnavailable extends Error {
+  status: number;
+  constructor(message: string, status = 404) {
+    super(message);
+    this.name = "BriefUnavailable";
+    this.status = status;
+  }
+}

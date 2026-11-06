@@ -5,7 +5,7 @@
 
 import type { AIRouter } from "../ai/router.ts";
 import { briefCites } from "./build.ts";
-import { DESCRIPTION_KEY, type Brief, type BriefAiNote, type BriefFact } from "./types.ts";
+import { BriefUnavailable, DESCRIPTION_KEY, type Brief, type BriefAiNote, type BriefFact } from "./types.ts";
 
 export const BRIEF_NOTES_PROMPT_VERSION = "brief-notes-2026-11-06.1";
 const MAX_ITEMS = 24;
@@ -60,9 +60,9 @@ const SYSTEM = [
 /** Write one note: `key` is an outline heading, or DESCRIPTION_KEY for the listing description. */
 export async function writeBriefNote(router: AIRouter, brief: Brief, key: string): Promise<BriefAiNote> {
   const isDescription = key === DESCRIPTION_KEY;
-  if (!isDescription && !brief.outline.some((s) => s.heading === key)) throw new Error(`no outline section "${key}"`);
+  if (!isDescription && !brief.outline.some((s) => s.heading === key)) throw new BriefUnavailable(`no outline section "${key}"`, 400);
   const items = noteEvidence(brief);
-  if (!items.length) throw new Error("this brief has no cited lines to write from");
+  if (!items.length) throw new BriefUnavailable("this brief has no cited lines to write from", 409);
 
   const task = isDescription
     ? `Draft a product description (90 to 150 words) for a Gumroad or Etsy listing of "${brief.title}", a ${brief.format.toLowerCase()}. Echo the buyer language where it fits. No price, no guarantees, no medical, financial or legal promises.`

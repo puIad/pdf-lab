@@ -2,12 +2,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { acceptNotes, buildBrief } from "./build.ts";
-import { BriefUnavailable, loadIdeaBriefInput, loadOpportunityBriefInput } from "./load.ts";
-import type { Brief, BriefSource } from "./types.ts";
+import { loadIdeaBriefInput, loadOpportunityBriefInput } from "./load.ts";
+import { BriefUnavailable, type Brief, type BriefSource } from "./types.ts";
 
 export * from "./types.ts";
 export { buildBrief, briefCites, acceptNotes } from "./build.ts";
-export { BriefUnavailable } from "./load.ts";
 export { briefBlocks } from "./blocks.ts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

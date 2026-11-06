@@ -14,16 +14,8 @@ import { generateMarketOverview } from "../search/overview.ts";
 import type { EvidenceCitation, MarketOverview } from "../search/types.ts";
 import { buildVerdict } from "../planner/verdict.ts";
 import { verbatim, type BriefInput, type BriefPhrase, type BriefPrice } from "./build.ts";
-import type { BriefCite, BriefFact, BriefMarketplace } from "./types.ts";
+import { BriefUnavailable, type BriefCite, type BriefFact, type BriefMarketplace } from "./types.ts";
 
-export class BriefUnavailable extends Error {
-  status: number;
-  constructor(message: string, status = 404) {
-    super(message);
-    this.name = "BriefUnavailable";
-    this.status = status;
-  }
-}
 
 const MAX_QUOTES = 8;
 const PLATFORM_LABEL: Record<string, string> = { etsy: "Etsy", gumroad: "Gumroad", kdp: "Amazon KDP", amazon_kdp: "Amazon KDP" };
