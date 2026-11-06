@@ -8,7 +8,7 @@ const iso = (d: number) => new Date(Date.now() - d * DAY).toISOString();
 function fakeSupabase(tables: Record<string, unknown[]>) {
   return {
     from: (t: string) => {
-      const q = { select: () => q, in: () => q, limit: () => q, then: (r: (v: unknown) => void) => r({ data: tables[t] ?? [], error: null }) };
+      const q = { select: () => q, in: () => q, limit: () => q, order: () => q, range: () => q, then: (r: (v: unknown) => void) => r({ data: tables[t] ?? [], error: null }) };
       return q;
     },
   } as never;

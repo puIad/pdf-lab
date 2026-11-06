@@ -79,22 +79,7 @@ export function RadarFilterBar({
       {/* Bottom Filter Row: Category, Confidence, Solvability Toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/50 text-xs">
         <div className="flex flex-wrap items-center gap-3">
-          {/* Category Selector */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Category:</span>
-            <NativeSelect
-              value={filters.category || "all"}
-              onChange={(e) => onChangeFilters({ ...filters, category: e.target.value })}
-              className="h-8 text-xs w-36"
-            >
-              <option value="all">All Categories</option>
-              <option value="tech">Tech & AI</option>
-              <option value="creator">Creator & Media</option>
-              <option value="finance">Finance & Tax</option>
-              <option value="productivity">Productivity</option>
-              <option value="lifestyle">Lifestyle & Craft</option>
-            </NativeSelect>
-          </div>
+          {/* Category filter removed until markets have a category column (all stored markets are "general"). */}
 
           {/* Min Confidence Threshold */}
           <div className="flex items-center gap-1.5">

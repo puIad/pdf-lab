@@ -33,20 +33,29 @@ export async function loadStoredMarketTopics(supabase: SupabaseClient): Promise<
   if (!markets?.length) return [];
   const ids = markets.map((m) => m.id as string);
 
-  const { data: links, error: linkErr } = await supabase
-    .from("market_signals")
-    .select(
-      "market_id, signals(id, external_id, url, title, content, published_at, engagement, sources(type), signal_analysis(intent, urgency))",
-    )
-    .in("market_id", ids)
-    .limit(10000);
-  if (linkErr) throw new Error(`Failed to load market signals: ${linkErr.message}`);
+  // PostgREST caps a response at max_rows (1000 on hosted Supabase), so read in ordered pages.
+  const PAGE = 1000;
+  const links: unknown[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error: linkErr } = await supabase
+      .from("market_signals")
+      .select(
+        "market_id, signal_id, signals(id, external_id, url, title, content, published_at, engagement, sources(type), signal_analysis(intent, urgency))",
+      )
+      .in("market_id", ids)
+      .order("market_id")
+      .order("signal_id")
+      .range(from, from + PAGE - 1);
+    if (linkErr) throw new Error(`Failed to load market signals: ${linkErr.message}`);
+    links.push(...(data ?? []));
+    if ((data?.length ?? 0) < PAGE) break;
+  }
 
   const { data: comps, error: compErr } = await supabase.from("competitors").select("market_id").in("market_id", ids);
   if (compErr) throw new Error(`Failed to load competitors: ${compErr.message}`);
 
   const signalsByMarket = new Map<string, SignalRecord[]>();
-  for (const link of (links ?? []) as unknown as LinkRow[]) {
+  for (const link of links as LinkRow[]) {
     const s = one(link.signals);
     if (!s || !s.published_at) continue; // undated rows cannot carry a trend (QC Rule 2)
     const sourceType = one(s.sources)?.type ?? "";
