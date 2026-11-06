@@ -2,7 +2,8 @@
 // Returns trending topics filtered strictly by PDF suitability (evaluates realistic PDF deliverables).
 
 import { NextResponse } from "next/server";
-import { trendingRadarService } from "@/lib/trends/service";
+import { createServiceSupabaseClient } from "@/lib/db/client";
+import { getTrendingRadarService } from "@/lib/trends/load";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,8 @@ export async function GET(req: Request) {
   const minPdfFit = minPdfFitStr ? parseFloat(minPdfFitStr) : 0.65;
 
   try {
-    const opportunities = trendingRadarService.getSolvableOpportunities(limit, minPdfFit);
+    const radar = await getTrendingRadarService(createServiceSupabaseClient());
+    const opportunities = radar.getSolvableOpportunities(limit, minPdfFit);
     return NextResponse.json({
       ok: true,
       count: opportunities.length,

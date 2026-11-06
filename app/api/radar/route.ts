@@ -2,7 +2,8 @@
 // Returns synchronized 4-window radar snapshots or single window data with filters.
 
 import { NextResponse } from "next/server";
-import { trendingRadarService } from "@/lib/trends/service";
+import { createServiceSupabaseClient } from "@/lib/db/client";
+import { getTrendingRadarService } from "@/lib/trends/load";
 import type { RadarFilterOptions, TimeWindow } from "@/lib/trends/types";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +27,10 @@ export async function GET(req: Request) {
   };
 
   try {
+    const radar = await getTrendingRadarService(createServiceSupabaseClient());
     if (!windowParam || windowParam === "all") {
-      const snapshots = trendingRadarService.getFourWindowSnapshots(filterOptions);
-      const upcomingSeasonal = trendingRadarService.getUpcomingSeasonalSurges();
+      const snapshots = radar.getFourWindowSnapshots(filterOptions);
+      const upcomingSeasonal = radar.getUpcomingSeasonalSurges();
       return NextResponse.json({
         ok: true,
         mode: "four_window",
@@ -45,7 +47,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const snapshot = trendingRadarService.getSnapshot(windowParam, filterOptions);
+    const snapshot = radar.getSnapshot(windowParam, filterOptions);
     return NextResponse.json({
       ok: true,
       mode: "single_window",
