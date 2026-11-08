@@ -1,0 +1,17 @@
+# pdf-lab
+
+> Market-research engine for digital PDF products (guides, checklists, templates, workbooks). Given a niche it collects real discussions, search trends and marketplace listings, extracts pains and buyer intent, groups them into problem markets and suggests PDF opportunities. Every score links back to stored evidence rows. Next.js, Supabase, pgvector. In development.
+
+## Docs
+
+- [README.md](https://github.com/puIad/pdf-lab/blob/master/README.md): install, scope and the evidence-first rule
+- [docs/STATE.md](https://github.com/puIad/pdf-lab/blob/master/docs/STATE.md): live progress and current phase
+- [AGENTS.md](https://github.com/puIad/pdf-lab/blob/master/AGENTS.md): rules for coding agents
+- [CLAUDE.md](https://github.com/puIad/pdf-lab/blob/master/CLAUDE.md): project instructions
+
+## Source
+
+- [lib/sources](https://github.com/puIad/pdf-lab/tree/master/lib/sources): source adapters: reddit, gtrends, web, etsy, gumroad, kdp, youtube, wikipedia, autocomplete
+- [lib/scoring](https://github.com/puIad/pdf-lab/tree/master/lib/scoring): scoring
+- [lib/evidence](https://github.com/puIad/pdf-lab/tree/master/lib/evidence): evidence rows
+- [supabase](https://github.com/puIad/pdf-lab/tree/master/supabase): database schema
