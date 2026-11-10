@@ -18,14 +18,13 @@ const sig = (id: string, extra: Record<string, unknown> = {}) => ({
   signals: { id, external_id: id, url: "https://x/" + id, title: "t", content: "c", published_at: iso(2), engagement: {}, sources: { type: "reddit" }, signal_analysis: { intent: "strong", urgency: null }, ...extra },
 });
 
-test("loads only dated, real, discussion rows and drops markets with none", async () => {
+test("loads only dated discussion rows and drops markets with none", async () => {
   const topics = await loadStoredMarketTopics(
     fakeSupabase({
       markets: [{ id: "m1", name: "A" }, { id: "m2", name: "B" }],
       market_signals: [
         { market_id: "m1", ...sig("ok") },
         { market_id: "m1", ...sig("undated", { published_at: null }) },
-        { market_id: "m1", ...sig("yt_fallback_1", { sources: { type: "youtube" } }) },
         { market_id: "m1", ...sig("w", { sources: { type: "wikipedia" } }) },
         { market_id: "m2", ...sig("serp:q") },
       ],

@@ -6,7 +6,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SignalRecord } from "./detector.ts";
 import { TrendingRadarService, type MarketTopicData } from "./service.ts";
 import { isDemandOnly } from "../sources/demand-only.ts";
-import { isTemplateRow } from "../brief/load.ts";
 
 type Rel<T> = T | T[] | null | undefined;
 const one = <T>(v: Rel<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
@@ -59,7 +58,7 @@ export async function loadStoredMarketTopics(supabase: SupabaseClient): Promise<
     const s = one(link.signals);
     if (!s || !s.published_at) continue; // undated rows cannot carry a trend (QC Rule 2)
     const sourceType = one(s.sources)?.type ?? "";
-    if (isDemandOnly({ source_type: sourceType, external_id: s.external_id }) || isTemplateRow(s)) continue;
+    if (isDemandOnly({ source_type: sourceType, external_id: s.external_id })) continue;
     const analysis = one(s.signal_analysis);
     const list = signalsByMarket.get(link.market_id) ?? [];
     list.push({
