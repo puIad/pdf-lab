@@ -291,31 +291,57 @@ test("AI path: model wording, stored grounding, no defaults, no padding (Part 6.
     format: "planner",
   };
 
-  await t.test("drops unknown markets, missing fields and unknown formats; keeps the rest as is", async () => {
+  await t.test("keeps only candidates grounded in the market's signals; the observed pool always joins", async () => {
     const res = await generate25Opportunities(markets, {
       router: routerReturning([
         ok,
         { ...ok, marketId: "not-in-input", title: "Wrong market" },
         { ...ok, solution: "", title: "No solution" },
         { ...ok, format: "video course", title: "Bad format" },
-        { ...ok, marketId: markets[2].id, title: "Fine wording", sophistication: "expert", outcome: "Spend under plan" },
+        { ...ok, targetAudience: "Competitive Gamers", title: "Made-up audience" },
+        { ...ok, marketId: markets[2].id, title: "Market without analysed signals" },
+        {
+          ...ok,
+          title: "Fine wording",
+          targetAudience: "College Students",
+          problem: "No simple way to track weekly spending",
+          format: "tracker",
+          sophistication: "expert",
+          outcome: "Spend under plan",
+        },
       ]),
     });
-    assert.deepEqual(res.opportunities.map((o) => o.title), ["Grocery Budget Reset", "Fine wording"]);
+    // 2 model candidates, then the pool's 3 minus the one sharing (audience, problem, format) with the first.
+    assert.deepEqual(res.opportunities.map((o) => o.title).slice(0, 2), ["Grocery Budget Reset", "Fine wording"]);
+    assert.equal(res.opportunities.length, 4);
+    assert.equal(res.totalCandidatesGenerated, 4);
     const [first, second] = res.opportunities;
     assert.equal(first.priceRange, "$4.99–$19"); // observed on the market, never the model's
-    assert.equal(first.urgency, "high");
+    assert.equal(first.urgency, "high"); // from the young-couples signals
+    assert.deepEqual(first.evidence.map((e) => e.sourceId), ["src-b1", "src-b2"]);
     assert.equal(first.sophistication, null);
     assert.equal(first.mechanism, null);
-    assert.equal(second.priceRange, null);
+    assert.equal(second.targetAudience, "college students"); // stored wording, not the model's
+    assert.equal(second.urgency, "low"); // from the college-students signal, not the market's first three
+    assert.deepEqual(second.evidence.map((e) => e.sourceId), ["src-b3"]);
     assert.equal(second.sophistication, null); // "expert" is not a level
     assert.equal(second.outcome, "Spend under plan");
     assert.doesNotMatch(JSON.stringify(res), PC_TEXT);
   });
 
-  await t.test("no usable AI candidate falls back to the observed pool, still unpadded", async () => {
-    const res = await generate25Opportunities(markets, { router: routerReturning([{ title: "only a title" }]) });
-    assert.equal(res.opportunities.length, 3);
+  await t.test("no usable model candidate, or a provider error, leaves the observed pool", async () => {
+    const none = await generate25Opportunities(markets, { router: routerReturning([{ title: "only a title" }]) });
+    assert.equal(none.opportunities.length, 3);
+    const failing = { generateObject: async () => { throw new Error("provider down"); } } as unknown as AIRouter;
+    assert.equal((await generate25Opportunities(markets, { router: failing })).opportunities.length, 3);
+  });
+
+  await t.test("the model is not called when no signal has both an audience and a problem", async () => {
+    let calls = 0;
+    const counting = { generateObject: async () => { calls += 1; return { object: [] }; } } as unknown as AIRouter;
+    const res = await generate25Opportunities([markets[2]], { router: counting });
+    assert.equal(calls, 0);
+    assert.equal(res.opportunities.length, 0);
   });
 });
 

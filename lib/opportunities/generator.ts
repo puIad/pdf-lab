@@ -299,19 +299,16 @@ export async function generate25Opportunities(
   const promptVersion = options.promptVersion ?? OPPORTUNITY_PROMPT_VERSION;
 
   // Step 1: Generate candidates
-  let candidatePool: GeneratedOpportunity[] = [];
-
-  if (options.router) {
-    try {
-      // Strong tier LLM generation when router is supplied
-      candidatePool = await generateWithAIRouter(markets, options.router, options.tier ?? "strong");
-    } catch {
-      // Provider error or no usable candidate: fall back to the observed-fields pool
-      candidatePool = generateCandidatePool(markets);
-    }
-  } else {
-    candidatePool = generateCandidatePool(markets);
-  }
+  // The observed pool always joins: model candidates add wording, they never replace it.
+  // A provider error only loses the model's candidates.
+  const fromModel = options.router
+    ? await generateWithAIRouter(markets, options.router, options.tier ?? "strong").catch(() => [])
+    : [];
+  const seenKeys = new Set<string>();
+  const candidatePool = [...fromModel, ...generateCandidatePool(markets)].filter((c) => {
+    const key = `${normalizeKey(c.targetAudience)}::${normalizeKey(c.problem)}::${c.format}`;
+    return !seenKeys.has(key) && Boolean(seenKeys.add(key));
+  });
 
   candidatePool.push(...(options.extraCandidates ?? []));
 
@@ -358,18 +355,21 @@ async function generateWithAIRouter(
   router: AIRouter,
   tier: "strong",
 ): Promise<GeneratedOpportunity[]> {
-  const marketSummaries = markets.slice(0, 5).map((m) => ({
-    marketId: m.id,
-    name: m.name,
-    demandScore: m.demandScore,
-    confidence: m.confidence,
-    topSignals: m.signals.slice(0, 4).map((s) => ({
-      id: s.id,
-      title: s.title,
-      problem: s.analysis?.problem || s.content?.slice(0, 100),
-      audience: s.analysis?.audience,
-    })),
-  }));
+  // The model only sees signals where extraction stored both an audience and a problem.
+  const marketSummaries = markets
+    .map((m) => ({
+      marketId: m.id,
+      name: m.name,
+      demandScore: m.demandScore,
+      confidence: m.confidence,
+      topSignals: m.signals
+        .filter((s) => s.analysis?.audience?.trim() && s.analysis?.problem?.trim())
+        .slice(0, 4)
+        .map((s) => ({ id: s.id, title: s.title, problem: s.analysis!.problem, audience: s.analysis!.audience })),
+    }))
+    .filter((m) => m.topSignals.length > 0)
+    .slice(0, 5);
+  if (marketSummaries.length === 0) return [];
 
   const systemPrompt = `You are the lead product strategist at PDF Lab.
 Your task is to synthesize diversified, evidence-backed PDF product opportunities based on real market clusters.
@@ -435,9 +435,16 @@ ${JSON.stringify(marketSummaries, null, 2)}`;
   const marketMap = new Map(markets.map((m) => [m.id, m]));
 
   for (const raw of res.object) {
-    // Unknown market, or a market with no signals: nothing to ground the candidate in.
     const market = marketMap.get(raw.marketId);
-    if (!market || market.signals.length === 0) continue;
+    if (!market) continue;
+
+    // The audience must be one extraction stored on this market's signals; those signals are the
+    // candidate's evidence. A model-invented audience has no such signals and is skipped.
+    const audienceKey = normalizeKey(raw.targetAudience);
+    const signals = market.signals.filter(
+      (s) => s.analysis?.audience && normalizeKey(s.analysis.audience) === audienceKey,
+    );
+    if (signals.length === 0) continue;
 
     const format = raw.format.toLowerCase().trim() as OpportunityFormat;
     if (!ALLOWED_FORMATS.includes(format)) continue;
@@ -445,13 +452,12 @@ ${JSON.stringify(marketSummaries, null, 2)}`;
     const soph = filled(raw.sophistication) ? raw.sophistication.toLowerCase().trim() : "";
     const oppId = crypto.randomUUID();
     const title = raw.title.trim();
-    const signals = market.signals.slice(0, 3);
 
     out.push({
       id: oppId,
       marketId: market.id,
       title,
-      targetAudience: raw.targetAudience.trim(),
+      targetAudience: signals[0].analysis!.audience!.trim(), // stored wording
       problem: raw.problem.trim(),
       solution: raw.solution.trim(),
       format,
@@ -466,6 +472,5 @@ ${JSON.stringify(marketSummaries, null, 2)}`;
     });
   }
 
-  if (out.length === 0) throw new Error("AI returned no usable candidate");
   return out;
 }
