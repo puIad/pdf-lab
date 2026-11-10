@@ -55,8 +55,23 @@ recommended because the MVP gate lives there.
 | 6.1 | QC enforcement + confidence display + anti-gaming review | 2.4, 3.4 | §53–§54 |
 | 6.2 | Success-metrics instrumentation (north-star + §58 events) | 6.1 | §58–§59 |
 | 6.3 | Launch checklist: costs, abuse, legal/ToS, roadmap handoff | 6.2 | §50, §57 |
+| 6.4 | Remove invented content from the Deep pipeline (DEC-014) | 2.1, 2.3, 1.4 | §29, §53 |
+| 6.5 | YouTube adapter: no template comments; clean stored fakes | 3.3 | §53 |
+| 6.6 | Radar reads the database | 6.5 | §9, §22–§25, §53 |
+| 6.7 | Scope markets, opportunities, competitors to a run | 6.4 | §37–§38 |
+| 6.8 | Evidence that belongs to the opportunity | 6.4, 6.7 | §30, §53 |
+| 6.9 | Batched extraction; a run that analysed nothing fails | 1.3 | §13, §32–§33 |
+| 6.10 | Deep runs as a background job (blocked on DEC-001) | 6.9 | §38–§39 |
+| 6.11 | Score honesty + calibration from stored competition checks | 3.9 | §16, §54 |
+| 6.12 | Ideas-first home + shared navigation | 3.10, 6.7 | §7, §40 |
+| 6.13 | Lighter process docs | none | — |
 
-Total: **33 parts** (3.5 and 3.6 added 2026-10-24 from the PDFMinter teardown; 3.7 to 3.11 and 5.4 added the same day from the competitor sweep, DEC-010; the earlier "24" was a miscount). Each phase file repeats its rows with full task detail.
+Order after DEC-014 (2026-11-10 evaluation): 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10,
+with 6.13 any time. Phase 4 starts after 6.7 and 5.1: watchlists and schedules need run-scoped
+data and a signed-in user. 6.4 also changes the MVP gate below from "25" to "up to 25, limited
+by evidence".
+
+Total: **43 parts** (6.4 to 6.13 added 2026-11-10, DEC-014; before that 33: 3.5 and 3.6 added 2026-10-24 from the PDFMinter teardown; 3.7 to 3.11 and 5.4 added the same day from the competitor sweep, DEC-010; the earlier "24" was a miscount). Each phase file repeats its rows with full task detail.
 
 ## MVP cut line (PRD §51–§52, §62)
 

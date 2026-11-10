@@ -71,6 +71,19 @@ Done = code runs + acceptance met + review passed + commit hash recorded.
 | 6.1 | QC enforcement + code review fixes | done | 208926d | Applied all 22 fixes from code-review-report (C-1 to L-3), 150/150 tests pass, lint clean. |
 | 6.2 | Metrics instrumentation (§58–§59) | pending | — | |
 | 6.3 | Launch checklist + handoff | pending | — | |
+| 6.4 | Remove invented content from the Deep pipeline | pending | — | DEC-014. Generator, review miner, summarizer: no PC templates, no pad-to-25, no guaranteed gap |
+| 6.5 | YouTube adapter: no template comments; clean stored fakes | pending | — | DEC-014. Row deletion needs the user's yes |
+| 6.6 | Radar reads the database | pending | — | DEC-014. Needs 6.5 |
+| 6.7 | Scope markets, opportunities, competitors to a run | pending | — | DEC-014. Migration (`run_id`); needs 6.4 |
+| 6.8 | Evidence that belongs to the opportunity | pending | — | DEC-014. Needs 6.4, 6.7 |
+| 6.9 | Batched extraction; a run that analysed nothing fails | pending | — | DEC-014 |
+| 6.10 | Deep runs as a background job | blocked | — | DEC-014; waits on DEC-001 (ask with the post-6.9 duration) and 6.9 |
+| 6.11 | Score honesty + calibration from stored competition checks | pending | — | DEC-014. Does not wait for 3.11's PDFMinter file |
+| 6.12 | Ideas-first home + shared navigation | pending | — | DEC-014. Needs 6.7 for the runs list |
+| 6.13 | Lighter process docs | pending | — | DEC-014. Includes the missing megalibrary path (decision request) |
+
+Order after DEC-014: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10, with 6.13 any time.
+Phase 4 starts after 6.7 and 5.1. Details per part: `phases/phase-6-hardening.md`.
 
 ## Blockers / deferred
 

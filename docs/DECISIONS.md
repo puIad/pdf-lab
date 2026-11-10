@@ -327,3 +327,40 @@ patch the affected guide/phase file (link the follow-up commit).
   `de881e6b` on "budgeting" then completed in 17.7 minutes with 97 of 102 signals analyzed. That
   length does not fit a Vercel function; Deep runs in production need a background job (4.2 decides
   the scheduler, DEC-001).
+
+## DEC-014 — Findings from the 2026-11-10 app evaluation become Parts 6.4 to 6.13
+
+- Date: 2026-11-10
+- Part: none in progress (evaluation requested by the user after Part 3.10)
+- Expected: `06-EVIDENCE-CONTRACT.md` holds everywhere; Part 6.1 task 3 purged fixtures from
+  production paths; a Deep run's output belongs to its niche.
+- Found (code read at 693ad87, app not run):
+  1. Invented content in the Deep pipeline: fixed PC audiences, mechanisms, outcome, prices and
+     index-based urgency in `lib/opportunities/generator.ts`, padded to 25; a "guaranteed
+     fallback" gap and PC gap texts in `lib/competition/review-miner.ts`; PC defaults in
+     `lib/cluster/summarizer.ts`.
+  2. Fixtures served as data: YouTube template comments without a key, `/radar` and the trend
+     routes on `getSeededMarketTopics()`.
+  3. Opportunity evidence is the market's first three signals for every opportunity; a
+     source-less row satisfies QC Rule 1.
+  4. No `run_id` on markets, opportunities, competitors; signals matched by text across the
+     table; all competitors saved on the first market.
+  5. Deep runs: one model call per signal, 17.7 minutes inside one request, extraction failures
+     do not fail the run, a timed-out step keeps running.
+  6. Scores: demand saturates at 10 signals, engagement sums any numeric field, thresholds
+     uncalibrated, 3.11 blocked on an outside file.
+  7. Product shape: quick ideas → Validate → competition → brief works and is cheap, but the
+     home page is the explorer over old global markets; no shared navigation; in production
+     `/ideas`, competition checks and Deep need the internal key.
+  8. Process: STATE rows too long to load every session; defects logged as observations with no
+     owning part; megalibrary path in `AGENTS.md` missing on this machine.
+- Options: (a) log every finding as a part and implement them before Phase 4; (b) fix only the
+  evidence-contract breaches (1 to 3) now and leave the rest to Phase 6 as planned.
+- Recommendation: (a). Watchlists and schedules (Phase 4) would otherwise monitor unscoped
+  markets and padded opportunities.
+- Question for user: "Log all findings for implementation, or only the evidence-contract fixes?"
+- Resolution: _resolved 2026-11-10_ — user: "log all findings for opus to implement them".
+  Parts 6.4 to 6.13 added to `phases/phase-6-hardening.md`, `02-MASTER-PLAN.md` and `STATE.md`
+  with a recommended order (6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10; 6.13 any time).
+  5.1 (auth) moves ahead of Phase 4. Still open inside the parts: DEC-001 (job provider, asked in
+  6.10), deletion of stored fake rows (user's yes, 6.5), the megalibrary location (6.13).
