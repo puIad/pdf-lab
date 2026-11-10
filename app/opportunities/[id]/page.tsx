@@ -81,7 +81,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   const score = Math.round(opp.opportunity_score || 75);
   const confPct = Math.round((opp.confidence || 0.5) * 100);
   const formatLabel = (opp.format || "checklist").replace("_", " ");
-  const priceRange = opp.price_range || "$12–$19";
+  const priceRange = opp.price_range || "Not observed";
 
   // Derive Table of Contents modules based on format and problem
   const tableOfContents = [
@@ -438,7 +438,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
             suggestion={{
               format: opp.format,
               mechanism: opp.solution,
-              outcome: "Resolve PC failure within 15 minutes safely",
+              outcome: "Not observed",
               priceRange,
             }}
           />

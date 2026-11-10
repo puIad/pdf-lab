@@ -3,7 +3,10 @@
 
 import type { EvidenceInput } from "../evidence/types.ts";
 
-export const OPPORTUNITY_PROMPT_VERSION = "2026-09-20.1";
+export const OPPORTUNITY_PROMPT_VERSION = "2026-11-10.1";
+
+/** A run aims for this many opportunities and returns fewer when the evidence supports fewer. */
+export const OPPORTUNITY_TARGET = 25;
 
 export const ALLOWED_FORMATS = [
   "checklist",
@@ -49,6 +52,8 @@ export interface OpportunityMarketInput {
   demandScore: number;
   confidence: number;
   pdfFitScore?: number;
+  /** Observed paid price range of this market's stored competitors (`observedPriceRange`); null = not observed. */
+  priceRange?: string | null;
   signals: OpportunitySignalInput[];
 }
 
@@ -60,11 +65,14 @@ export interface GeneratedOpportunity {
   problem: string;
   solution: string;
   format: OpportunityFormat;
-  priceRange: string;
-  sophistication: SophisticationLevel;
-  mechanism: string;
-  outcome: string;
-  urgency: UrgencyLevel;
+  /** Observed competitor price range, or null ("Not observed"). Never a format default. */
+  priceRange: string | null;
+  /** AI interpretation when a model supplied it, else null. */
+  sophistication: SophisticationLevel | null;
+  mechanism: string | null;
+  outcome: string | null;
+  /** Highest `signal_analysis.urgency` among the attached signals, or null. */
+  urgency: UrgencyLevel | null;
   opportunityScore: number;
   confidence: number;
   evidence: EvidenceInput[];
@@ -78,7 +86,7 @@ export interface OpportunityRow {
   problem: string;
   solution: string;
   format: string;
-  price_range: string;
+  price_range: string | null;
   opportunity_score: number;
   confidence: number;
   created_at?: string;

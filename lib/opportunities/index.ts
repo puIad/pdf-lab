@@ -3,6 +3,7 @@
 export {
   ALLOWED_FORMATS,
   OPPORTUNITY_PROMPT_VERSION,
+  OPPORTUNITY_TARGET,
   SOPHISTICATION_LEVELS,
   URGENCY_LEVELS,
 } from "./types.ts";
@@ -22,6 +23,7 @@ export {
   computeDiversificationStats,
   generate25Opportunities,
   generateCandidatePool,
+  observedPriceRange,
   selectDiversifiedOpportunities,
 } from "./generator.ts";
 

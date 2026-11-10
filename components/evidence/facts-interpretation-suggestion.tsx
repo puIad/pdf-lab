@@ -131,7 +131,7 @@ export function FactsInterpretationSuggestion({
               </Badge>
             </div>
             <div className="flex justify-between border-b border-emerald-200/40 dark:border-emerald-800/40 pb-1.5">
-              <span className="text-muted-foreground">Pricing Tier:</span>
+              <span className="text-muted-foreground">Observed competitor prices:</span>
               <span className="font-semibold">{suggestion.priceRange}</span>
             </div>
             <div className="flex flex-col gap-1 border-b border-emerald-200/40 dark:border-emerald-800/40 pb-1.5">

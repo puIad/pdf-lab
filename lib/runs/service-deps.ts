@@ -11,7 +11,7 @@ import { writeEvidence } from "../evidence/writer.ts";
 import { createServerEvidenceDeps } from "../evidence/service-deps.ts";
 import { fetchRunCompleteness } from "./completeness.ts";
 import { buildSearchFilter } from "../db/search.ts";
-import { generate25Opportunities, ideaCandidates, type OpportunityMarketInput } from "../opportunities/index.ts";
+import { generate25Opportunities, ideaCandidates, OPPORTUNITY_TARGET, type OpportunityMarketInput } from "../opportunities/index.ts";
 import { loadStoredIdeas } from "../ideas/stored.ts";
 import type { OrchestratorDeps, OrchestratorCompetitorItem } from "./orchestrator.ts";
 import { parseMarketplaceProduct } from "../sources/marketplace-helper.ts";
@@ -307,6 +307,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         demandScore: m.demandScore,
         confidence: m.confidence,
         pdfFitScore: m.pdfFitScore,
+        priceRange: m.priceRange ?? null,
         signals: m.signals.map((s) => ({
           id: s.id,
           source_id: s.source_id,
@@ -331,7 +332,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         return null;
       });
       const res = await generate25Opportunities(marketInputs, {
-        targetCount: 25,
+        targetCount: OPPORTUNITY_TARGET,
         router,
         tier: "strong",
         extraCandidates: stored ? ideaCandidates(seed, stored.result.ideas, marketInputs, stored.refs) : [],
@@ -346,6 +347,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           problem: opp.problem,
           solution: opp.solution,
           format: opp.format,
+          priceRange: opp.priceRange,
           opportunityScore: opp.opportunityScore,
           confidence: opp.confidence,
         },
@@ -367,6 +369,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
             problem: opp.problem,
             solution: opp.solution,
             format: opp.format,
+            price_range: opp.priceRange ?? null,
             opportunity_score: opp.opportunityScore,
             confidence: opp.confidence,
           })

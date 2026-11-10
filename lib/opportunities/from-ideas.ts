@@ -5,8 +5,7 @@
 
 import type { EvidenceInput } from "../evidence/types.ts";
 import { jaccard, tokens, type IdeaFormat, type QuickIdea } from "../ideas/ideas.ts";
-import { FORMAT_PRICE_TIERS } from "./generator.ts";
-import type { GeneratedOpportunity, OpportunityFormat, OpportunityMarketInput, UrgencyLevel } from "./types.ts";
+import type { GeneratedOpportunity, OpportunityFormat, OpportunityMarketInput } from "./types.ts";
 
 export const IDEA_CANDIDATES = 20;
 /** Two phrases sharing this much of their content words count as one idea. */
@@ -20,7 +19,7 @@ export interface IdeaSignalRef {
   excerpt: string | null;
 }
 
-const FORMAT_MAP: Record<IdeaFormat, OpportunityFormat> = {
+export const IDEA_FORMAT_MAP: Record<IdeaFormat, OpportunityFormat> = {
   Guide: "guide",
   Checklist: "checklist",
   Planner: "planner",
@@ -68,9 +67,7 @@ export function ideaCandidates(
   return pickDistinctIdeas(ideas).map((idea) => {
     const id = crypto.randomUUID();
     const market = marketFor(idea, markets);
-    const format = FORMAT_MAP[idea.format];
-    const { priceRange, sophistication } = FORMAT_PRICE_TIERS[format];
-    const urgency: UrgencyLevel = idea.trend ? "high" : idea.isQuestion ? "medium" : "low";
+    const format = IDEA_FORMAT_MAP[idea.format];
     const evidence: EvidenceInput[] = idea.evidence.map((e) => ({
       entityType: "opportunity",
       entityId: id,
@@ -89,11 +86,11 @@ export function ideaCandidates(
       problem: idea.phrase,
       solution: `A ${format.replace("_", " ")} that answers "${idea.phrase}" directly.`,
       format,
-      priceRange,
-      sophistication,
-      mechanism: `${idea.format} built around the searched phrase`,
-      outcome: `The reader gets a usable answer to "${idea.phrase}"`,
-      urgency,
+      priceRange: market.priceRange ?? null,
+      sophistication: null,
+      mechanism: null,
+      outcome: null,
+      urgency: null, // phrase rows are never extracted, so no urgency is observed
       opportunityScore: idea.opportunity,
       confidence: idea.confidence,
       evidence,

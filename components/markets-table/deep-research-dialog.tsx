@@ -103,7 +103,7 @@ export function DeepResearchDialog({
               <span>Launch Deep Market Research</span>
             </DialogTitle>
             <DialogDescription>
-              Execute a zero-hallucination, 10-state research pipeline. Ingests real market signals, extracts pain points, clusters problem areas, and synthesizes 25 distinct opportunities.
+              Execute a zero-hallucination, 10-state research pipeline. Ingests real market signals, extracts pain points, clusters problem areas, and synthesizes up to 25 distinct opportunities, limited by evidence.
             </DialogDescription>
           </DialogHeader>
 

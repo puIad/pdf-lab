@@ -325,6 +325,28 @@ Recommended order: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1 (auth, pulled ahead o
 - Acceptance: from `/`, a new visitor reaches a brief without typing a URL; 0 px overflow at
   375 px; 0 console errors; existing deep links still resolve.
 
+## Part 6.14 — Report pages: remove hard-coded PC copy and invented values
+
+- Deps: 6.4 (done). Touches: `app/opportunities/[id]/page.tsx`, `app/markets/[id]/page.tsx`,
+  `lib/export/fetcher.ts`, `components/evidence/facts-interpretation-suggestion.tsx`.
+  Found while doing 6.4 (2026-11-10); not in the DEC-014 evaluation.
+- Findings:
+  1. `app/opportunities/[id]/page.tsx` renders fixed PC text for every opportunity: bonus items
+     with made-up "$7 Value" prices ("Command-Line & Powercfg Diagnostic Code Reference"), search
+     keywords built from templates ("how to solve ... pc error", "... troubleshooting guide"),
+     the "Core Problem" paragraph ("permanent hardware damage"), `urgency: "high"`,
+     `trendLabel ... || "accelerating"`, `sourcesCount: 2`.
+  2. `app/markets/[id]/page.tsx` "Core Audience Friction" card is fixed PC text ("high repair
+     shop quotes", "boot, driver updates, and thermal crashes").
+  3. `signalsCollected` / `signalsAnalyzed` are `Math.max(n, 25)` on the market page and in
+     `lib/export/fetcher.ts`, so the quality panel never shows fewer than 25.
+- Tasks: each block shows stored values or "Not observed"; delete the fixed paragraphs, the
+  bonus list and the keyword templates (briefs already build keywords from observed phrases);
+  remove the `Math.max(…, 25)` floors.
+- Acceptance: an opportunity and a market page from a non-PC run contain none of "PC", "BIOS",
+  "hardware", "repair shop", "troubleshooting" unless a stored row says it; panel counts equal
+  `select count(*)`.
+
 ## Part 6.13 — Lighter process docs
 
 - Deps: none. Touches: `docs/STATE.md`, new `docs/log/`, `docs/00-START-HERE.md`,

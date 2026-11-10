@@ -37,7 +37,7 @@ export function generateReportMarkdown(data: ReportExportData): string {
   );
   lines.push(`| **Problem Markets Identified** | ${data.completeness.marketsIdentified} | Clustered submarkets |`);
   lines.push(
-    `| **Opportunities Generated** | ${data.completeness.opportunitiesGenerated} | Exact 25 target |`,
+    `| **Opportunities Generated** | ${data.completeness.opportunitiesGenerated} | Up to 25, limited by evidence |`,
   );
   lines.push(
     `| **Evidence-Backed Opportunities** | ${data.completeness.evidenceBackedOpportunitiesCount} / ${data.completeness.opportunitiesGenerated} | ${
