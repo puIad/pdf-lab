@@ -1,5 +1,19 @@
 {
   "mcpServers": {
-    "playwright": { "type": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@latest"] }
+    "playwright": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${HOME}/obscura/playwright-mcp.mjs"
+      ]
+    },
+    "playwright-chrome": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${HOME}/obscura/playwright-mcp.mjs",
+        "chrome"
+      ]
+    }
   }
 }

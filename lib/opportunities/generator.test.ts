@@ -1,4 +1,4 @@
-// lib/opportunities/generator.test.ts — Unit and invariant tests for 25-opportunity generator.
+// lib/opportunities/generator.test.ts — Unit and invariant tests for the opportunity generator.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -7,11 +7,12 @@ import {
   generateCandidatePool,
   IDEA_CLAIM_PREFIX,
   ideaCandidates,
-  OPPORTUNITY_PROMPT_VERSION,
+  observedPriceRange,
   pickDistinctIdeas,
   type OpportunityMarketInput,
 } from "./index.ts";
-import { QCViolationError } from "../evidence/qc.ts";
+import type { AIRouter } from "../ai/router.ts";
+import { enforceRule1_OpportunityEvidence, QCViolationError } from "../evidence/qc.ts";
 import { buildIdeas } from "../ideas/ideas.ts";
 
 function createMockMarkets(): OpportunityMarketInput[] {
@@ -135,117 +136,212 @@ function createMockMarkets(): OpportunityMarketInput[] {
   ];
 }
 
-test("25-Opportunity Generator — Core Specification & Acceptance Gates", async (t) => {
-  const markets = createMockMarkets();
+/** Part 6.4: nothing in a non-PC run may carry the old PC template text. */
+const PC_TEXT = /\b(pc|bios|gamers?|repair shop|hardware|boot)\b/i;
 
-  await t.test("generates candidate pool of up to 50+ diverse candidates", () => {
-    const candidates = generateCandidatePool(markets);
-    assert.ok(candidates.length >= 30, `Expected >= 30 candidates, got ${candidates.length}`);
+// SAMPLE DATA (fixture rule): a budgeting niche, shaped like stored signals + signal_analysis rows.
+function createBudgetMarkets(): OpportunityMarketInput[] {
+  const sig = (id: string, title: string, audience: string | null, problem: string | null, urgency: string | null) => ({
+    id,
+    source_id: `src-${id}`,
+    source_type: "reddit",
+    title,
+    content: `${title}. Looking for something I can actually stick to.`,
+    url: `https://reddit.com/r/personalfinance/${id}`,
+    published_at: "2026-10-20T12:00:00Z",
+    analysis: audience || problem ? { audience, problem, intent: "strong", urgency, pdf_relevance: 0.8 } : null,
+  });
+  return [
+    {
+      id: "aaaaaaaa-0000-0000-0000-000000000001",
+      name: "Monthly Budget Overspending",
+      demandScore: 71,
+      confidence: 0.6,
+      priceRange: "$4.99–$19",
+      signals: [
+        sig("b1", "I blow my grocery budget every month", "young couples", "Grocery spending exceeds the monthly plan", "high"),
+        sig("b2", "Same here, groceries wreck our plan", "young couples", "Grocery spending exceeds the monthly plan", "medium"),
+        sig("b3", "Need a weekly spending checklist", "college students", "No simple way to track weekly spending", "low"),
+        sig("b4", "Random post with no extraction", null, null, null),
+      ],
+    },
+    {
+      id: "aaaaaaaa-0000-0000-0000-000000000002",
+      name: "Irregular Income Planning",
+      demandScore: 55,
+      confidence: 0.4,
+      signals: [
+        sig("b5", "Freelancer here, income changes monthly", "freelancers", "Cannot cover bills when income is irregular", null),
+      ],
+    },
+    { id: "aaaaaaaa-0000-0000-0000-000000000003", name: "Unanalysed Market", demandScore: 40, confidence: 0.2, signals: [sig("b6", "Untitled", null, null, null)] },
+  ];
+}
+
+test("Opportunity generator: observed fields only, never padded (Part 6.4)", async (t) => {
+  const markets = createBudgetMarkets();
+  const analysed = markets.flatMap((m) => m.signals).filter((s) => s.analysis);
+
+  await t.test("one candidate per distinct (audience, problem); unanalysed signals yield none", () => {
+    const pool = generateCandidatePool(markets);
+    assert.equal(pool.length, 3);
+    assert.deepEqual(pool.map((c) => c.marketId), [markets[0].id, markets[0].id, markets[1].id]);
   });
 
-  await t.test("master generator outputs EXACTLY 25 opportunities", async () => {
-    const res = await generate25Opportunities(markets, { targetCount: 25 });
-    assert.equal(res.opportunities.length, 25, "Must generate exactly 25 opportunities per PRD §18/§28");
-    assert.equal(res.promptVersion, OPPORTUNITY_PROMPT_VERSION);
+  await t.test("a non-PC run contains no PC template text", async () => {
+    const res = await generate25Opportunities(markets);
+    assert.doesNotMatch(JSON.stringify(res), PC_TEXT);
   });
 
-  await t.test("Acceptance Gate: all 25 opportunities are pairwise-distinct on (audience, problem, format)", async () => {
-    const res = await generate25Opportunities(markets, { targetCount: 25 });
-    const keys = new Set<string>();
+  await t.test("thin markets give fewer than 25: the count equals what the pool supports", async () => {
+    const res = await generate25Opportunities(markets);
+    assert.equal(res.targetCount, 25);
+    assert.equal(res.opportunities.length, 3);
+    assert.equal(res.totalCandidatesGenerated, 3);
+    const empty = await generate25Opportunities([{ id: "e", name: "Empty", demandScore: 50, confidence: 0.5, signals: [] }]);
+    assert.equal(empty.opportunities.length, 0);
+    assert.equal((await generate25Opportunities([])).opportunities.length, 0);
+  });
 
+  await t.test("audience, problem and urgency trace to a stored row; price is observed or null", () => {
+    for (const c of generateCandidatePool(markets)) {
+      const src = analysed.filter((s) => s.analysis!.audience === c.targetAudience && s.analysis!.problem === c.problem);
+      assert.ok(src.length > 0, `no signal behind ${c.title}`);
+      assert.equal(c.evidence.length, Math.min(3, src.length));
+      assert.ok(c.evidence.every((e) => e.entityId === c.id && src.some((s) => s.url === e.url && e.sourceId === s.source_id)));
+      assert.equal(c.sophistication, null);
+      assert.equal(c.mechanism, null);
+      assert.equal(c.outcome, null);
+    }
+    const [couples, students, freelancers] = generateCandidatePool(markets);
+    assert.equal(couples.urgency, "high"); // highest of high + medium
+    assert.equal(students.urgency, "low");
+    assert.equal(freelancers.urgency, null); // none stored
+    assert.equal(couples.priceRange, "$4.99–$19"); // the market's observed range
+    assert.equal(freelancers.priceRange, null); // no stored competitor prices
+    assert.equal(students.format, "checklist"); // the signal's wording names the format
+    assert.equal(freelancers.format, "guide");
+  });
+
+  await t.test("selection keeps (audience, problem, format) distinct and caps a format at 36%", async () => {
+    const many: OpportunityMarketInput[] = [{
+      id: "big",
+      name: "Big",
+      demandScore: 60,
+      confidence: 0.5,
+      signals: Array.from({ length: 40 }, (_, i) => ({
+        id: `s${i}`,
+        title: i % 2 ? `budget planner ${i}` : `saving checklist ${i}`,
+        content: null,
+        url: `https://example.com/${i}`,
+        analysis: { audience: `audience ${i % 10}`, problem: `problem number ${i}` },
+      })),
+    }];
+    const res = await generate25Opportunities(many);
+    assert.equal(res.opportunities.length, 25);
+    assert.equal(new Set(res.opportunities.map((o) => `${o.targetAudience}::${o.problem}::${o.format}`)).size, 25);
+    // Two formats exist in the data, so the cap relaxes only after both reach 9.
+    for (const n of Object.values(res.diversification.formatCounts)) assert.ok(n === 0 || n >= 9);
+    assert.deepEqual(res.diversification.priceRanges, []);
+  });
+
+  await t.test("QC Rule 1: every opportunity has evidence rows of its own", async () => {
+    const res = await generate25Opportunities(markets);
     for (const opp of res.opportunities) {
-      const key = `${opp.targetAudience.toLowerCase().trim()}::${opp.problem.toLowerCase().trim()}::${opp.format}`;
-      assert.ok(!keys.has(key), `Duplicate found for key: ${key}`);
-      keys.add(key);
-    }
-    assert.equal(keys.size, 25, "All 25 items must be strictly distinct on (audience, problem, format)");
-  });
-
-  await t.test("Diversification Constraints: 8 dimensions verified", async () => {
-    const res = await generate25Opportunities(markets, { targetCount: 25 });
-    const opps = res.opportunities;
-    const stats = res.diversification;
-
-    // 1. Audience diversity (>= 4 distinct segments)
-    assert.ok(stats.audienceCount >= 4, `Expected >= 4 distinct audiences, got ${stats.audienceCount}`);
-
-    // 2. Format diversity (>= 4 distinct formats)
-    const usedFormats = Object.entries(stats.formatCounts).filter(([, count]) => count > 0);
-    assert.ok(usedFormats.length >= 4, `Expected >= 4 formats, got ${usedFormats.length}`);
-
-    // 3. Format cap: no format exceeds 36% (<= 9 out of 25)
-    for (const [fmt, count] of Object.entries(stats.formatCounts)) {
-      assert.ok(count <= 9, `Format ${fmt} exceeded cap with count ${count}`);
-    }
-
-    // 4. Urgency spread: high, medium, low all represented
-    assert.ok(stats.urgencyCounts.high > 0, "Expected high urgency opportunities");
-    assert.ok(stats.urgencyCounts.medium > 0, "Expected medium urgency opportunities");
-
-    // 5. Sophistication spread: beginner, intermediate, advanced all represented
-    assert.ok(stats.sophisticationCounts.beginner > 0, "Expected beginner opportunities");
-    assert.ok(stats.sophisticationCounts.intermediate > 0, "Expected intermediate opportunities");
-
-    // 6. Price range diversity: multiple price points
-    assert.ok(stats.priceRanges.length >= 3, `Expected >= 3 price ranges, got ${stats.priceRanges.length}`);
-
-    // 7. Mechanisms and outcomes are populated on every item
-    for (const opp of opps) {
-      assert.ok(opp.mechanism && opp.mechanism.length > 10, `Missing mechanism on ${opp.title}`);
-      assert.ok(opp.outcome && opp.outcome.length > 10, `Missing outcome on ${opp.title}`);
-    }
-  });
-
-  await t.test("Acceptance Gate: QC Rule 1 — every opportunity has >= 1 evidence row", async () => {
-    const res = await generate25Opportunities(markets, { targetCount: 25 });
-    for (const opp of res.opportunities) {
-      assert.ok(opp.evidence && opp.evidence.length >= 1, `Opp ${opp.title} has 0 evidence rows`);
-      assert.ok(opp.confidence >= 0.05 && opp.confidence <= 1.0, `Invalid confidence ${opp.confidence}`);
+      assert.ok(opp.evidence.length >= 1, `Opp ${opp.title} has 0 evidence rows`);
       for (const ev of opp.evidence) {
         assert.equal(ev.entityType, "opportunity");
         assert.equal(ev.entityId, opp.id);
         assert.ok(ev.claim.length > 0);
       }
     }
-  });
-
-  await t.test("Acceptance Gate: QC Rule 1 blocks opportunity without evidence during generation", async () => {
-    const badMarket: OpportunityMarketInput[] = [
-      {
-        id: "bad-id",
-        name: "Empty Market",
-        demandScore: 50,
-        confidence: 0.5,
-        signals: [],
-      },
-    ];
-
-    // Artificially stripping evidence throws QCViolationError
-    const candidates = generateCandidatePool(badMarket);
-    candidates[0].evidence = [];
-
     assert.throws(
-      () => {
-        // Enforce QC Rule 1 explicitly
-        if (candidates[0].evidence.length === 0) {
-          throw new QCViolationError(1, "Opportunity has 0 evidence rows");
-        }
-      },
+      () => enforceRule1_OpportunityEvidence({ id: "x", title: "No evidence" }, []),
       (err) => err instanceof QCViolationError && err.ruleNumber === 1,
     );
   });
 
-  await t.test("Determinism: same evidence snapshot produces stable opportunity set", async () => {
-    const resA = await generate25Opportunities(markets, { targetCount: 25 });
-    const resB = await generate25Opportunities(markets, { targetCount: 25 });
+  await t.test("deterministic: the same stored rows give the same set", async () => {
+    const a = await generate25Opportunities(markets);
+    const b = await generate25Opportunities(markets);
+    assert.deepEqual(
+      a.opportunities.map((o) => [o.title, o.format, o.targetAudience, o.opportunityScore]),
+      b.opportunities.map((o) => [o.title, o.format, o.targetAudience, o.opportunityScore]),
+    );
+  });
 
-    assert.equal(resA.opportunities.length, resB.opportunities.length);
-    for (let i = 0; i < 25; i++) {
-      assert.equal(resA.opportunities[i].title, resB.opportunities[i].title);
-      assert.equal(resA.opportunities[i].format, resB.opportunities[i].format);
-      assert.equal(resA.opportunities[i].targetAudience, resB.opportunities[i].targetAudience);
-      assert.equal(resA.opportunities[i].opportunityScore, resB.opportunities[i].opportunityScore);
-    }
+  await t.test("observedPriceRange reads paid prices in the most common currency", () => {
+    assert.equal(observedPriceRange(["$4.99", "$19.00", "Free", null, "£3"]), "$4.99–$19");
+    assert.equal(observedPriceRange(["$7"]), "$7");
+    assert.equal(observedPriceRange(["Free", null, "n/a"]), null);
+    assert.equal(observedPriceRange([]), null);
+  });
+});
+
+test("AI path: model wording, stored grounding, no defaults, no padding (Part 6.4)", async (t) => {
+  const markets = createBudgetMarkets();
+  const routerReturning = (raw: unknown) =>
+    ({ generateObject: async (o: { validate: (r: unknown) => unknown }) => ({ object: o.validate(raw) }) }) as unknown as AIRouter;
+  const ok = {
+    marketId: markets[0].id,
+    title: "Grocery Budget Reset",
+    targetAudience: "young couples",
+    problem: "Grocery spending exceeds the monthly plan",
+    solution: "A weekly grocery planner",
+    format: "planner",
+  };
+
+  await t.test("keeps only candidates grounded in the market's signals; the observed pool always joins", async () => {
+    const res = await generate25Opportunities(markets, {
+      router: routerReturning([
+        ok,
+        { ...ok, marketId: "not-in-input", title: "Wrong market" },
+        { ...ok, solution: "", title: "No solution" },
+        { ...ok, format: "video course", title: "Bad format" },
+        { ...ok, targetAudience: "Competitive Gamers", title: "Made-up audience" },
+        { ...ok, marketId: markets[2].id, title: "Market without analysed signals" },
+        {
+          ...ok,
+          title: "Fine wording",
+          targetAudience: "College Students",
+          problem: "No simple way to track weekly spending",
+          format: "tracker",
+          sophistication: "expert",
+          outcome: "Spend under plan",
+        },
+      ]),
+    });
+    // 2 model candidates, then the pool's 3 minus the one sharing (audience, problem, format) with the first.
+    assert.deepEqual(res.opportunities.map((o) => o.title).slice(0, 2), ["Grocery Budget Reset", "Fine wording"]);
+    assert.equal(res.opportunities.length, 4);
+    assert.equal(res.totalCandidatesGenerated, 4);
+    const [first, second] = res.opportunities;
+    assert.equal(first.priceRange, "$4.99–$19"); // observed on the market, never the model's
+    assert.equal(first.urgency, "high"); // from the young-couples signals
+    assert.deepEqual(first.evidence.map((e) => e.sourceId), ["src-b1", "src-b2"]);
+    assert.equal(first.sophistication, null);
+    assert.equal(first.mechanism, null);
+    assert.equal(second.targetAudience, "college students"); // stored wording, not the model's
+    assert.equal(second.urgency, "low"); // from the college-students signal, not the market's first three
+    assert.deepEqual(second.evidence.map((e) => e.sourceId), ["src-b3"]);
+    assert.equal(second.sophistication, null); // "expert" is not a level
+    assert.equal(second.outcome, "Spend under plan");
+    assert.doesNotMatch(JSON.stringify(res), PC_TEXT);
+  });
+
+  await t.test("no usable model candidate, or a provider error, leaves the observed pool", async () => {
+    const none = await generate25Opportunities(markets, { router: routerReturning([{ title: "only a title" }]) });
+    assert.equal(none.opportunities.length, 3);
+    const failing = { generateObject: async () => { throw new Error("provider down"); } } as unknown as AIRouter;
+    assert.equal((await generate25Opportunities(markets, { router: failing })).opportunities.length, 3);
+  });
+
+  await t.test("the model is not called when no signal has both an audience and a problem", async () => {
+    let calls = 0;
+    const counting = { generateObject: async () => { calls += 1; return { object: [] }; } } as unknown as AIRouter;
+    const res = await generate25Opportunities([markets[2]], { router: counting });
+    assert.equal(calls, 0);
+    assert.equal(res.opportunities.length, 0);
   });
 });
 
@@ -290,12 +386,13 @@ test("Part 3.8: quick ideas join the Deep-run candidate pool", async (t) => {
     assert.equal(ideaCandidates("x", ideas, [], refs).length, 0); // no market, no candidate
   });
 
-  await t.test("still 25 distinct, PRD §29 rules unchanged, at least one traced to a phrase", async () => {
-    const res = await generate25Opportunities(markets, { targetCount: 25, extraCandidates: ideaCandidates("pc troubleshooting", ideas, markets, refs) });
-    assert.equal(res.opportunities.length, 25);
+  await t.test("ideas join the pool; the count is what the pool supports, all distinct, one traced to a phrase", async () => {
+    const extra = ideaCandidates("pc troubleshooting", ideas, markets, refs);
+    const res = await generate25Opportunities(markets, { targetCount: 25, extraCandidates: extra });
+    assert.equal(res.opportunities.length, Math.min(25, generateCandidatePool(markets).length + extra.length));
     const keys = new Set(res.opportunities.map((o) => `${o.targetAudience}::${o.problem}::${o.format}`));
-    assert.equal(keys.size, 25);
-    for (const n of Object.values(res.diversification.formatCounts)) assert.ok(n <= 9);
+    assert.equal(keys.size, res.opportunities.length);
     assert.ok(res.opportunities.some((o) => o.evidence.some((e) => e.claim.startsWith(IDEA_CLAIM_PREFIX))));
+    assert.ok(extra.every((c) => c.urgency === null && c.sophistication === null && c.priceRange === null));
   });
 });

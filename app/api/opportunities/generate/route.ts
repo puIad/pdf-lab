@@ -1,11 +1,11 @@
 // app/api/opportunities/generate/route.ts — Phase 2 Part 2.1 API.
-// Generates exactly 25 diversified, evidence-backed opportunities from stored markets and signals.
+// Generates up to 25 diversified, evidence-backed opportunities from stored markets and signals.
 // Persists opportunities to `opportunities` table and evidence to `evidence` table (QC Rule 1).
 
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { getRouter } from "@/lib/ai/index";
-import { generate25Opportunities } from "@/lib/opportunities/index";
+import { generate25Opportunities, observedPriceRange } from "@/lib/opportunities/index";
 import type { OpportunityMarketInput, OpportunitySignalInput } from "@/lib/opportunities/index";
 import { writeEvidence } from "@/lib/evidence/writer";
 import { createServerEvidenceDeps } from "@/lib/evidence/service-deps";
@@ -78,6 +78,12 @@ export async function POST(req: Request) {
     );
   }
 
+  // Observed competitor prices per market; a market with none gets a null price range.
+  const { data: competitorRows } = await supabase
+    .from("competitors")
+    .select("market_id, price")
+    .in("market_id", marketRows.map((m) => m.id));
+
   // 2. Map DB records to OpportunityMarketInput
   const marketsForGeneration: OpportunityMarketInput[] = marketRows.map((m) => {
     const rawSignals: OpportunitySignalInput[] = [];
@@ -113,6 +119,9 @@ export async function POST(req: Request) {
       demandScore: m.demand_score || 50,
       confidence: m.confidence || 0.5,
       pdfFitScore: m.pdf_fit_score || 75,
+      priceRange: observedPriceRange(
+        (competitorRows ?? []).filter((c) => c.market_id === m.id).map((c) => c.price as string | null),
+      ),
       signals: rawSignals,
     };
   });

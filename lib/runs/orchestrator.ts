@@ -16,6 +16,8 @@ import {
 import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 import { isDemandOnly } from "../sources/demand-only.ts";
 import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
+import { observedPriceRange } from "../opportunities/generator.ts";
+import { OPPORTUNITY_TARGET } from "../opportunities/types.ts";
 
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 // Extraction is one model call per signal: ~7 signals/min on NVIDIA's hosted gpt-oss (DEC-013),
@@ -82,6 +84,8 @@ export interface OrchestratorMarketItem {
   demandScore: number;
   confidence: number;
   pdfFitScore: number;
+  /** Paid price range of the competitors stored against this market in this run; null = not observed. */
+  priceRange?: string | null;
   signals: StoredSignalForRun[];
 }
 
@@ -93,6 +97,7 @@ export interface OrchestratorOpportunityItem {
   problem: string;
   solution: string;
   format: string;
+  priceRange?: string | null;
   opportunityScore: number;
   confidence: number;
 }
@@ -313,6 +318,11 @@ export async function executeResearchRun(
     if (compState.hasCompetitors) {
       const primaryMarketId = marketCandidates[0]?.id || runId;
 
+      // Competitors are stored against the first market (until Part 6.7 maps them), so only it gets their price range.
+      if (marketCandidates[0]) {
+        marketCandidates[0].priceRange = observedPriceRange(observedCompetitors.map((c) => c.price));
+      }
+
       if (deps.saveCompetitors && marketCandidates.length > 0) {
         await deps.saveCompetitors(
           observedCompetitors.map((c) => ({
@@ -432,7 +442,10 @@ export async function executeResearchRun(
         opportunitiesFromIdeas: fromIdeas,
         evidenceCreated: totalEvidenceCreated,
       },
-      message: `Assembling research completeness panel and reconciling database counts`,
+      message:
+        `Saved ${savedOppsCount} of ${OPPORTUNITY_TARGET} target opportunities` +
+        (savedOppsCount < OPPORTUNITY_TARGET ? ", limited by evidence" : "") +
+        `; assembling research completeness panel and reconciling database counts`,
     });
     await deps.updateRunStatus(runId, "report_generation");
 

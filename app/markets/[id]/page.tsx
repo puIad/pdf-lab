@@ -657,7 +657,7 @@ export default async function MarketPage(props: MarketPageProps) {
           )}
         </section>
 
-        {/* Section 4: 25 DIVERSIFIED OPPORTUNITIES */}
+        {/* Section 4: DIVERSIFIED OPPORTUNITIES (up to 25 per run, limited by evidence) */}
         <section className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
             <div>
@@ -666,6 +666,7 @@ export default async function MarketPage(props: MarketPageProps) {
               </h2>
               <p className="text-xs text-muted-foreground">
                 Pairwise-distinct across audience, problem, and format (PRD §29 diversification constraint).
+                A run targets up to 25; a lower count means the evidence supported fewer.
               </p>
             </div>
           </div>
@@ -710,7 +711,7 @@ export default async function MarketPage(props: MarketPageProps) {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs font-mono text-foreground">
-                        {opp.price_range || "$12–$19"}
+                        {opp.price_range || "Not observed"}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end">

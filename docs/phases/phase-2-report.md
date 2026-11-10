@@ -7,16 +7,18 @@ trends, competition, gaps, formats, source links, confidence, at near-zero dev c
 
 Load: Phase-1 files + `05-PIPELINE-SCORING.md → 06-EVIDENCE-CONTRACT.md → 09-UX-SPEC.md`.
 
-## Part 2.1 — 25-opportunity generator (diversification constraints)
+## Part 2.1 — Opportunity generator, up to 25 (diversification constraints)
 
 - Deps: 1.5. Touches: `lib/opportunities/*`, `app/api/opportunities/generate/route.ts`.
 - Tasks:
-  1. Strong-tier synthesis over clusters+evidence: 50 candidates → select EXACTLY 25,
+  1. Strong-tier synthesis over clusters+evidence: candidates → select up to 25 (fewer when the
+     evidence supports fewer; never padded, Part 6.4),
      diversified across audiences/problems/formats/urgency/price/sophistication/
      mechanism/outcome (PRD §29 — 25 variations of one product FAILS).
   2. Each writes `opportunities` row with score+confidence+evidence links (QC Rule 1).
   3. Deterministic-ish: same evidence snapshot → stable set (log prompt version).
-- Acceptance: `pc troubleshooting` → 25 rows, pairwise-distinct on (audience, problem,
+- Acceptance: `pc troubleshooting` → up to 25 rows (the count the candidate pool supports),
+  pairwise-distinct on (audience, problem,
   format); every row has ≥1 evidence row; rerun stable ± documented tolerance.
 - Guides: `guides/ai-providers.md`.
 
@@ -46,7 +48,8 @@ Load: Phase-1 files + `05-PIPELINE-SCORING.md → 06-EVIDENCE-CONTRACT.md → 09
   3. Review mining → likes/dislikes/missing/confusing/requests → product gaps
      (PRD §21, e.g. "too technical" → plain-English opportunity).
 - Acceptance: market page shows competitors with real URLs/prices; landscape shares sum
-  from observed rows; ≥1 gap traces to quoted review excerpts.
+  from observed rows; ≥1 gap when a review or discussion matches a mining pattern, each
+  traced to quoted excerpts; no match means no gap (Part 6.4).
 - Guides: sources guide + `08-ADAPTERS.md`.
 
 ## Part 2.4 — Export (MD/CSV/JSON) + research-quality panel
@@ -57,6 +60,6 @@ Load: Phase-1 files + `05-PIPELINE-SCORING.md → 06-EVIDENCE-CONTRACT.md → 09
   2. Quality panel per PRD §55: completeness %, sources, signals, markets,
      opportunities, evidence-backed count.
   3. Export includes evidence URLs + confidence (round-trip: re-import JSON recounts).
-- Acceptance: exported files contain all 25 opps + evidence links; counts match UI;
+- Acceptance: exported files contain every stored opportunity (up to 25) + evidence links; counts match UI;
   JSON re-validates against schema.
 - Review: full checklist + Phase-2/MVP gate.

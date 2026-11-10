@@ -1,6 +1,6 @@
 // lib/competition/review-miner.ts — Review mining & product gap extraction per PRD §21.
 // Mines likes, dislikes, missing, confusing, requests and translates them into actionable product gaps.
-// Ensures acceptance criterion: ">=1 gap traces to quoted review excerpts".
+// Every gap traces to quoted review or discussion excerpts; no match means no gap.
 
 import type {
   CompetitorProduct,
@@ -25,48 +25,52 @@ interface MiningPattern {
   opportunityTranslation: string;
 }
 
+// Niche-neutral wording only (Part 6.4): the texts describe the pattern, the quoted excerpts carry
+// the niche. A category with no matching excerpt produces no gap.
 const MINING_PATTERNS: MiningPattern[] = [
   {
     category: "too_technical",
     sentiment: "dislike",
     regex: /\b(too technical|way too complex|jargon|dense manual|hard to understand|assumed i knew|overly complicated)\b/i,
-    gapTitle: "Zero-Jargon Plain-English Diagnostic Guide",
-    gapSummary: "Existing products and guides are overly technical, written for sysadmins rather than non-technical everyday computer owners.",
-    opportunityTranslation: "Create a plain-English, visual troubleshooting guide that avoids IT jargon and explains symptoms in everyday language with clear pass/fail checkpoints.",
+    gapTitle: "Too technical for the reader",
+    gapSummary: "Quoted users say existing material is too technical or assumes knowledge they do not have.",
+    opportunityTranslation: "A plain-language version that explains each term and step without jargon.",
   },
   {
     category: "confusing",
     sentiment: "confusing",
     regex: /\b(confusing|unclear instructions|lost at step|hard to follow|vague|did not explain how|ambiguous)\b/i,
-    gapTitle: "Step-by-Step Visual Decision Tree",
-    gapSummary: "Current materials provide disjointed lists of fixes without a structured sequence or clear decision branches when a step fails.",
-    opportunityTranslation: "Design a sequential decision tree flowchart that guides users to the exact next step based on whether a symptom resolved or persisted.",
+    gapTitle: "Hard to follow",
+    gapSummary: "Quoted users say existing material is confusing or unclear about what to do next.",
+    opportunityTranslation: "A clearly sequenced version with one action per step.",
   },
   {
     category: "missing_feature",
     sentiment: "missing",
-    regex: /\b(missing|no flowchart|lacks|wish it had|did not include|no diagnostic tree|didn't cover|needs more diagrams)\b/i,
-    gapTitle: "Comprehensive Diagnostic Flowchart & Symptom Matrix",
-    gapSummary: "Competitors offer wall-of-text explanations but omit immediate visual triage flowcharts and symptom lookup matrices.",
-    opportunityTranslation: "Publish a high-contrast printable flowchart with a symptom-to-solution matrix enabling 60-second triage without reading pages of theory.",
+    regex: /\b(missing|lacks|wish it had|did not include|didn't cover|needs more (?:diagrams|examples|detail))\b/i,
+    gapTitle: "Something users expected is missing",
+    gapSummary: "Quoted users name content they expected and did not find.",
+    opportunityTranslation: "Cover the missing content named in the quotes.",
   },
   {
     category: "offline_access",
     sentiment: "request",
-    regex: /\b(offline|printable|could not browse|no internet|when pc won't boot|black screen|phone friendly|laminated)\b/i,
-    gapTitle: "Offline Emergency Triage Checklist",
-    gapSummary: "Users facing boot failure or network card crashes cannot access web-based guides or videos while their computer is down.",
-    opportunityTranslation: "Offer a compact 2-page printable emergency PDF checklist designed specifically for offline troubleshooting from a phone or printed sheet.",
+    regex: /\b(offline|printable|print it|no internet|phone friendly|laminated)\b/i,
+    gapTitle: "Wanted offline or on paper",
+    gapSummary: "Quoted users ask for something they can print or use without a connection.",
+    opportunityTranslation: "A compact printable version that works offline.",
   },
   {
     category: "outdated",
     sentiment: "dislike",
-    regex: /\b(outdated|old version|doesn't apply to windows 11|wrong settings|obsolete|menus changed)\b/i,
-    gapTitle: "Modernized OS & Hardware Quick-Fix Blueprint",
-    gapSummary: "Existing books and PDFs still reference legacy operating system dialogs and outdated BIOS menus, causing frustration on modern PCs.",
-    opportunityTranslation: "Deliver an up-to-date, modern OS troubleshooting blueprint verified against current operating system updates and modern UEFI architectures.",
+    regex: /\b(outdated|out of date|old version|obsolete|no longer (?:works|applies|accurate))\b/i,
+    gapTitle: "Out of date",
+    gapSummary: "Quoted users say existing material no longer matches the current situation.",
+    opportunityTranslation: "An up-to-date version, checked against how things work now.",
   },
 ];
+
+const LIKES_REGEX = /\b(helpful|lifesaver|easy to follow|easy reference|well organized|worth every penny)\b/i;
 
 /**
  * Extracts a concise, readable sentence around a keyword match to serve as an authentic quote.
@@ -169,11 +173,8 @@ export function mineReviewsAndGaps(
     }
 
     // Check for positive signals (likes)
-    if (/\b(helpful|great checklist|lifesaver|clear screenshots|saved my pc|easy reference|fixed it in 10 minutes)\b/i.test(candidate.text)) {
-      const positiveSentence = extractQuotedSentence(
-        candidate.text,
-        /\b(helpful|great checklist|lifesaver|clear screenshots|saved my pc|easy reference|fixed it in 10 minutes)\b/i,
-      );
+    if (LIKES_REGEX.test(candidate.text)) {
+      const positiveSentence = extractQuotedSentence(candidate.text, LIKES_REGEX);
       if (positiveSentence && likes.size < 5) {
         likes.add(positiveSentence);
       }
@@ -197,34 +198,7 @@ export function mineReviewsAndGaps(
     }
   }
 
-  // Guaranteed fallback: If no pattern triggered because collected signals were sparse,
-  // construct at least one grounded gap from the first available signal or competitor quote,
-  // ensuring acceptance criteria: ">=1 gap traces to quoted review excerpts".
-  if (productGaps.length === 0) {
-    const fallbackSource = textCandidates[0];
-    const quoteText = fallbackSource?.text
-      ? fallbackSource.text.slice(0, 150).trim()
-      : "Users struggle to diagnose root-cause hardware failures without sequential triage checklists.";
-
-    productGaps.push({
-      id: "gap-format-friction",
-      title: "Self-Guided Diagnostic Triage Checklist",
-      category: "format_friction",
-      summary: "Observed users encounter fragmented troubleshooting advice without structured, step-by-step diagnostic verification.",
-      opportunityTranslation: "Provide an organized, self-paced PDF checklist with sequential triage steps to isolate faulty components.",
-      reviewExcerpts: [
-        {
-          quote: quoteText,
-          source: fallbackSource?.source || "Customer Feedback",
-          url: fallbackSource?.url || null,
-          sentiment: "missing",
-        },
-      ],
-    });
-
-    missing.add(quoteText);
-  }
-
+  // No fallback: text with no pattern match yields no gap (06-EVIDENCE-CONTRACT, QC Rule 3).
   return {
     reviewMining: {
       likes: Array.from(likes).slice(0, 5),

@@ -153,14 +153,39 @@ describe("mineReviewsAndGaps (PRD §21)", () => {
     // Check specific "too_technical" gap from the fixture
     const technicalGap = productGaps.find((g) => g.category === "too_technical");
     assert.ok(technicalGap);
-    assert.ok(technicalGap.opportunityTranslation.toLowerCase().includes("plain-english"));
+    assert.ok(technicalGap.opportunityTranslation.toLowerCase().includes("plain-language"));
     assert.ok(technicalGap.reviewExcerpts.some((e) => e.quote.toLowerCase().includes("too technical")));
   });
 
-  it("creates grounded fallback gap if signals are sparse", () => {
+  it("produces no gap from text with no pattern match (no fallback, Part 6.4)", () => {
     const sparse = mineReviewsAndGaps([], [{ content: "Users report frequent crashes when booting Windows." }]);
-    assert.ok(sparse.productGaps.length >= 1);
-    assert.ok(sparse.productGaps[0].reviewExcerpts.length >= 1);
+    assert.deepEqual(sparse.productGaps, []);
+    assert.deepEqual(sparse.reviewMining, { likes: [], dislikes: [], missing: [], confusing: [], requests: [] });
+    assert.deepEqual(mineReviewsAndGaps([], []).productGaps, []);
+  });
+
+  it("a non-PC niche gets gaps with no PC wording; the niche lives in the quotes", () => {
+    // SAMPLE DATA (fixture rule): budgeting reviews and one discussion.
+    const { productGaps, reviewMining } = mineReviewsAndGaps(
+      [{
+        platform: "etsy",
+        title: "Monthly Budget Planner",
+        url: "https://www.etsy.com/listing/9",
+        price: "$6.50",
+        format: "planner",
+        rating: 4.6,
+        reviewCount: 20,
+        positioning: null,
+        promises: [],
+        reviews: ["Pretty, but the sinking funds page is confusing.", "Wish it had a debt payoff tracker.", "So helpful for our first budget."],
+      }],
+      [{ content: "Every budgeting template I find is outdated and ignores irregular income.", url: "https://reddit.com/r/x/1", source_type: "reddit", title: "templates" }],
+    );
+    assert.deepEqual(productGaps.map((g) => g.category).sort(), ["confusing", "missing_feature", "outdated"]);
+    assert.equal(reviewMining.likes.length, 1);
+    const fixedText = productGaps.map((g) => `${g.title} ${g.summary} ${g.opportunityTranslation}`).join(" ");
+    assert.doesNotMatch(fixedText, /\b(pc|bios|gamers?|repair shop|hardware|boot|windows|diagnostic|troubleshooting)\b/i);
+    assert.ok(productGaps.every((g) => g.reviewExcerpts.length >= 1));
   });
 });
 

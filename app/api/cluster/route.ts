@@ -243,7 +243,7 @@ export async function POST(req: Request) {
       .from("markets")
       .insert({
         name: cluster.name,
-        description: `Audience: ${cluster.audience}. Evidenced by ${cluster.frequency} signals. Primary problem: ${cluster.language[0] || cluster.name}`,
+        description: `Audience: ${cluster.audience ?? "Not observed"}. Evidenced by ${cluster.frequency} signals. Primary problem: ${cluster.language[0] || cluster.name}`,
         trend: cluster.trend,
         demand_score: cluster.scoring.factors.demand,
         competition_score: cluster.scoring.factors.competitiveDensity,

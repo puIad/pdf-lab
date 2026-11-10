@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { cosineSimilarity, computeCentroid } from "./similarity.ts";
 import { clusterSignals } from "./clusterer.ts";
+import { summarizeCluster } from "./summarizer.ts";
 import type { ClusterSignal } from "./types.ts";
 
 describe("similarity & vector math", () => {
@@ -114,7 +115,7 @@ describe("clusterSignals (PRD §15)", () => {
     assert.equal(c1.frequency, 2);
     assert.ok(c1.growth >= 1.0);
     assert.ok(c1.language.length > 0);
-    assert.ok(c1.relatedProducts.length > 0);
+    assert.deepEqual(c1.relatedProducts, []); // no model, no product titles
     assert.ok(c1.scoring.score > 0);
     assert.ok(c1.scoring.confidence > 0);
     assert.equal(c1.signals.length, 2);
@@ -129,3 +130,35 @@ describe("clusterSignals (PRD §15)", () => {
     assert.ok(wifiCluster.signals.every((s) => s.id === "sig-3" || s.id === "sig-4"));
   });
 });
+
+describe("summarizeCluster without a model (Part 6.4)", () => {
+  // SAMPLE DATA (fixture rule): budgeting signals.
+  const sig = (id: string, title: string, audience: string | null, problem: string | null): ClusterSignal => ({
+    id,
+    sourceType: "reddit",
+    title,
+    content: title,
+    url: `https://reddit.com/${id}`,
+    analysis: { audience, problem, intent: "strong", urgency: null, pdf_relevance: 0.8 },
+    embedding: [1, 0, 0],
+  });
+
+  it("names a cluster from its most frequent problem terms, with no PC defaults", async () => {
+    const c = await summarizeCluster("cluster-1", [
+      sig("a", "Groceries wreck our plan", "young couples", "Grocery spending exceeds the monthly budget"),
+      sig("b", "Overspending again", "young couples", "Monthly grocery budget runs out early"),
+      sig("c", "Budget help", "students", "Cannot keep a grocery budget"),
+    ], [1, 0, 0]);
+    assert.equal(c.name, "Budget Grocery Monthly");
+    assert.equal(c.audience, "young couples");
+    assert.deepEqual(c.relatedProducts, []);
+    assert.doesNotMatch(JSON.stringify({ ...c, signals: [] }), /\b(pc|bios|gamers?|repair shop|hardware|boot|troubleshooting)\b/i);
+  });
+
+  it("unknown audience is null and an empty cluster is unnamed, not invented", async () => {
+    const c = await summarizeCluster("cluster-2", [sig("d", "", null, null)], [1, 0, 0]);
+    assert.equal(c.audience, null);
+    assert.equal(c.name, "Unnamed cluster");
+  });
+});
+

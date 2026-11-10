@@ -30,13 +30,14 @@ function determineUrgency(signals: ClusterSignal[]): "low" | "medium" | "high" {
   return "low";
 }
 
-function determineAudience(signals: ClusterSignal[]): string {
+/** Most frequent extracted audience, or null when extraction found none. */
+function determineAudience(signals: ClusterSignal[]): string | null {
   const counts = new Map<string, number>();
   for (const s of signals) {
     const a = (s.analysis?.audience || "").trim();
     if (a) counts.set(a, (counts.get(a) || 0) + 1);
   }
-  if (counts.size === 0) return "PC users & builders";
+  if (counts.size === 0) return null;
   let best = "";
   let bestCount = -1;
   for (const [aud, count] of counts) {
@@ -67,70 +68,23 @@ function extractLanguagePhrases(signals: ClusterSignal[]): string[] {
   return [...phrases].slice(0, 6);
 }
 
+const NAME_STOP = new Set(
+  "a an the and or of to for in on with how what why when is are was can do does did my your you i me we they it its be as at by from this that not no have has had get got but if so than then there their them too very just about into out up will would could should".split(" "),
+);
+
+/** Model-free name: the cluster's most frequent problem terms (titles when no problem was extracted). */
 function generateDefaultClusterName(signals: ClusterSignal[]): string {
-  const combined = signals.map((s) => `${s.title || ""} ${s.analysis?.problem || ""}`).join(" ").toLowerCase();
-
-  if (combined.includes("boot") || combined.includes("shut") || combined.includes("power") || combined.includes("turn on")) {
-    return "Boot & Power Delivery Failures";
+  const problems = signals.map((s) => s.analysis?.problem || "").filter(Boolean);
+  const texts = problems.length > 0 ? problems : signals.map((s) => s.title || "");
+  const counts = new Map<string, number>();
+  for (const text of texts) {
+    // Count each term once per signal so one long text cannot name the cluster.
+    for (const term of new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2 && !NAME_STOP.has(t)))) {
+      counts.set(term, (counts.get(term) || 0) + 1);
+    }
   }
-  if (combined.includes("display") || combined.includes("screen") || combined.includes("gpu") || combined.includes("monitor") || combined.includes("black")) {
-    return "Display & GPU Diagnostic Issues";
-  }
-  if (combined.includes("wifi") || combined.includes("network") || combined.includes("ethernet") || combined.includes("internet")) {
-    return "Wi-Fi & Network Adapter Troubleshooting";
-  }
-  if (combined.includes("bsod") || combined.includes("blue screen") || combined.includes("crash") || combined.includes("freeze")) {
-    return "BSOD & System Stability Crashes";
-  }
-  if (combined.includes("overheat") || combined.includes("fan") || combined.includes("temp") || combined.includes("thermal")) {
-    return "Thermal Management & Overheating";
-  }
-  if (combined.includes("driver") || combined.includes("update") || combined.includes("bios") || combined.includes("firmware")) {
-    return "Driver & BIOS Configuration";
-  }
-  if (combined.includes("game") || combined.includes("fps") || combined.includes("performance") || combined.includes("slow")) {
-    return "Gaming & System Performance Optimization";
-  }
-
-  const primaryAudience = signals[0]?.analysis?.audience || "System";
-  return `${primaryAudience} Troubleshooting`;
-}
-
-function generateRelatedProducts(clusterName: string): string[] {
-  const nameLower = clusterName.toLowerCase();
-  if (nameLower.includes("boot") || nameLower.includes("power")) {
-    return [
-      "The First-Time Builder's No-Boot Diagnostic Flowchart",
-      "PC Power & Wiring 10-Minute Verification Checklist",
-      "Standing Desk & Cable Management Strain-Relief Guide",
-    ];
-  }
-  if (nameLower.includes("display") || nameLower.includes("gpu")) {
-    return [
-      "No-Display Troubleshooting Decision Tree (GPU vs Motherboard)",
-      "Post-Impact PC Hardware Physical Reseating Guide",
-      "Monitor & DisplayPort Connection Handshake Checklist",
-    ];
-  }
-  if (nameLower.includes("wifi") || nameLower.includes("network")) {
-    return [
-      "Prebuilt PC Wi-Fi & Antenna Signal Optimization Checklist",
-      "Motherboard Debug LED Error Code Reference Card",
-      "Windows Network Stack Clean Reinstall Guide",
-    ];
-  }
-  if (nameLower.includes("bsod") || nameLower.includes("crash")) {
-    return [
-      "Windows BSOD Stop-Code Identification & Repair Matrix",
-      "Memory & Driver Crash Diagnostic Checklist",
-      "Safe-Mode System File Verification Guide",
-    ];
-  }
-  return [
-    `${clusterName} Diagnostic Checklist`,
-    `Step-by-Step ${clusterName} Resolution Guide`,
-    `${clusterName} Quick Reference Cheat Sheet`,
-  ];
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 3).map(([t]) => t);
+  return top.length > 0 ? top.map((t) => t[0].toUpperCase() + t.slice(1)).join(" ") : "Unnamed cluster";
 }
 
 export async function summarizeCluster(
@@ -144,7 +98,8 @@ export async function summarizeCluster(
   const language = extractLanguagePhrases(signals);
   const defaultName = generateDefaultClusterName(signals);
   let name = defaultName;
-  let relatedProducts = generateRelatedProducts(name);
+  // Product titles come from the model only; without one there are none to show.
+  let relatedProducts: string[] = [];
 
   // If AIRouter is provided and cheap tier is configured, synthesize via router
   if (opts.router) {

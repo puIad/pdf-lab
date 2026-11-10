@@ -27,10 +27,10 @@ export interface ProblemCluster {
   name: string; // e.g. "Boot & Power Delivery Failures"
   frequency: number; // count of signals in this cluster
   growth: number; // growth rate / momentum metric
-  audience: string; // primary audience facing this problem
+  audience: string | null; // most frequent extracted audience; null = not observed
   urgency: "low" | "medium" | "high";
   language: string[]; // key verbatim customer phrases & keywords
-  relatedProducts: string[]; // existing or potential PDF product titles
+  relatedProducts: string[]; // model-suggested PDF product titles; empty without a model
   centroid: number[]; // cluster center vector
   signalIds: string[];
   signals: ClusterSignal[];
