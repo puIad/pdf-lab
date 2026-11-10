@@ -9,6 +9,9 @@ import {
 } from "./detector.ts";
 import { checkTopicSeasonality, predictUpcomingSeasonalSurges } from "./seasonality.ts";
 import { TrendingRadarService } from "./service.ts";
+import { getFixtureMarketTopics } from "./test-fixtures.ts";
+
+const fixtureService = () => new TrendingRadarService(getFixtureMarketTopics());
 
 const DAY_MS = 86_400_000;
 const NOW = new Date("2026-09-21T00:00:00Z").getTime();
@@ -120,7 +123,7 @@ test("known spike fixture is classified correctly with temporal deltas (emerging
 });
 
 test("QC Rule 2: No trend claim without temporal evidence deltas", () => {
-  const service = new TrendingRadarService();
+  const service = fixtureService();
   const topics = service.getAnalyzedTopics();
 
   assert.ok(topics.length > 0);
@@ -141,10 +144,11 @@ test("seasonal probe returns dated reasoning and 30-60 day surge forecasts (PRD 
   const marchDate = new Date("2026-03-01T00:00:00Z");
   const taxSeasonal = checkTopicSeasonality("Freelancer Tax Deductions & 1099 Checklist", [], marchDate);
   assert.equal(taxSeasonal.isSeasonal, true);
-  assert.match(taxSeasonal.reasoning || "", /annual baseline in 12m data/i);
+  assert.match(taxSeasonal.reasoning || "", /calendar prior, not measured/i);
 
   // Predict upcoming seasonal surges
-  const forecasts = predictUpcomingSeasonalSurges(marchDate);
+  assert.deepEqual(predictUpcomingSeasonalSurges(marchDate), [], "no stored markets, no forecast");
+  const forecasts = predictUpcomingSeasonalSurges(marchDate, ["Freelancer Tax Deductions & 1099 Checklist"]);
   assert.ok(forecasts.length > 0);
   const taxForecast = forecasts.find((f) => f.topicName.includes("Tax"));
   assert.ok(taxForecast);
@@ -198,7 +202,7 @@ test("solvability filter gates non-solvable problems", () => {
 });
 
 test("radar calculator maps coordinates and builds synchronized 4-window snapshots", () => {
-  const service = new TrendingRadarService();
+  const service = fixtureService();
   const snapshots = service.getFourWindowSnapshots();
 
   assert.ok(snapshots["7d"]);
@@ -217,7 +221,7 @@ test("radar calculator maps coordinates and builds synchronized 4-window snapsho
 });
 
 test("service filters by source (YouTube vs Reddit) and category", () => {
-  const service = new TrendingRadarService();
+  const service = fixtureService();
 
   const ytOnlyTopics = service.getAnalyzedTopics({ source: "youtube" });
   assert.ok(ytOnlyTopics.length > 0);
@@ -235,4 +239,13 @@ test("service filters by source (YouTube vs Reddit) and category", () => {
   for (const opp of solvableTopics) {
     assert.ok(opp.pdfFitScore >= 0.7);
   }
+});
+
+test("a service with no stored topics returns empty results, never samples", () => {
+  const service = new TrendingRadarService([]);
+  assert.deepEqual(service.getAnalyzedTopics(), []);
+  assert.equal(service.getFourWindowSnapshots()["7d"].summary.totalTopics, 0);
+  assert.deepEqual(service.getSolvableOpportunities(), []);
+  assert.deepEqual(service.getUpcomingSeasonalSurges(), []);
+  assert.equal(service.getTopicDelta("m-pc-troubleshoot"), null);
 });

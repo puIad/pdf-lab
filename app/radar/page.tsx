@@ -7,7 +7,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadarContainer } from "@/components/radar/radar-container";
-import { trendingRadarService } from "@/lib/trends/service";
+import { createServiceSupabaseClient } from "@/lib/db/client";
+import { getTrendingRadarService } from "@/lib/trends/load";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +18,18 @@ export const metadata = {
     "Multi-window temporal radar detecting emerging, high-demand topics across YouTube comments and Reddit discussions with solvability gating.",
 };
 
-export default function RadarPage() {
-  // Load initial 4-window snapshots & seasonal surges server-side
-  const snapshots = trendingRadarService.getFourWindowSnapshots();
-  const upcomingSeasonal = trendingRadarService.getUpcomingSeasonalSurges();
+export default async function RadarPage() {
+  // Stored markets + dated signals only. Nothing stored (or the DB unreachable) shows an honest empty state.
+  let radar: Awaited<ReturnType<typeof getTrendingRadarService>> | null = null;
+  let loadError: string | null = null;
+  try {
+    radar = await getTrendingRadarService(createServiceSupabaseClient());
+  } catch (err) {
+    loadError = err instanceof Error ? err.message : String(err);
+  }
+  const snapshots = radar?.getFourWindowSnapshots();
+  const upcomingSeasonal = radar?.getUpcomingSeasonalSurges() ?? [];
+  const hasData = !!snapshots && snapshots["12m"].summary.totalTopics > 0;
 
   return (
     <main className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6 lg:px-8">
@@ -43,10 +52,26 @@ export default function RadarPage() {
         </div>
 
         {/* Master Radar Component */}
-        <RadarContainer
-          initialSnapshots={snapshots}
-          upcomingSeasonal={upcomingSeasonal}
-        />
+        {snapshots && hasData ? (
+          <RadarContainer
+            initialSnapshots={snapshots}
+            upcomingSeasonal={upcomingSeasonal}
+          />
+        ) : (
+          <section
+            role="status"
+            className="rounded-lg border border-dashed p-8 text-center space-y-2"
+          >
+            <h1 className="text-lg font-semibold">
+              {loadError ? "Radar data could not be loaded" : "Not enough data for a radar yet"}
+            </h1>
+            <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+              {loadError
+                ? `The stored signals could not be read (${loadError}). No sample data is shown.`
+                : "The radar only plots markets that have dated signals stored in the database. None qualify yet. Run a research or an ingest, then come back."}
+            </p>
+          </section>
+        )}
       </div>
     </main>
   );
