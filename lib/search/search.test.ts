@@ -402,3 +402,35 @@ describe("PRD §8 Market Overview Aggregator", () => {
     assert.equal(history[0].user_id, "user-alpha");
   });
 });
+
+describe("Buyer-intent quotes are stored text only (Part 6.5)", () => {
+  // SAMPLE DATA (fixture rule): matched through signal_analysis.problem, since one row has no text.
+  const signal = (id: string, title: string | null, content: string | null) => ({
+    id,
+    source_id: "src-1",
+    url: `https://reddit.com/r/personalfinance/${id}`,
+    title,
+    content,
+    published_at: "2026-10-01T10:00:00Z",
+    collected_at: "2026-10-02T10:00:00Z",
+    engagement: {},
+    sources: { type: "reddit", name: "Reddit" },
+    signal_analysis: { audience: "young couples", problem: "budgeting falls apart mid-month", intent: "strong", urgency: "medium", pdf_relevance: 0.8 },
+  });
+
+  test("a buyer-intent row with no title and no content is counted but never quoted", async () => {
+    const overview = await generateMarketOverview("budgeting", createMockSupabase({ signals: [signal("s-empty", null, null)] }), { persistRun: false });
+    assert.equal(overview.buyerIntentSignals.observed, true);
+    assert.equal(overview.buyerIntentSignals.value?.strongCount, 1);
+    assert.deepEqual(overview.buyerIntentSignals.value?.sampleQuotes, []);
+  });
+
+  test("rows with text are quoted verbatim; the textless one is skipped", async () => {
+    const overview = await generateMarketOverview(
+      "budgeting",
+      createMockSupabase({ signals: [signal("s-empty", null, null), signal("s-text", null, "I would pay for a budgeting planner")] }),
+      { persistRun: false },
+    );
+    assert.deepEqual(overview.buyerIntentSignals.value?.sampleQuotes.map((q) => q.quote), ["I would pay for a budgeting planner"]);
+  });
+});

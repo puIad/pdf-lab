@@ -57,8 +57,7 @@ function overviewFacts(ov: MarketOverview) {
   const quotes: BriefFact[] = [];
   for (const q of ov.buyerIntentSignals.value?.sampleQuotes ?? []) {
     const c = q.url ? { id: q.url, source: q.source ?? "signal", url: q.url } : null;
-    // The overview falls back to a placeholder when a row has no text: not a quote.
-    if (c && q.quote && q.quote !== "Customer intent statement" && DISCUSSION.has(c.source)) quotes.push({ text: `“${verbatim(q.quote)}”`, cites: [c] });
+    if (c && q.quote && DISCUSSION.has(c.source)) quotes.push({ text: `“${verbatim(q.quote)}”`, cites: [c] });
   }
   for (const p of pains) {
     for (const c of p.citations) {
@@ -252,11 +251,9 @@ export async function loadOpportunityBriefInput(supabase: SupabaseClient, id: st
     products,
     signals.map((s) => ({ title: s.title, content: s.content, url: s.url, source_type: one(s.sources)?.type ?? null })),
   );
-  // Gap titles are the miner's fixed category texts (PC-repair wording), so the brief quotes the
-  // observed excerpt instead. Its "gap-format-friction" fallback exists when nothing matched: skipped.
+  // Gap titles are the miner's fixed category texts, so the brief quotes the observed excerpt instead.
   const typeByUrl = new Map(signals.map((s) => [s.url, one(s.sources)?.type ?? "signal"]));
   const gaps: BriefFact[] = productGaps
-    .filter((g) => g.id !== "gap-format-friction")
     .flatMap((g) =>
       (g.reviewExcerpts ?? [])
         .filter((r) => r.url && r.quote)
