@@ -1,6 +1,6 @@
 // lib/cluster/summarizer.ts — Synthesizes PRD §15 problem cluster attributes.
 // Shape: name, frequency, growth, audience, urgency, language, related products.
-// Uses AIRouter cheap tier when available with deterministic rule fallback for tests.
+// Uses AIRouter cheap tier when available; without it the name comes from observed problem terms.
 
 import type { AIRouter } from "../ai/router.ts";
 import type { ClusterSignal, ProblemCluster } from "./types.ts";
@@ -139,7 +139,7 @@ Respond with JSON:
       if (res.object.name) name = res.object.name;
       if (res.object.products.length > 0) relatedProducts = res.object.products;
     } catch {
-      // Fallback to deterministic rule generator on any provider error
+      // Provider error: keep the name built from observed problem terms
     }
   }
 

@@ -550,8 +550,9 @@ export async function generateMarketOverview(
       }
     }
 
-    const sampleQuotes = intentSignals.slice(0, 4).map((s) => ({
-      quote: s.content?.slice(0, 160) || s.title || "Customer intent statement",
+    // A row with no stored text has nothing to quote; it is skipped, never given placeholder words.
+    const sampleQuotes = intentSignals.filter((s) => s.content || s.title).slice(0, 4).map((s) => ({
+      quote: (s.content?.slice(0, 160) || s.title)!,
       url: s.url,
       source: s.sources?.type || "web",
       intentLevel: s.signal_analysis?.intent || "strong",
