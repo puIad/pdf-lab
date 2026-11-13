@@ -83,7 +83,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 | 6.8 | Evidence that belongs to the opportunity | blocked | db30a8e | Opportunity evidence is the signals matching its problem; stricter QC Rules 1 and 4. Live check waits on DEC-015. [log](log/part-6.8.md) |
 | 6.9 | Batched extraction; a run that analysed nothing fails | blocked | 88fe435 | Batched extraction, 10 signals per call; a run that analysed under half fails. Live run waits on DEC-015. [log](log/part-6.9.md) |
 | 6.10 | Deep runs as a background job | blocked | — | Waits on DEC-001 (job provider) and a measured post-6.9 run duration. [log](log/part-6.10.md) |
-| 6.11 | Score honesty + calibration from stored competition checks | in_progress | — | Demand independent of the fetch limit, intent over analysed signals, calibration from stored competition checks. [log](log/part-6.11.md) |
+| 6.11 | Score honesty + calibration from stored competition checks | done | 2ff8833 | Demand no longer grows with the fetch limit, intent averages analysed signals, competition tick recut from 30 stored checks. [log](log/part-6.11.md) |
 | 6.12 | Ideas-first home + shared navigation | pending | — | Ideas-first home and one shared header. [log](log/part-6.12.md) |
 | 6.13 | Lighter process docs | blocked | 12e791c | STATE notes moved to docs/log, open-defects table added. The megalibrary path waits on DEC-016. [log](log/part-6.13.md) |
 | 6.14 | Report pages: remove hard-coded PC copy and invented values | done | 878caea | Report pages show stored values or "Not observed"; panel counts equal the stored rows. [log](log/part-6.14.md) |
