@@ -14,6 +14,7 @@ import {
   enforceRule5_SeparationOfConcerns,
 } from "../evidence/qc.ts";
 import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
+import { marketForCompetitor } from "../competition/map.ts";
 import { isDemandOnly } from "../sources/demand-only.ts";
 import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
 import { observedPriceRange } from "../opportunities/generator.ts";
@@ -102,6 +103,8 @@ export interface OrchestratorOpportunityItem {
   confidence: number;
 }
 export interface OrchestratorCompetitorItem {
+  /** The stored listing row this competitor was read from. */
+  signalId?: string | null;
   platform: string;
   title: string;
   url?: string | null;
@@ -130,30 +133,34 @@ export interface OrchestratorDeps {
     status: LifecycleState,
     completedAt?: string | null,
   ) => Promise<void>;
-  ingest: (params: { query: string; limit: number; sourceKeys?: string[] }) => Promise<{
+  /** Collects, stores, and links every returned signal to the run (`run_signals`). */
+  ingest: (params: { runId: string; query: string; limit: number; sourceKeys?: string[] }) => Promise<{
     collected: number;
     normalized: number;
     inserted: number;
     sources: Array<{ key: string; status: string; count: number }>;
   }>;
-  getSignals: (query: string) => Promise<StoredSignalForRun[]>;
+  /** The run's own signals (`run_signals`), never a text match over the whole table. */
+  getSignals: (runId: string) => Promise<StoredSignalForRun[]>;
   extract: (signals: Array<{ id: string; title: string | null; content: string | null; url: string | null }>) => Promise<{
     analyzed: number;
     succeeded: number;
     failed: number;
   }>;
   clusterAndScore: (signals: StoredSignalForRun[]) => Promise<OrchestratorMarketItem[]>;
-  saveMarkets: (markets: OrchestratorMarketItem[]) => Promise<Array<{ id: string; name: string }>>;
+  saveMarkets: (markets: OrchestratorMarketItem[], runId: string) => Promise<Array<{ id: string; name: string }>>;
   saveEvidence: (items: EvidenceInput[]) => Promise<EvidenceRow[]>;
   /** `seed`: the stored quick ideas of this seed join the candidate pool (Part 3.8). */
   generateOpportunities: (markets: OrchestratorMarketItem[], seed: string) => Promise<Array<{
     opportunity: OrchestratorOpportunityItem;
     evidence: EvidenceInput[];
   }>>;
-  saveOpportunities: (items: OrchestratorOpportunityItem[]) => Promise<Array<{ id: string; title: string }>>;
+  saveOpportunities: (items: OrchestratorOpportunityItem[], runId: string) => Promise<Array<{ id: string; title: string }>>;
   observeCompetition: (signals: StoredSignalForRun[]) => Promise<OrchestratorCompetitorItem[]>;
   saveCompetitors?: (competitors: Array<{
-    market_id: string;
+    run_id: string;
+    /** null: the listing overlaps no market of the run and stays attached to the run only. */
+    market_id: string | null;
     platform: string;
     title: string;
     url?: string | null;
@@ -161,7 +168,7 @@ export interface OrchestratorDeps {
     rating?: number | null;
     review_count?: number | null;
   }>) => Promise<Array<{ id: string }>>;
-  fetchCompleteness: (runId: string, query: string) => Promise<ResearchCompleteness>;
+  fetchCompleteness: (runId: string) => Promise<ResearchCompleteness>;
 }
 
 export async function executeResearchRun(
@@ -194,6 +201,7 @@ export async function executeResearchRun(
     tracker.transition("collecting", { message: `Collecting signals from adapters for "${query}"` });
     await deps.updateRunStatus(runId, "collecting");
     const ingestResult = await withTimeout(deps.ingest({
+      runId,
       query,
       limit,
       sourceKeys: options.sourceKeys,
@@ -210,7 +218,7 @@ export async function executeResearchRun(
     });
     await deps.updateRunStatus(runId, "normalizing");
 
-    const signals = discussionsOnly(await deps.getSignals(query));
+    const signals = discussionsOnly(await deps.getSignals(runId));
 
     // 4. CLASSIFYING
     tracker.transition("classifying", {
@@ -230,7 +238,7 @@ export async function executeResearchRun(
         })),
       ), "extract", Math.max(STEP_TIMEOUT_MS, unanalyzedSignals.length * EXTRACT_MS_PER_SIGNAL));
     }
-    const freshSignals = discussionsOnly(await deps.getSignals(query));
+    const freshSignals = discussionsOnly(await deps.getSignals(runId));
 
     // 5. CLUSTERING
     tracker.transition("clustering", {
@@ -240,7 +248,7 @@ export async function executeResearchRun(
     await deps.updateRunStatus(runId, "clustering");
 
     const marketCandidates = await withTimeout(deps.clusterAndScore(freshSignals), "clusterAndScore");
-    const savedMarkets = await deps.saveMarkets(marketCandidates);
+    const savedMarkets = await deps.saveMarkets(marketCandidates, runId);
 
     // Write evidence for each market from its supporting signals
     const marketEvidenceItems: EvidenceInput[] = [];
@@ -316,17 +324,25 @@ export async function executeResearchRun(
     const compState = enforceRule3_CompetitionObserved(observedCompetitors);
 
     if (compState.hasCompetitors) {
-      const primaryMarketId = marketCandidates[0]?.id || runId;
+      // Each listing goes to the market it was clustered into or overlaps best; below the minimum
+      // overlap it stays on the run only (Part 6.7), never on the first market.
+      const mapTargets = marketCandidates.map((m) => ({
+        id: m.id,
+        name: m.name,
+        signalIds: m.signals.map((s) => s.id),
+        texts: m.signals.map((s) => s.analysis?.problem || s.title || ""),
+      }));
+      const seedText = options.seed?.trim() || query;
+      const assigned = observedCompetitors.map((c) => ({
+        competitor: c,
+        marketId: marketForCompetitor(c, mapTargets, seedText),
+      }));
 
-      // Competitors are stored against the first market (until Part 6.7 maps them), so only it gets their price range.
-      if (marketCandidates[0]) {
-        marketCandidates[0].priceRange = observedPriceRange(observedCompetitors.map((c) => c.price));
-      }
-
-      if (deps.saveCompetitors && marketCandidates.length > 0) {
+      if (deps.saveCompetitors) {
         await deps.saveCompetitors(
-          observedCompetitors.map((c) => ({
-            market_id: primaryMarketId,
+          assigned.map(({ competitor: c, marketId }) => ({
+            run_id: runId,
+            market_id: marketId,
             platform: c.platform,
             title: c.title,
             url: c.url,
@@ -337,51 +353,57 @@ export async function executeResearchRun(
         );
       }
 
-      const compEvidenceItems: EvidenceInput[] = observedCompetitors.map((c) => ({
+      // An unmapped listing is still an observation of the run: its evidence hangs off the run id.
+      const compEvidenceItems: EvidenceInput[] = assigned.map(({ competitor: c, marketId }) => ({
         entityType: "competition",
-        entityId: primaryMarketId,
+        entityId: marketId ?? runId,
         claim: `Observed competitor on ${c.platform}: ${c.title}`,
         url: c.url,
         signalType: "competition_observed",
         confidence: 0.9,
       }));
 
-      // Review mining -> likes/dislikes/missing/confusing/requests -> product gaps (PRD §21)
-      const competitorProducts: CompetitorProduct[] = observedCompetitors.map((c) => ({
-        platform: c.platform,
-        title: c.title,
-        url: c.url || null,
-        price: c.price || null,
-        format: c.format || "guide",
-        rating: c.rating || null,
-        reviewCount: c.reviewCount || null,
-        positioning: c.positioning || null,
-        promises: c.promises || [],
-        reviews: c.reviews || [],
-      }));
+      for (const market of marketCandidates) {
+        const own = assigned.filter((a) => a.marketId === market.id).map((a) => a.competitor);
+        if (own.length === 0) continue; // no observed product, so no price range and no product gap
+        market.priceRange = observedPriceRange(own.map((c) => c.price));
 
-      const { productGaps } = mineReviewsAndGaps(
-        competitorProducts,
-        freshSignals.map((s) => ({
-          title: s.title,
-          content: s.content,
-          url: s.url,
-          source_type: s.source_type,
-        })),
-      );
+        // Review mining -> likes/dislikes/missing/confusing/requests -> product gaps (PRD §21)
+        const competitorProducts: CompetitorProduct[] = own.map((c) => ({
+          platform: c.platform,
+          title: c.title,
+          url: c.url || null,
+          price: c.price || null,
+          format: c.format || "guide",
+          rating: c.rating || null,
+          reviewCount: c.reviewCount || null,
+          positioning: c.positioning || null,
+          promises: c.promises || [],
+          reviews: c.reviews || [],
+        }));
+        const { productGaps } = mineReviewsAndGaps(
+          competitorProducts,
+          market.signals.map((s) => ({
+            title: s.title,
+            content: s.content,
+            url: s.url,
+            source_type: s.source_type,
+          })),
+        );
 
-      // Add product gaps with quoted review excerpts as competition evidence
-      for (const gap of productGaps) {
-        for (const excerpt of gap.reviewExcerpts) {
-          compEvidenceItems.push({
-            entityType: "competition",
-            entityId: primaryMarketId,
-            claim: `Product gap "${gap.title}": ${gap.opportunityTranslation}`,
-            excerpt: excerpt.quote,
-            url: excerpt.url,
-            signalType: "competition_observed",
-            confidence: 0.85,
-          });
+        // Add product gaps with quoted review excerpts as competition evidence
+        for (const gap of productGaps) {
+          for (const excerpt of gap.reviewExcerpts) {
+            compEvidenceItems.push({
+              entityType: "competition",
+              entityId: market.id,
+              claim: `Product gap "${gap.title}": ${gap.opportunityTranslation}`,
+              excerpt: excerpt.quote,
+              url: excerpt.url,
+              signalType: "competition_observed",
+              confidence: 0.85,
+            });
+          }
         }
       }
 
@@ -425,7 +447,7 @@ export async function executeResearchRun(
 
     let savedOppsCount = 0;
     if (validOpportunitiesToSave.length > 0) {
-      const saved = await deps.saveOpportunities(validOpportunitiesToSave);
+      const saved = await deps.saveOpportunities(validOpportunitiesToSave, runId);
       savedOppsCount = saved.length;
 
       if (oppEvidenceToSave.length > 0) {
@@ -449,7 +471,7 @@ export async function executeResearchRun(
     });
     await deps.updateRunStatus(runId, "report_generation");
 
-    const completeness = await deps.fetchCompleteness(runId, query);
+    const completeness = await deps.fetchCompleteness(runId);
 
     // 10. COMPLETED (Invariant: zero-evidence run is forbidden per 05-PIPELINE-SCORING)
     if (completeness.evidenceCount === 0 && totalEvidenceCreated === 0) {
@@ -494,7 +516,7 @@ export async function executeResearchRun(
     await deps.updateRunStatus(runId, "failed");
 
     const completeness = await deps
-      .fetchCompleteness(runId, query)
+      .fetchCompleteness(runId)
       .catch(() => ({
         sourcesCovered: 0,
         signalsCollected: 0,

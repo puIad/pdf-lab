@@ -31,7 +31,7 @@ export async function GET(
   }
 
   const currentStatus = run.status as LifecycleState;
-  const completeness = await fetchRunCompleteness(supabase, run.query).catch(() => ({
+  const completeness = await fetchRunCompleteness(supabase, run.id).catch(() => ({
     sourcesCovered: 0,
     signalsCollected: 0,
     signalsAnalyzed: 0,

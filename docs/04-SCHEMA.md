@@ -70,6 +70,7 @@ create index on signal_analysis using ivfflat (embedding vector_cosine_ops);
 
 create table markets (
   id uuid primary key default gen_random_uuid(),
+  run_id uuid references research_runs(id) on delete cascade,  -- null = legacy row (Part 6.7)
   name text not null,
   description text,
   trend text,                  -- emerging|accelerating|seasonal|stable|declining|unknown
@@ -89,6 +90,7 @@ create table market_signals (
 
 create table opportunities (
   id uuid primary key default gen_random_uuid(),
+  run_id uuid references research_runs(id) on delete cascade,  -- null = legacy row (Part 6.7)
   market_id uuid references markets(id) on delete cascade not null,
   title text not null,
   target_audience text,
@@ -103,7 +105,8 @@ create table opportunities (
 
 create table competitors (
   id uuid primary key default gen_random_uuid(),
-  market_id uuid references markets(id) on delete cascade not null,
+  run_id uuid references research_runs(id) on delete cascade,  -- null = legacy row (Part 6.7)
+  market_id uuid references markets(id) on delete cascade,     -- null = overlaps no market of its run
   platform text,               -- etsy|gumroad|amazon_kdp|web|...
   title text,
   url text,
@@ -124,14 +127,39 @@ create table evidence (
   created_at timestamptz not null default now()
 );
 create index on evidence (entity_type, entity_id);
+
+-- Which signals a run collected: new rows and rows it met again (Part 6.7). A run reads its
+-- signals through this join, never a text match over `signals`.
+create table run_signals (
+  run_id uuid references research_runs(id) on delete cascade not null,
+  signal_id uuid references signals(id) on delete cascade not null,
+  primary key (run_id, signal_id)
+);
+create index on markets (run_id);
+create index on opportunities (run_id);
+create index on competitors (run_id);
 ```
+
+## Run scope (Part 6.7, DEC-014)
+
+- A Deep run writes its id on every `markets`, `opportunities` and `competitors` row it saves, and
+  links the signals it collected in `run_signals`. A join table was chosen over a `run_id` column on
+  `signals` because a signal is deduplicated across runs: two runs on the same seed meet the same
+  rows, and each needs its own link.
+- Rows from before the migration keep `run_id` null ("legacy"). Readers treat the latest completed
+  Deep run of each seed (`research_runs.query`, case-insensitive) as current; an older run of the
+  same seed is superseded and only shown when asked for by id (`lib/runs/scope.ts`).
+- A competitor is saved on the market it was clustered into or overlaps best. Below the minimum
+  overlap `market_id` stays null and the row belongs to the run only (`lib/competition/map.ts`).
+  Its `evidence` row then uses the run id as `entity_id`.
+- Migration: `supabase/migrations/20261113000006_run_scope.sql`.
 
 ## RLS (Supabase)
 
 - Public read: `markets`, `opportunities`, `competitors`, `evidence`, `sources` (anon can
   browse explorer within free-tier limits enforced app-side).
 - Private: `users` (owner only), `research_runs` + `signals`/`signal_analysis`/
-  `market_signals` (owner's runs + linked rows, or service-role only in MVP; tighten in Phase 5).
+  `market_signals`/`run_signals` (owner's runs + linked rows, or service-role only in MVP; tighten in Phase 5).
 - Enforce with policies + tests in Phase 0 Part 0.2; service-role key NEVER ships to client.
 
 ## Invariants

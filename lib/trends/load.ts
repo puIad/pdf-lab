@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SignalRecord } from "./detector.ts";
 import { TrendingRadarService, type MarketTopicData } from "./service.ts";
 import { isDemandOnly } from "../sources/demand-only.ts";
+import { isCurrent, latestRunIds } from "../runs/scope.ts";
 
 type Rel<T> = T | T[] | null | undefined;
 const one = <T>(v: Rel<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
@@ -27,9 +28,12 @@ interface LinkRow {
 }
 
 export async function loadStoredMarketTopics(supabase: SupabaseClient): Promise<MarketTopicData[]> {
-  const { data: markets, error } = await supabase.from("markets").select("id, name, description");
+  const { data: allMarkets, error } = await supabase.from("markets").select("id, run_id, name, description");
   if (error) throw new Error(`Failed to load markets: ${error.message}`);
-  if (!markets?.length) return [];
+  // One run per seed: a market of a run that a newer run replaced is not plotted twice (Part 6.7).
+  const latest = await latestRunIds(supabase);
+  const markets = (allMarkets ?? []).filter((m) => isCurrent(m.run_id as string | null, latest));
+  if (!markets.length) return [];
   const ids = markets.map((m) => m.id as string);
 
   // PostgREST caps a response at max_rows (1000 on hosted Supabase), so read in ordered pages.
