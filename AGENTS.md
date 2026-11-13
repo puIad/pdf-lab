@@ -6,10 +6,12 @@ This is the PDF Lab project. `docs/` is the single source of truth; the PRD visi
 Every task, in this order:
 1. Read `docs/00-START-HERE.md` (load order + short-prompt contract).
 2. Read `docs/01-PHILOSOPHY.md` (session protocol).
-3. Read `docs/STATE.md` (what is done / next / blocked).
+3. Read `docs/STATE.md` (what is done / next / blocked, open defects). Part notes are in
+   `docs/log/part-<N>.<M>.md`: open one only when working on or depending on that part.
 4. Read `docs/02-MASTER-PLAN.md` (where the part sits in the DAG).
 5. Read the requested phase file in `docs/phases/`, then follow its links.
-6. Do the work, update `docs/STATE.md` same turn, run `docs/REVIEW-CHECKLIST.md`.
+6. Do the work, update `docs/STATE.md` (one line) and the part's log same turn, run
+   `docs/REVIEW-CHECKLIST.md`.
 
 Rules: evidence before synthesis; adapters own source code; problems halt into
 `docs/DECISIONS.md`; one part = one commit (`phase-<N>-part-<M>: <summary>`).

@@ -411,3 +411,21 @@ patch the affected guide/phase file (link the follow-up commit).
   single and 10 of 30 batched (NVIDIA timeouts, then OpenRouter HTTP 429): batching did not make it
   usable, which weakens the earlier recommendation of (c). What works today is (b), or (d).
 - Resolution: _open_
+
+## DEC-016 — Where the frontend megalibrary lives
+
+- Date: 2026-11-13
+- Part: Phase 6 Part 6.13 (task 4); affects 6.12 and every later frontend part
+- Expected: `AGENTS.md` and `00-START-HERE.md` rule 5: all frontend comes from
+  `C:\Users\pulad\Desktop\frontend-ai-megalibrary`.
+- Found: that folder does not exist on this machine (checked 2026-11-06 in Part 3.10 and again
+  2026-11-13). Since 3.10 the pages reuse `components/ui`, which was taken from the library in
+  Part 3.1. The load-order rule makes a missing listed file a decision request.
+- Options: (a) the library moved: give the new path and both docs get it; (b) it is gone: the
+  rule becomes "build from `components/ui` (taken from the library in 3.1)"; (c) restore the
+  folder at the old path, no doc change.
+- Recommendation: (b) unless the folder still exists somewhere, because (a) and (c) need it.
+- Question for user: "The frontend megalibrary folder is missing. Has it moved (new path?), or
+  should the rule point at `components/ui` instead?"
+- Resolution: _open_
+
