@@ -146,11 +146,12 @@ export async function fetchReportExportData(
     };
   });
 
-  // 6. Fetch competitors
-  const { data: compRows } = await supabase
-    .from("competitors")
-    .select("id, platform, title, url, price, rating, review_count")
-    .eq("market_id", targetMarketId);
+  // 6. Fetch competitors: the whole run's, like its opportunities, including listings that
+  // overlap no market (`market_id` null); a legacy market only has its own.
+  const compQuery = supabase.from("competitors").select("id, platform, title, url, price, rating, review_count");
+  const { data: compRows } = await (scopedRunId
+    ? compQuery.eq("run_id", scopedRunId)
+    : compQuery.eq("market_id", targetMarketId));
 
   const exportCompetitors: ExportCompetitor[] = (compRows ?? []).map((comp) => ({
     platform: comp.platform || "web",

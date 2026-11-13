@@ -100,10 +100,11 @@ describe("run signals", () => {
 });
 
 describe("run scope for readers", () => {
+  const has = [{ id: "m" }];
   const runs = [
-    { id: "11111111-1111-4111-8111-111111111111", query: "Budgeting", completed_at: "2026-11-13T10:00:00Z" },
-    { id: "22222222-2222-4222-8222-222222222222", query: "meal prep", completed_at: "2026-11-12T10:00:00Z" },
-    { id: "33333333-3333-4333-8333-333333333333", query: "budgeting ", completed_at: "2026-11-01T10:00:00Z" },
+    { id: "11111111-1111-4111-8111-111111111111", query: "Budgeting", completed_at: "2026-11-13T10:00:00Z", markets: has },
+    { id: "22222222-2222-4222-8222-222222222222", query: "meal prep", completed_at: "2026-11-12T10:00:00Z", markets: has },
+    { id: "33333333-3333-4333-8333-333333333333", query: "budgeting ", completed_at: "2026-11-01T10:00:00Z", markets: has },
   ];
   const market = (id: string, run_id: string | null) => ({ id, run_id, name: id, created_at: "2026-11-13T00:00:00Z" });
   const tables = {
@@ -117,6 +118,16 @@ describe("run scope for readers", () => {
     const latest = new Set(list.filter((r) => r.latest).map((r) => r.id));
     assert.equal(isCurrent(null, latest), true);
     assert.equal(isCurrent(runs[2].id, latest), false);
+  });
+
+  it("a run that completed with no market never replaces the last good run of its seed", async () => {
+    const empty = { id: "44444444-4444-4444-8444-444444444444", query: "budgeting", completed_at: "2026-11-14T10:00:00Z", markets: [] };
+    const withEmpty = { ...tables, research_runs: [empty, ...runs] };
+    const list = await listCompletedRuns(fakeSupabase(withEmpty).client);
+    assert.deepEqual(list.map((r) => r.id), runs.map((r) => r.id));
+    assert.equal(list[0].latest, true);
+    const shown = (await fetchMarketsData(fakeSupabase(withEmpty).client, "latest")).markets.map((m) => m.name).sort();
+    assert.deepEqual(shown, ["meal", "new-budget"]);
   });
 
   it("explorer scopes: latest runs, one run, legacy, never every run mixed", async () => {
