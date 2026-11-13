@@ -40,6 +40,9 @@ const DAY_MS = 86_400_000;
 const EPSILON = 2.0;
 // Fewer dated signals than this cannot carry a trend claim (QC Rule 2): classification stays "unknown".
 export const MIN_TREND_SIGNALS = 3;
+// From this many on, the count alone lifts confidence past the 0.25 trend gate. Below it a market also
+// needs a first signal at least 14 days old, or YouTube and Reddit both in the last 30 days.
+export const CONFIDENT_TREND_SIGNALS = 5;
 
 function toTimestamp(d: string | Date | number): number {
   if (typeof d === "number") return d;
@@ -169,7 +172,7 @@ export function detectTopicTrend(input: DetectTrendInput): TopicTrendAnalysis {
       ? (now - Math.min(...input.signals.map((s) => toTimestamp(s.publishedAt)))) / DAY_MS
       : 0;
   let rawConfidence = 0.2;
-  if (input.signals.length >= 5) rawConfidence += 0.25;
+  if (input.signals.length >= CONFIDENT_TREND_SIGNALS) rawConfidence += 0.25;
   if (input.signals.length >= 15) rawConfidence += 0.2;
   if (totalObservedDays >= 14) rawConfidence += 0.15;
   if (hasYouTube && hasReddit) rawConfidence += 0.2;

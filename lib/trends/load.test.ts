@@ -64,7 +64,21 @@ test("thin data: no trend to plot, and the empty state states the stored counts"
     }),
   );
   assert.equal(new TrendingRadarService(topics).hasTrend(), false);
-  assert.match(thinRadarMessage(topics), /^3 dated signals are stored across 2 markets\. A market needs at least 3 /);
+  assert.match(thinRadarMessage(topics), /^3 dated signals are stored across 2 markets\. A market needs 5 dated signals .*, or 3 when /);
   assert.equal(new TrendingRadarService([]).hasTrend(), false);
   assert.match(thinRadarMessage([]), /^0 dated signals are stored across 0 markets/);
+});
+
+test("the empty-state rule matches the detector: 4 recent single-source signals are not enough", async () => {
+  const load = (rows: unknown[]) => loadStoredMarketTopics(fakeSupabase({ markets: [{ id: "m1", name: "A" }], market_signals: rows }));
+  const recent = (n: number) => Array.from({ length: n }, (_, i) => ({ market_id: "m1", ...sig("r" + i) }));
+
+  const four = await load(recent(4));
+  assert.equal(new TrendingRadarService(four).hasTrend(), false);
+  assert.match(thinRadarMessage(four), /^4 dated signals are stored across 1 market\. A market needs 5 dated signals/);
+
+  assert.equal(new TrendingRadarService(await load(recent(5))).hasTrend(), true);
+  // 3 are enough when the oldest is two weeks old, or when YouTube and Reddit both appear.
+  assert.equal(new TrendingRadarService(await load([...recent(2), { market_id: "m1", ...sig("old", { published_at: iso(20) }) }])).hasTrend(), true);
+  assert.equal(new TrendingRadarService(await load([...recent(2), { market_id: "m1", ...sig("yt", { sources: { type: "youtube" } }) }])).hasTrend(), true);
 });
