@@ -29,6 +29,7 @@ import { calculateLandscape, mineReviewsAndGaps, type CompetitorProduct } from "
 import { parsePrice } from "@/lib/sources/marketplace-helper";
 import { QualityPanel } from "@/components/quality-panel";
 import { calculateCompleteness } from "@/lib/runs/completeness";
+import { marketCompletenessCounts, observeMarket, type ReportSignal } from "@/lib/report/observed";
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +101,9 @@ export default async function MarketPage(props: MarketPageProps) {
 
   const demandScore = Math.round(market.demand_score || 0);
   const pdfFitScore = Math.round(market.pdf_fit_score || 0);
-  const confidencePct = Math.round((market.confidence || 0.5) * 100);
+  const confidencePct = typeof market.confidence === "number" ? Math.round(market.confidence * 100) : null;
+  // Everything the "why this market" cards and the quality panel show, from the linked signals.
+  const observed = observeMarket(signalsList as ReportSignal[]);
 
   const competitorProducts: CompetitorProduct[] = compList.map((comp) => {
     const { priceNumeric } = parsePrice(comp.price);
@@ -142,11 +145,7 @@ export default async function MarketPage(props: MarketPageProps) {
     }
   }
 
-  // 6. Compute Research Completeness (PRD §55)
-  const distinctSources = new Set(
-    signalsList.map((s) => (s.sources as { type?: string })?.type).filter(Boolean),
-  ).size || 3;
-
+  // 6. Research Completeness (PRD §55): this market's own stored rows, no floors (Part 6.14).
   const oppIds = oppList.map((o) => o.id);
   const { data: oppEvidenceData } = await supabase
     .from("evidence")
@@ -154,19 +153,8 @@ export default async function MarketPage(props: MarketPageProps) {
     .in("entity_id", [id, ...oppIds]);
 
   const allEvidence = (oppEvidenceData ?? []) as Array<{ id: string; entity_type: string; entity_id: string }>;
-  const backedOppIds = new Set(
-    allEvidence.filter((e) => e.entity_type === "opportunity").map((e) => e.entity_id),
-  );
-
-  const completeness = calculateCompleteness({
-    sourcesCovered: Math.max(3, distinctSources),
-    signalsCollected: Math.max(signalsList.length, 25),
-    signalsAnalyzed: Math.max(signalsList.length, 25),
-    marketsIdentified: 14,
-    opportunitiesGenerated: oppList.length,
-    evidenceCount: allEvidence.length || evidenceRows.length,
-    evidenceBackedOpportunitiesCount: backedOppIds.size || oppList.length,
-  });
+  const counts = marketCompletenessCounts({ observations: observed, opportunityIds: oppIds, evidence: allEvidence });
+  const completeness = calculateCompleteness(counts);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -181,8 +169,8 @@ export default async function MarketPage(props: MarketPageProps) {
               <ArrowLeft className="size-3.5" />
               <span>Back to Explorer</span>
             </Link>
-            <span className="text-border">/</span>
-            <span className="text-xs font-medium text-foreground truncate max-w-[280px] sm:max-w-md">
+            <span className="hidden text-border sm:inline">/</span>
+            <span className="hidden text-xs font-medium text-foreground truncate max-w-md sm:inline">
               {market.name}
             </span>
           </div>
@@ -215,11 +203,11 @@ export default async function MarketPage(props: MarketPageProps) {
             <Badge
               variant="outline"
               className={`text-xs ${
-                confidencePct >= 70 ? "text-emerald-600 border-emerald-500/40" : "text-amber-600 border-amber-500/40"
+                confidencePct !== null && confidencePct >= 70 ? "text-emerald-600 border-emerald-500/40" : "text-amber-600 border-amber-500/40"
               }`}
             >
               <ShieldCheck className="mr-1 size-3" />
-              {confidencePct}% Evidence Confidence
+              {confidencePct === null ? "Confidence not stored" : `${confidencePct}% Evidence Confidence`}
             </Badge>
           </div>
 
@@ -228,7 +216,7 @@ export default async function MarketPage(props: MarketPageProps) {
           </h1>
 
           <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            {market.description || `Comprehensive market analysis and opportunity matrix evidenced by ${signalsList.length} observed discussions across monitored channels.`}
+            {market.description || `${signalsList.length} stored signals are linked to this market.`}
           </p>
         </div>
 
@@ -237,6 +225,7 @@ export default async function MarketPage(props: MarketPageProps) {
           marketId={market.id}
           completeness={completeness}
           marketName={market.name}
+          sourceTypes={observed.sources}
         />
 
         {/* Top Metric Cards */}
@@ -271,7 +260,7 @@ export default async function MarketPage(props: MarketPageProps) {
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div className="h-full bg-emerald-500" style={{ width: `${pdfFitScore}%` }} />
               </div>
-              <span className="text-[11px] text-muted-foreground">High suitability for checklists & diagnostic guides</span>
+              <span className="text-[11px] text-muted-foreground">Rule-based index from the signals&apos; extracted PDF relevance</span>
             </CardContent>
           </Card>
 
@@ -288,7 +277,7 @@ export default async function MarketPage(props: MarketPageProps) {
               </div>
               <span className="text-[11px] text-muted-foreground">
                 {compList.length === 0
-                  ? "Zero direct competitors found in marketplace index (QC Rule 3)"
+                  ? "No marketplace listing is stored for this market (QC Rule 3)"
                   : `${compList.length} existing products logged`}
               </span>
             </CardContent>
@@ -306,7 +295,7 @@ export default async function MarketPage(props: MarketPageProps) {
                 {oppList.length} Products
               </div>
               <span className="text-[11px] text-muted-foreground">
-                100% backed by evidence citations (QC Rule 1)
+                {counts.evidenceBackedOpportunitiesCount} of {oppList.length} have evidence rows (QC Rule 1)
               </span>
             </CardContent>
           </Card>
@@ -326,28 +315,44 @@ export default async function MarketPage(props: MarketPageProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Core Audience Friction</CardTitle>
+                <CardTitle className="text-sm font-semibold">Extracted Problems</CardTitle>
               </CardHeader>
               <CardContent className="text-xs leading-relaxed text-muted-foreground flex flex-col gap-2">
-                <p>
-                  Discussions show buyers repeatedly failing to resolve root-cause hardware or software issues through generic web search. Users encounter conflicting advice, fragmented documentation, and high repair shop quotes.
-                </p>
+                {observed.problems.length === 0 ? (
+                  <p>Not observed. No analysed signal of this market carries a problem.</p>
+                ) : (
+                  <ul className="flex flex-col gap-1.5">
+                    {observed.problems.map((p) => (
+                      <li key={p.problem} className="text-foreground">
+                        {p.problem}
+                        <span className="text-muted-foreground">
+                          {" "}
+                          ({p.count} {p.count === 1 ? "signal" : "signals"}
+                          {p.audience ? `, ${p.audience}` : ""})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="rounded bg-muted/50 p-2.5 text-foreground font-mono text-[11px]">
-                  Root-cause frequency: High urgency across boot, driver updates, and thermal crashes.
+                  {observed.analysedSignals} of {observed.totalSignals} signals analysed. Urgency: {observed.urgency.high} high,{" "}
+                  {observed.urgency.medium} medium, {observed.urgency.low} low.
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Why Static PDF Succeeds Here</CardTitle>
+                <CardTitle className="text-sm font-semibold">PDF Fit</CardTitle>
               </CardHeader>
               <CardContent className="text-xs leading-relaxed text-muted-foreground flex flex-col gap-2">
                 <p>
-                  When a PC refuses to boot or drops Wi-Fi, the user cannot easily browse complex interactive websites. A printable or phone-accessible offline PDF checklist provides immediate, distraction-free triage without requiring an active browser connection.
+                  {observed.avgPdfRelevance === null
+                    ? "Not observed. No analysed signal of this market carries a PDF relevance value."
+                    : `Mean extracted PDF relevance over the analysed signals: ${observed.avgPdfRelevance} on a 0 to 1 scale. This is an AI interpretation of each signal, not a measurement of sales.`}
                 </p>
                 <div className="rounded bg-emerald-500/10 p-2.5 text-emerald-700 dark:text-emerald-300 text-[11px]">
-                  PDF Suitability Score: {pdfFitScore}% (Exceeds PRD §17 threshold for physical/offline utility).
+                  Stored PDF fit score: {pdfFitScore} / 100 (rule-based index).
                 </div>
               </CardContent>
             </Card>
@@ -396,7 +401,7 @@ export default async function MarketPage(props: MarketPageProps) {
 
         {/* Section 3: COMPETITORS & MARKET GAPS (PRD §20 & §21, QC Rule 3) */}
         <section className="flex flex-col gap-5">
-          <div className="flex items-center justify-between border-b border-border pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
             <div>
               <h2 className="text-lg font-semibold tracking-tight text-foreground">
                 Competition Landscape & Product Gaps
@@ -421,7 +426,7 @@ export default async function MarketPage(props: MarketPageProps) {
                 <AlertCircle className="size-6 text-muted-foreground/60" />
                 <div className="text-sm font-medium">None Observed in Monitored Marketplaces</div>
                 <p className="max-w-md text-xs text-muted-foreground">
-                  Per QC Rule 3, PDF Lab refuses to hallucinate competitor titles or ratings. No direct downloadable PDF products were detected during crawl, signaling an open, underserved gap.
+                  No marketplace listing is stored for this market. That means none was observed in the marketplace searches of its run, not that none exists.
                 </p>
               </CardContent>
             </Card>
@@ -453,7 +458,7 @@ export default async function MarketPage(props: MarketPageProps) {
                               {comp.platform === "amazon_kdp" ? "Amazon KDP" : comp.platform}
                             </Badge>
                             <span className="font-mono font-semibold text-foreground text-[11px]">
-                              {comp.price || "Free"}
+                              {comp.price || "Price not observed"}
                             </span>
                           </div>
 
@@ -719,7 +724,7 @@ export default async function MarketPage(props: MarketPageProps) {
                             {Math.round(opp.opportunity_score || 0)}
                           </span>
                           <span className="text-[10px] text-muted-foreground font-mono">
-                            {Math.round((opp.confidence || 0.5) * 100)}% conf
+                            {Math.round(opp.confidence * 100)}% conf
                           </span>
                         </div>
                       </TableCell>

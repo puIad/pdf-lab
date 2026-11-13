@@ -2,6 +2,8 @@
 
 import type { ReportExportData } from "./types.ts";
 
+const score = (v: number | null): string => (v === null ? "Not observed" : `${Math.round(v)}/100`);
+
 export function generateReportMarkdown(data: ReportExportData): string {
   const lines: string[] = [];
 
@@ -51,19 +53,21 @@ export function generateReportMarkdown(data: ReportExportData): string {
   lines.push("");
 
   lines.push("### Anti-Hallucination & Quality Control Status (PRD §53)");
-  lines.push("- ✅ **QC Rule 1 (Evidence Link):** 100% of opportunities link to verified source signals.");
   lines.push(
-    `- ✅ **QC Rule 2 (Temporal Evidence):** Market trend \`${data.market.trend}\` grounded in observed signals.`,
+    `- **QC Rule 1 (Evidence Link):** ${data.completeness.evidenceBackedOpportunitiesCount} of ${data.completeness.opportunitiesGenerated} opportunities have evidence rows.`,
   );
   lines.push(
-    `- ✅ **QC Rule 3 (Observed Competitors):** ${
+    `- **QC Rule 2 (Temporal Evidence):** Stored market trend: \`${data.market.trend}\` ("unknown" means too few dated signals).`,
+  );
+  lines.push(
+    `- **QC Rule 3 (Observed Competitors):** ${
       data.competitors.length > 0
-        ? `${data.competitors.length} live competitors analyzed.`
-        : "No competitors observed yet (honest empty state)."
+        ? `${data.competitors.length} stored marketplace listings.`
+        : "No competitors observed."
     }`,
   );
-  lines.push("- ✅ **QC Rule 4 (Counts-Backed Demand):** Scores calculated mathematically without LLM opinion.");
-  lines.push("- ✅ **QC Rule 5 (Separation):** Facts, interpretations, and suggestions structurally distinct.");
+  lines.push("- **QC Rule 4 (Counts-Backed Demand):** Scores are rule-based indexes over stored counts.");
+  lines.push("- **QC Rule 5 (Separation):** Facts, interpretations and suggestions are listed separately below.");
   lines.push("");
   lines.push("---");
   lines.push("");
@@ -81,16 +85,16 @@ export function generateReportMarkdown(data: ReportExportData): string {
     `| **Trend Direction** | ${data.market.trend.toUpperCase()} | Multi-window signal velocity | Stored temporal delta |`,
   );
   lines.push(
-    `| **Demand Score** | ${Math.round(data.market.demandScore)}/100 | Volume × Buyer Intent | Observed queries & posts |`,
+    `| **Demand Score** | ${score(data.market.demandScore)} | Volume × Buyer Intent | Observed queries & posts |`,
   );
   lines.push(
-    `| **Competition Score** | ${Math.round(data.market.competitionScore)}/100 | Saturation & Density | Marketplace listings |`,
+    `| **Competition Score** | ${score(data.market.competitionScore)} | Saturation & Density | Marketplace listings |`,
   );
   lines.push(
-    `| **PDF Suitability** | ${Math.round(data.market.pdfFitScore)}/100 | Checklists/Guides/Workbooks | Non-interactive resolution |`,
+    `| **PDF Suitability** | ${score(data.market.pdfFitScore)} | Checklists/Guides/Workbooks | Non-interactive resolution |`,
   );
   lines.push(
-    `| **Confidence Level** | ${Math.round(data.market.confidence * 100)}% | Multi-source corroboration | ${
+    `| **Confidence Level** | ${data.market.confidence === null ? "Not observed" : `${Math.round(data.market.confidence * 100)}%`} | Multi-source corroboration | ${
       data.completeness.sourcesCovered
     } distinct sources |`,
   );

@@ -399,6 +399,22 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
     assert.ok(seen.competition.includes("etsy-1"));
   });
 
+  it("stores the validated trend: one dated signal saves the market as unknown (QC Rule 2)", async () => {
+    const base = createMockOrchestratorDeps();
+    const [a, b] = await base.deps.getSignals("run");
+    let savedTrend: string | undefined;
+    const { deps } = createMockOrchestratorDeps({
+      getSignals: async () => [a, { ...b, source_type: "web", published_at: null }],
+      saveMarkets: async (markets, runId) => {
+        savedTrend = markets[0].trend;
+        return base.deps.saveMarkets(markets, runId);
+      },
+    });
+    const result = await executeResearchRun({ query: "budgeting" }, deps);
+    assert.equal(result.status, "completed", result.error ?? "");
+    assert.equal(savedTrend, "unknown"); // the mock clusterer proposed "accelerating"
+  });
+
   it("a run with all extractions failing ends failed (Part 6.9)", async () => {
     const base = createMockOrchestratorDeps();
     const stored = await base.deps.getSignals("run");

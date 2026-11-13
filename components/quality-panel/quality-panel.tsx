@@ -21,6 +21,8 @@ interface QualityPanelProps {
   marketId: string;
   completeness: ResearchCompleteness;
   marketName?: string;
+  /** Source types behind `sourcesCovered`, as stored. */
+  sourceTypes?: string[];
   className?: string;
 }
 
@@ -28,6 +30,7 @@ export function QualityPanel({
   marketId,
   completeness,
   marketName,
+  sourceTypes,
   className = "",
 }: QualityPanelProps) {
   const pct = Math.min(100, Math.max(0, completeness.completenessPercentage || 0));
@@ -39,7 +42,7 @@ export function QualityPanel({
             completeness.opportunitiesGenerated) *
             100,
         )
-      : 100;
+      : null;
 
   return (
     <Card className={`border-emerald-500/20 bg-emerald-500/[0.02] shadow-sm ${className}`}>
@@ -111,7 +114,7 @@ export function QualityPanel({
             </div>
             <div className="text-xl font-bold font-mono">{completeness.sourcesCovered}</div>
             <p className="text-[11px] text-muted-foreground truncate">
-              Reddit, Trends, Web
+              {sourceTypes === undefined ? "Distinct source types" : sourceTypes.length > 0 ? sourceTypes.join(", ") : "None"}
             </p>
           </div>
 
@@ -166,7 +169,7 @@ export function QualityPanel({
             <div className="text-xl font-bold font-mono">
               {completeness.opportunitiesGenerated}{" "}
               <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400">
-                ({backingRate}%)
+                {backingRate === null ? "" : `(${backingRate}%)`}
               </span>
             </div>
             <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">
@@ -200,7 +203,9 @@ export function QualityPanel({
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 text-xs">
             <div className="flex items-start gap-2 text-muted-foreground">
               <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">R1:</span>
-              <span>100% of opportunities link directly to evidence rows</span>
+              <span>
+                {completeness.evidenceBackedOpportunitiesCount} of {completeness.opportunitiesGenerated} opportunities link to evidence rows
+              </span>
             </div>
             <div className="flex items-start gap-2 text-muted-foreground">
               <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">R2:</span>

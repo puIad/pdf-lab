@@ -62,8 +62,8 @@ export function validateAndRecountJson(input: string | unknown): ValidationResul
     if (typeof market.id !== "string" || !market.id) errors.push("market.id is required");
     if (typeof market.name !== "string" || !market.name) errors.push("market.name is required");
     if (typeof market.trend !== "string") errors.push("market.trend is required");
-    if (typeof market.demandScore !== "number") errors.push("market.demandScore must be a number");
-    if (typeof market.confidence !== "number") errors.push("market.confidence must be a number");
+    if (market.demandScore !== null && typeof market.demandScore !== "number") errors.push("market.demandScore must be a number or null");
+    if (market.confidence !== null && typeof market.confidence !== "number") errors.push("market.confidence must be a number or null");
   }
 
   if (!data.completeness || typeof data.completeness !== "object") {
