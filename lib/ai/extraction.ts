@@ -1,7 +1,8 @@
 // lib/ai/extraction.ts — signal → structured analysis job (Phase 1 Part 1.3, batched in Part 6.9).
 // Signals go to the model in batches (default 10 per call, one JSON item per signal keyed by its
-// number); an item that is missing or invalid is retried alone. A call that fails as a whole fails
-// its signals without single retries: the router already tried every provider.
+// number); an item that is missing or invalid is retried alone, and so are the signals of a call
+// that failed as a whole (malformed JSON, timeout). Single retries stop after three failures in a
+// row, so a provider outage costs a few calls, not one per signal.
 // Per signal (title+content from the DB, NEVER invented): validated
 // {audience, problem, intent, urgency, pdf_relevance} → one `signal_analysis`
 // row per signal (04-SCHEMA invariant 3: re-runs UPDATE).
@@ -249,12 +250,12 @@ export function validateBatchExtraction(raw: unknown, count: number): Map<number
 
 interface BatchResult {
   outcomes: ExtractionOutcome[];
-  /** Signals whose item was missing or invalid in an otherwise readable reply: worth one single call each. */
+  /** Signals with no valid item (missing, invalid, or the whole call failed): one single call each. */
   retry: ExtractionInput[];
   cost?: CostLogEntry;
 }
 
-/** One model call for several signals. A failed call fails all of them and is not retried singly. */
+/** One model call for several signals. */
 async function extractBatch(signals: ExtractionInput[], opts: CallOptions): Promise<BatchResult> {
   const tier: TaskTier = opts.tier ?? "cheap";
   const user = signals
@@ -283,9 +284,8 @@ async function extractBatch(signals: ExtractionInput[], opts: CallOptions): Prom
       }
     });
     return { outcomes, retry, cost };
-  } catch (err) {
-    const error = `batch call failed: ${errorText(err)}`;
-    return { outcomes: signals.map((s) => ({ signalId: s.id, ok: false as const, error })), retry: [] };
+  } catch {
+    return { outcomes: [], retry: signals };
   }
 }
 
@@ -337,7 +337,7 @@ export async function runExtractionJob(opts: ExtractionJobOptions): Promise<Extr
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, units.length) }, () => worker()));
 
-  // Only the ids a readable batch left out or got wrong are retried, one call each.
+  // Only the ids without a valid item are retried, one call each.
   let consecutiveFailures = 0;
   for (const signal of retry) {
     if (consecutiveFailures >= MAX_CONSECUTIVE_RETRY_FAILURES) {

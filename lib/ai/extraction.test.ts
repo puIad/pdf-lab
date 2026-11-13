@@ -207,13 +207,21 @@ describe("batched extraction (Part 6.9)", () => {
     assert.deepEqual(log, { batch: 1, single: 2 });
   });
 
-  it("a batch call that fails as a whole fails its signals without single retries", async () => {
+  it("a batch call that fails as a whole is retried singly", async () => {
     const { router, log } = batchRouter({ failBatch: true });
     const job = await runExtractionJob({ signals: many(20), router, ...quiet });
+    assert.equal(job.succeeded, 20);
+    assert.deepEqual(job.calls, { batch: 2, single: 20 });
+    assert.equal(log.single, 20);
+  });
+
+  it("a provider outage costs a few calls, not one per signal", async () => {
+    const { router, log } = batchRouter({ failBatch: true, failSingle: true });
+    const job = await runExtractionJob({ signals: many(100), router, ...quiet });
     assert.equal(job.succeeded, 0);
-    assert.equal(job.failed, 20);
-    assert.equal(log.single, 0);
-    assert.ok(job.failures[0].error.includes("batch call failed"));
+    assert.equal(job.failed, 100);
+    assert.equal(log.single, 3);
+    assert.ok(job.calls.batch + job.calls.single <= 15);
   });
 
   it("stops single retries after three failures in a row", async () => {
