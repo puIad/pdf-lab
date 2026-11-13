@@ -26,7 +26,11 @@ agent loads **context** from disk.
 
 ### 3. State is explicit, not implied
 
-- `STATE.md` tracks per part: `pending | in_progress | blocked | done`, plus commit refs.
+- `STATE.md` tracks per part: `pending | in_progress | blocked | done`, plus commit refs and one
+  line. The part's notes (what was built, how it was verified, observations) live in
+  `docs/log/part-<N>.<M>.md`, read only when working on that part or depending on it.
+- A defect found while working goes in STATE's "Open defects" table with an owning part, or
+  marked unowned. An observation inside a done row is not picked up by "next unfinished part".
 - Exactly one part is `in_progress` at a time. It is marked `in_progress` BEFORE work
   starts and `done`/`blocked` AFTER, in the same turn.
 - "Done" = code runs + acceptance criteria met + review checklist passed + STATE updated.
@@ -66,7 +70,8 @@ The decision log is therefore also the project's record of "where reality differ
 
 ## Session protocol (normative)
 
-1. Load: `00` → `01` → `STATE.md` → `02-MASTER-PLAN.md` → requested phase file → linked specs/guides.
+1. Load: `00` → `01` → `STATE.md` → `02-MASTER-PLAN.md` → requested phase file → linked specs/guides
+   (+ the logs of the part and of its dependencies).
 2. Announce: part ID, goal in one line, deps status (satisfied/blocked).
 3. Mark `in_progress` in `STATE.md`.
 4. Implement exactly the part's tasks, in order. No scope creep into other parts; spillover
@@ -74,7 +79,8 @@ The decision log is therefore also the project's record of "where reality differ
 5. On any trigger from §4: escalate, do not improvise.
 6. Verify: run the part's acceptance checks for real (commands + outputs, not assertions).
 7. Review: `REVIEW-CHECKLIST.md`, record results in the reply.
-8. Update `STATE.md` (`done` + commit ref or `blocked` + decision ID) and report concisely:
+8. Update `STATE.md` (`done` + commit ref or `blocked` + decision ID, one line), write the notes
+   to the part's log, add or close its rows in "Open defects", and report concisely:
    what changed, how verified, what's next.
 
 ## Commit convention (so history answers "what was already done")
