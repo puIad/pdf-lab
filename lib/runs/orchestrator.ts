@@ -16,19 +16,23 @@ import {
 } from "../evidence/qc.ts";
 import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 import { marketForCompetitor } from "../competition/map.ts";
-import { isDemandOnly } from "../sources/demand-only.ts";
+import { isDemandOnly, isListing } from "../sources/demand-only.ts";
 import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
 import { evidenceSignalType, observedPriceRange } from "../opportunities/generator.ts";
 import { OPPORTUNITY_TARGET } from "../opportunities/types.ts";
 
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-// Extraction is one model call per signal: ~7 signals/min on NVIDIA's hosted gpt-oss (DEC-013),
-// so a fixed 5 minutes fails any run over ~35 signals. Budget 10 s per signal instead.
+// Extraction is batched (Part 6.9), but a slow provider can still take a minute per call and a
+// batch can fall back to single retries. Budget 10 s per signal, never under 5 minutes.
 export const EXTRACT_MS_PER_SIGNAL = 10_000;
+// shortcut: 50 % is a first guess; revisit once runs on several seeds show the usual analysed share.
+/** A run whose analysed share of discussion signals is below this fails instead of reporting on scraps. */
+export const MIN_ANALYZED_SHARE = 0.5;
 
-// Demand measurements, not discussions: they must not go through extraction or become market evidence.
+// Demand measurements and marketplace listings are not discussions: they must not go through
+// extraction or clustering, or become market evidence. Listings feed competition analysis instead.
 function discussionsOnly<T extends { source_type: string; external_id?: string | null }>(rows: T[]): T[] {
-  return rows.filter((s) => !isDemandOnly(s));
+  return rows.filter((s) => !isDemandOnly(s) && !isListing(s));
 }
 function withTimeout<T>(p: Promise<T>, label: string, ms = STEP_TIMEOUT_MS): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -150,6 +154,8 @@ export interface OrchestratorDeps {
     analyzed: number;
     succeeded: number;
     failed: number;
+    /** Model calls the extraction made. */
+    calls?: number;
   }>;
   clusterAndScore: (signals: StoredSignalForRun[]) => Promise<OrchestratorMarketItem[]>;
   saveMarkets: (markets: OrchestratorMarketItem[], runId: string) => Promise<Array<{ id: string; name: string }>>;
@@ -232,8 +238,9 @@ export async function executeResearchRun(
     await deps.updateRunStatus(runId, "classifying");
 
     const unanalyzedSignals = signals.filter((s) => !s.analysis);
+    let extraction: { failed: number; calls?: number } = { failed: 0, calls: 0 };
     if (unanalyzedSignals.length > 0) {
-      await withTimeout(deps.extract(
+      extraction = await withTimeout(deps.extract(
         unanalyzedSignals.map((s) => ({
           id: s.id,
           title: s.title,
@@ -242,16 +249,38 @@ export async function executeResearchRun(
         })),
       ), "extract", Math.max(STEP_TIMEOUT_MS, unanalyzedSignals.length * EXTRACT_MS_PER_SIGNAL));
     }
-    const freshSignals = discussionsOnly(await deps.getSignals(runId));
+    const runSignals = await deps.getSignals(runId);
+    const freshSignals = discussionsOnly(runSignals);
+
+    // A run that analysed too little fails here instead of reporting on scraps (Part 6.9).
+    const analyzedCount = freshSignals.filter((s) => s.analysis).length;
+    const notAnalyzed = freshSignals.length - analyzedCount;
+    if (freshSignals.length > 0 && analyzedCount / freshSignals.length < MIN_ANALYZED_SHARE) {
+      throw new Error(
+        `Only ${analyzedCount} of ${freshSignals.length} signals were analysed ` +
+          `(${extraction.failed} extraction failures in this run); a run needs at least ${Math.round(MIN_ANALYZED_SHARE * 100)}%.`,
+      );
+    }
 
     // 5. CLUSTERING
     tracker.transition("clustering", {
-      counts: { signalsToCluster: freshSignals.length },
-      message: `Clustering signals and evaluating market scoring formulas`,
+      counts: {
+        signalsToCluster: freshSignals.length,
+        signalsAnalyzed: analyzedCount,
+        signalsNotAnalyzed: notAnalyzed,
+        extractionFailures: extraction.failed,
+        extractionCalls: extraction.calls ?? 0,
+      },
+      message:
+        notAnalyzed > 0
+          ? `Partial: ${analyzedCount} of ${freshSignals.length} signals analysed; clustering those`
+          : `Clustering signals and evaluating market scoring formulas`,
     });
     await deps.updateRunStatus(runId, "clustering");
 
     const marketCandidates = await withTimeout(deps.clusterAndScore(freshSignals), "clusterAndScore");
+    // The clusterer skips a signal with no embedding; say how many (clusterAndScore fills them in place).
+    const unembedded = freshSignals.filter((s) => s.analysis && !s.analysis.embedding?.length).length;
     const savedMarkets = await deps.saveMarkets(marketCandidates, runId);
 
     // Write evidence for each market from its supporting signals
@@ -284,7 +313,7 @@ export async function executeResearchRun(
 
     // 6. TREND_ANALYSIS
     tracker.transition("trend_analysis", {
-      counts: { marketsChecked: marketCandidates.length },
+      counts: { marketsChecked: marketCandidates.length, signalsUnembedded: unembedded },
       message: `Evaluating temporal evidence and trend velocity`,
     });
     await deps.updateRunStatus(runId, "trend_analysis");
@@ -324,7 +353,8 @@ export async function executeResearchRun(
     });
     await deps.updateRunStatus(runId, "competition_analysis");
 
-    const observedCompetitors = await deps.observeCompetition(freshSignals);
+    // Listings (never extracted) plus discussion rows from store hosts.
+    const observedCompetitors = await deps.observeCompetition(runSignals.filter((s) => !isDemandOnly(s)));
     const compState = enforceRule3_CompetitionObserved(observedCompetitors);
 
     if (compState.hasCompetitors) {

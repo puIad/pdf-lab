@@ -133,6 +133,16 @@ export function QualityPanel({
                   )}% classified`
                 : "Awaiting signals"}
             </p>
+            {completeness.signalsAnalyzed < completeness.signalsCollected && (
+              <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                Partial: {completeness.signalsCollected - completeness.signalsAnalyzed} not analysed
+              </p>
+            )}
+            {(completeness.signalsUnembedded ?? 0) > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                {completeness.signalsUnembedded} analysed but not clustered (no embedding)
+              </p>
+            )}
           </div>
 
           <div className="rounded-lg border border-border/70 bg-card p-3 space-y-1">

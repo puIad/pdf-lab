@@ -368,6 +368,78 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
     assert.equal(state.runStatus, "failed");
   });
 
+  it("marketplace listings feed competition only: never extracted, never clustered (Part 6.9)", async () => {
+    const base = createMockOrchestratorDeps();
+    const stored = await base.deps.getSignals("run");
+    const listing: StoredSignalForRun = {
+      id: "etsy-1", title: "PC Boot Diagnostic Checklist PDF", content: "$7.00", url: "https://www.etsy.com/listing/1",
+      source_id: "src-etsy", source_type: "etsy", published_at: null, analysis: null,
+    };
+    const seen = { extracted: [] as string[], clustered: [] as string[], competition: [] as string[] };
+    const { deps } = createMockOrchestratorDeps({
+      getSignals: async () => [...stored, listing],
+      extract: async (rows) => {
+        seen.extracted.push(...rows.map((r) => r.id));
+        return { analyzed: rows.length, succeeded: rows.length, failed: 0 };
+      },
+      clusterAndScore: async (signals) => {
+        seen.clustered.push(...signals.map((s) => s.id));
+        return base.deps.clusterAndScore(signals);
+      },
+      observeCompetition: async (signals) => {
+        seen.competition.push(...signals.map((s) => s.id));
+        return [];
+      },
+    });
+    const result = await executeResearchRun({ query: "pc troubleshooting" }, deps);
+    assert.equal(result.status, "completed", result.error ?? "");
+    assert.deepEqual(seen.extracted, []);
+    assert.deepEqual(seen.clustered.sort(), ["sig-1", "sig-2"]);
+    assert.ok(seen.competition.includes("etsy-1"));
+  });
+
+  it("a run with all extractions failing ends failed (Part 6.9)", async () => {
+    const base = createMockOrchestratorDeps();
+    const stored = await base.deps.getSignals("run");
+    let clustered = false;
+    const { deps, state } = createMockOrchestratorDeps({
+      getSignals: async () => stored.map((s) => ({ ...s, analysis: null })),
+      extract: async (rows) => ({ analyzed: rows.length, succeeded: 0, failed: rows.length, calls: 1 }),
+      clusterAndScore: async (signals) => {
+        clustered = true;
+        return base.deps.clusterAndScore(signals);
+      },
+    });
+    const result = await executeResearchRun({ query: "budgeting" }, deps);
+    assert.equal(result.status, "failed");
+    assert.match(result.error ?? "", /Only 0 of 2 signals were analysed \(2 extraction failures in this run\)/);
+    assert.equal(state.runStatus, "failed");
+    assert.equal(clustered, false);
+  });
+
+  it("a run above the analysed share continues and reports itself as partial (Part 6.9)", async () => {
+    const base = createMockOrchestratorDeps();
+    const [a, b] = await base.deps.getSignals("run");
+    const third: StoredSignalForRun = { ...a, id: "sig-3", analysis: null };
+    const { deps } = createMockOrchestratorDeps({
+      getSignals: async () => [a, b, third],
+      extract: async () => ({ analyzed: 1, succeeded: 0, failed: 1, calls: 1 }),
+      clusterAndScore: async (signals) => base.deps.clusterAndScore(signals.filter((s) => s.analysis)),
+    });
+    const result = await executeResearchRun({ query: "budgeting" }, deps);
+    assert.equal(result.status, "completed", result.error ?? "");
+    const clustering = result.trace.find((t) => t.state === "clustering");
+    assert.deepEqual(clustering?.counts, {
+      signalsToCluster: 3,
+      signalsAnalyzed: 2,
+      signalsNotAnalyzed: 1,
+      extractionFailures: 1,
+      extractionCalls: 1,
+    });
+    assert.match(clustering?.message ?? "", /^Partial: 2 of 3 signals analysed/);
+    assert.equal(result.trace.find((t) => t.state === "trend_analysis")?.counts?.signalsUnembedded, 0);
+  });
+
   it("keeps search-suggestion, Serper phrase and pageview rows out of extraction and clustering", async () => {
     const demandRow = (id: string, source_type: string): StoredSignalForRun => ({
       id,

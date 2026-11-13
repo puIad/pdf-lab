@@ -88,11 +88,12 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         signals: inputs,
         router,
         tier: "cheap",
+        batchSize: Number(process.env.EXTRACTION_BATCH_SIZE) || undefined,
       });
 
       if (job.successes.length > 0) {
         const { error } = await supabase.from("signal_analysis").upsert(
-          job.successes.map((s) => ({ signal_id: s.signalId, ...s.analysis, embedding: null })),
+          job.successes.map((s) => ({ signal_id: s.signalId, ...s.analysis, embedding: null, prompt_version: job.promptVersion })),
           { onConflict: "signal_id" },
         );
         if (error) {
@@ -104,6 +105,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         analyzed: job.total,
         succeeded: job.succeeded,
         failed: job.failed,
+        calls: job.calls.batch + job.calls.single,
       };
     },
 

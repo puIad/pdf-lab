@@ -28,6 +28,13 @@ new file + registry line, zero caller changes.
   Changing embed models = migration + backfill plan, logged in DECISIONS.
 - Prompts are versioned in code; extraction outputs are validated objects (schema-checked),
   never free text parsed by regex.
+- Extraction is batched (Part 6.9, `lib/ai/extraction.ts`): 10 signals per call by default
+  (`EXTRACTION_BATCH_SIZE`, at most 25), one JSON item per signal keyed by its number, each item
+  validated alone. A missing or invalid item is retried in a single call; a call that fails as a
+  whole fails its signals with no single retries (the router already tried every provider), and
+  single retries stop after 3 failures in a row. About 100 signals take about 10 calls, which fits
+  both known limits: NVIDIA 40 requests a minute (DEC-013) and OpenRouter's 50 free calls a day
+  (DEC-012). `signal_analysis.prompt_version` records the prompt (`extract-v2-batch`).
 
 ## Hosting modes (PRD §34)
 

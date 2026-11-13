@@ -64,6 +64,7 @@ create table signal_analysis (
   intent text,                 -- weak|medium|strong|very_strong (+ raw label)
   urgency text,                -- low|medium|high
   pdf_relevance float,         -- 0..1
+  prompt_version text,         -- extraction prompt that wrote the row (Part 6.9); null = extract-v1
   embedding vector(1536)       -- ADJUST to chosen embedding model; migration if changed
 );
 create index on signal_analysis using ivfflat (embedding vector_cosine_ops);

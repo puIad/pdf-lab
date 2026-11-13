@@ -11,6 +11,10 @@ QUEUED → COLLECTING → NORMALIZING → CLASSIFYING → CLUSTERING → TREND_A
 - `research_runs.status` holds lowercase form. UI MUST expose progress (PRD §38-final).
 - Each transition writes evidence/counts; a run that reaches COMPLETED without stored
   evidence rows is a bug, not a success.
+- CLASSIFYING → FAILED when fewer than half of the run's discussion signals end up analysed
+  (`MIN_ANALYZED_SHARE` in `lib/runs/orchestrator.ts`, Part 6.9). Above that share the run goes
+  on and is marked partial: the trace and the completeness panel give analysed, not analysed and
+  not clustered (no embedding) counts.
 
 ## Deep-research pipeline (PRD §39) — the 9 phases every `pdf-lab <niche>` run executes
 
