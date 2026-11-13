@@ -10,6 +10,8 @@ import type { TrendDirection } from "../scoring/types.ts";
 export interface SummarizeClusterOptions {
   router?: AIRouter;
   tier?: "cheap";
+  /** Signals clustered in the whole run; scoring turns the cluster size into a share. */
+  totalSignals?: number;
 }
 
 const URGENCY_PRIORITY: Record<string, number> = {
@@ -143,12 +145,15 @@ Respond with JSON:
     }
   }
 
-  // Determine trend: if any signal has rising/accelerating, mark emerging/accelerating
-  let trend: TrendDirection = "stable";
-  const anyGtrends = signals.some((s) => s.sourceType === "gtrends");
-  if (anyGtrends) {
-    trend = "accelerating";
-  }
+  // Trend from observed Google Trends rows only: a rising related query or a rising interest
+  // summary. Trends rows without a direction read "stable"; no Trends row means unknown. The
+  // orchestrator still requires 2 dated observations before storing it (QC Rule 2).
+  const trendsRows = signals.filter((s) => s.sourceType === "gtrends");
+  const direction = (s: ClusterSignal) => String(s.engagement?.direction ?? "").toLowerCase();
+  let trend: TrendDirection = "unknown";
+  if (trendsRows.some((s) => s.engagement?.rising === true || direction(s) === "rising")) trend = "accelerating";
+  else if (trendsRows.some((s) => direction(s) === "falling")) trend = "declining";
+  else if (trendsRows.length > 0) trend = "stable";
 
   // Score the market candidate
   const scoringSignals = signals.map((s) => ({
@@ -160,7 +165,7 @@ Respond with JSON:
     analysis: s.analysis,
   }));
 
-  const scoring = scoreMarket(scoringSignals, { trend });
+  const scoring = scoreMarket(scoringSignals, { trend, totalSignals: opts.totalSignals });
 
   // Growth metric: calculated based on momentum and trend
   const growth = scoring.factors.trendMomentum;

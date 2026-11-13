@@ -78,6 +78,7 @@ interface SignalRow {
   source_id: string;
   external_id: string | null;
   published_at: string | null;
+  engagement?: Record<string, unknown> | null;
   sources: Rel<{ type: string }>;
   signal_analysis: Rel<AnalysisRow>;
 }
@@ -89,7 +90,7 @@ export async function loadRunSignals(supabase: SupabaseClient, runId: string): P
     const { data, error } = await supabase
       .from("run_signals")
       .select(
-        "signal_id, signals ( id, title, content, url, source_id, external_id, published_at, sources ( type ), signal_analysis ( id, audience, problem, intent, urgency, pdf_relevance, embedding ) )",
+        "signal_id, signals ( id, title, content, url, source_id, external_id, published_at, engagement, sources ( type ), signal_analysis ( id, audience, problem, intent, urgency, pdf_relevance, embedding ) )",
       )
       .eq("run_id", runId)
       .order("signal_id")
@@ -113,6 +114,7 @@ export async function loadRunSignals(supabase: SupabaseClient, runId: string): P
       source_type: one(r.sources)?.type || "web",
       external_id: r.external_id,
       published_at: r.published_at,
+      engagement: r.engagement ?? null,
       analysis: sa
         ? {
             id: sa.id,

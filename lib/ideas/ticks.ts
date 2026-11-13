@@ -20,9 +20,14 @@ export interface CompetitionCount {
   reviewed: number;
 }
 
-// shortcut: uncalibrated thresholds; refit in Part 3.11. The competition tick counts reviewed listings
-// because a check reads at most 10 results per marketplace, so the raw listing count saturates at 30.
-export const TICK_THRESHOLDS = { demand: 50, fit: 60, reviewedMax: 10 } as const;
+// Calibration on 30 phrases across 5 seeds (docs/research/2026-11-13-score-calibration.md, Part 6.11):
+// - demand 50 is kept: phrases passing it sit in markets with more reviewed listings (rho 0.53).
+// - reviewedMax was 10 and passed 29 of 30 phrases; 5 is the sample median, so the tick now splits.
+// shortcut: fit 60 is not supported by that data and reviewedMax is a relative cut, not validated
+// against sales; refit both when Part 3.11's file or more checks arrive.
+// The competition tick counts reviewed listings because a check reads at most 10 results per
+// marketplace, so the raw listing count saturates at 30.
+export const TICK_THRESHOLDS = { demand: 50, fit: 60, reviewedMax: 5 } as const;
 
 export function ideaTicks(idea: QuickIdea, competition: CompetitionCount | null = null): IdeaTick[] {
   const T = TICK_THRESHOLDS;
