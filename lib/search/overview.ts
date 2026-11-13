@@ -11,6 +11,7 @@
 // 9. Underserved submarkets
 // Each backed by concrete evidence citations or explicitly labeled "Not observed".
 
+import { isCurrent, latestRunIds } from "../runs/scope.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   MarketOverview,
@@ -49,6 +50,7 @@ interface RawSignalRow {
 
 interface RawMarketRow {
   id: string;
+  run_id?: string | null;
   name: string;
   description?: string | null;
   trend?: string | null;
@@ -61,6 +63,7 @@ interface RawMarketRow {
 
 interface RawOpportunityRow {
   id: string;
+  run_id?: string | null;
   market_id: string;
   title: string;
   target_audience?: string | null;
@@ -74,6 +77,7 @@ interface RawOpportunityRow {
 
 interface RawCompetitorRow {
   id: string;
+  run_id?: string | null;
   market_id?: string | null;
   platform?: string | null;
   title?: string | null;
@@ -117,15 +121,20 @@ export async function generateMarketOverview(
     .split(/\s+/)
     .filter((w) => w.length >= 2 && !stopWords.has(w));
 
+  // Rows of a run that a newer run of the same seed replaced are left out (Part 6.7).
+  // If the run list cannot be read, nothing is filtered.
+  const latestRuns = await latestRunIds(supabase).catch(() => null);
+  const current = (row: { run_id?: string | null }) => !latestRuns || isCurrent(row.run_id, latestRuns);
+
   // 2. Fetch matched Markets
   let matchedMarkets: RawMarketRow[] = [];
   try {
     const { data: allMarkets } = await supabase
       .from("markets")
-      .select("id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at");
+      .select("id, run_id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at");
 
     if (allMarkets && allMarkets.length > 0) {
-      matchedMarkets = (allMarkets as RawMarketRow[]).filter((m) => {
+      matchedMarkets = (allMarkets as RawMarketRow[]).filter(current).filter((m) => {
         const name = (m.name || "").toLowerCase();
         const desc = (m.description || "").toLowerCase();
         if (name.includes(cleanQ) || desc.includes(cleanQ)) return true;
@@ -244,11 +253,11 @@ export async function generateMarketOverview(
   try {
     const { data: allOpps } = await supabase
       .from("opportunities")
-      .select("id, market_id, title, target_audience, problem, solution, format, price_range, opportunity_score, confidence")
+      .select("id, run_id, market_id, title, target_audience, problem, solution, format, price_range, opportunity_score, confidence")
       .order("opportunity_score", { ascending: false });
 
     if (allOpps) {
-      matchedOpportunities = (allOpps as RawOpportunityRow[]).filter((o) => {
+      matchedOpportunities = (allOpps as RawOpportunityRow[]).filter(current).filter((o) => {
         if (matchedMarketIds.has(o.market_id)) return true;
         const title = (o.title || "").toLowerCase();
         const audience = (o.target_audience || "").toLowerCase();
@@ -266,10 +275,10 @@ export async function generateMarketOverview(
   try {
     const { data: allComps } = await supabase
       .from("competitors")
-      .select("id, market_id, platform, title, url, price, rating, review_count");
+      .select("id, run_id, market_id, platform, title, url, price, rating, review_count");
 
     if (allComps) {
-      matchedCompetitors = (allComps as RawCompetitorRow[]).filter((c) => {
+      matchedCompetitors = (allComps as RawCompetitorRow[]).filter(current).filter((c) => {
         if (c.market_id && matchedMarketIds.has(c.market_id)) return true;
         const title = (c.title || "").toLowerCase();
         if (title.includes(cleanQ)) return true;

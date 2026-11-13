@@ -9,6 +9,19 @@ import type {
   TopOpportunity,
   BuyerIntentLevel,
 } from "./types.ts";
+import { isCurrent, listCompletedRuns } from "../runs/scope.ts";
+
+/**
+ * Which markets to read (Part 6.7): "all" = the latest completed run of each seed plus legacy rows,
+ * "latest" = the latest completed run of each seed, "legacy" = rows from before run scoping,
+ * anything else = one run id.
+ */
+export type MarketScope = string;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function parseMarketScope(value: string | null | undefined, fallback: MarketScope): MarketScope {
+  return value && (["all", "latest", "legacy"].includes(value) || UUID.test(value)) ? value : fallback;
+}
 
 const VALID_TRENDS: Set<MarketTrend> = new Set([
   "emerging",
@@ -35,18 +48,32 @@ function resolveIntentFromScore(avg: number): BuyerIntentLevel {
 
 export async function fetchMarketsData(
   supabase: SupabaseClient,
+  scope: MarketScope = "all",
 ): Promise<FetchMarketsResult> {
-  // 1. Fetch all markets
+  // 1. Fetch markets, then keep the ones in scope
   const { data: marketsData, error: marketsErr } = await supabase
     .from("markets")
-    .select("id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at")
+    .select("id, run_id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at")
     .order("created_at", { ascending: false });
 
   if (marketsErr) {
     throw new Error(`Failed to fetch markets: ${marketsErr.message}`);
   }
 
-  const rawMarkets = marketsData ?? [];
+  const allMarkets = marketsData ?? [];
+  const completedRuns = await listCompletedRuns(supabase);
+  const latest = new Set(completedRuns.filter((r) => r.latest).map((r) => r.id));
+  const runsWithMarkets = new Set(allMarkets.map((m) => m.run_id as string | null).filter(Boolean));
+  const runs = completedRuns.filter((r) => runsWithMarkets.has(r.id));
+  const legacyCount = allMarkets.filter((m) => !m.run_id).length;
+
+  const rawMarkets = allMarkets.filter((m) => {
+    const runId = (m.run_id as string | null) ?? null;
+    if (scope === "all") return isCurrent(runId, latest);
+    if (scope === "latest") return !!runId && latest.has(runId);
+    if (scope === "legacy") return !runId;
+    return runId === scope;
+  });
   if (rawMarkets.length === 0) {
     return {
       markets: [],
@@ -56,6 +83,9 @@ export async function fetchMarketsData(
         totalOpportunities: 0,
         totalSignals: 0,
       },
+      runs,
+      scope,
+      legacyCount,
     };
   }
 
@@ -196,7 +226,7 @@ export async function fetchMarketsData(
 
   const stats: MarketStats = {
     totalMarkets: markets.length,
-    totalEvidence: rawEvidence.length,
+    totalEvidence: Object.values(evidenceCountByMarket).reduce((a, b) => a + b, 0),
     totalOpportunities: rawOpps.length,
     totalSignals: rawMarketSignals.length,
   };
@@ -204,5 +234,8 @@ export async function fetchMarketsData(
   return {
     markets,
     stats,
+    runs,
+    scope,
+    legacyCount,
   };
 }

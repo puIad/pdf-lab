@@ -3,7 +3,7 @@
 
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { fetchMarketsData } from "@/lib/markets/fetcher";
+import { fetchMarketsData, parseMarketScope } from "@/lib/markets/fetcher";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     const pdfFitFilter = searchParams.get("pdf_fit")?.toLowerCase().trim();
 
     const supabase = createServiceSupabaseClient();
-    const data = await fetchMarketsData(supabase);
+    const data = await fetchMarketsData(supabase, parseMarketScope(searchParams.get("run"), "latest"));
 
     let filtered = [...data.markets];
 
@@ -101,6 +101,9 @@ export async function GET(req: Request) {
       markets: filtered,
       total: filtered.length,
       stats: data.stats,
+      runs: data.runs,
+      scope: data.scope,
+      legacyCount: data.legacyCount,
     });
   } catch (err) {
     return NextResponse.json(

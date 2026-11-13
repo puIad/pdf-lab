@@ -2,7 +2,6 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResearchCompleteness } from "./types.ts";
-import { buildSearchFilter } from "../db/search.ts";
 import { isDemandOnly } from "../sources/demand-only.ts";
 
 export interface CompletenessRawCounts {
@@ -64,94 +63,57 @@ export function calculateCompleteness(counts: CompletenessRawCounts): ResearchCo
 }
 
 /**
- * Reconciles completeness numbers directly with live DB `select count(*)` queries.
+ * Counts what one run collected and produced, from its own rows (`run_signals`, `run_id`).
+ * Runs from before Part 6.7 have no such rows and count as zero.
  */
 export async function fetchRunCompleteness(
   supabase: SupabaseClient,
-  query: string,
+  runId: string,
 ): Promise<ResearchCompleteness> {
-  const filter = buildSearchFilter(query);
-  let queryBuilder = supabase.from("signals").select("id, source_id, external_id, sources ( type )");
-  if (filter) {
-    queryBuilder = queryBuilder.or(filter);
-  }
-  const { data: signals, error: sigErr } = await queryBuilder;
-
+  const { data: links, error: sigErr } = await supabase
+    .from("run_signals")
+    .select("signals ( id, source_id, external_id, sources ( type ), signal_analysis ( id ) )")
+    .eq("run_id", runId);
   if (sigErr) {
     throw new Error(`Failed to count signals for completeness: ${sigErr.message}`);
   }
 
-  const allRows = (signals ?? []) as unknown as Array<{
-    id: string;
-    source_id: string;
-    external_id: string | null;
-    sources: { type?: string } | null;
-  }>;
+  type Rel<T> = T | T[] | null | undefined;
+  const one = <T>(v: Rel<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+  const allRows = ((links ?? []) as unknown as Array<{
+    signals: Rel<{
+      id: string;
+      source_id: string;
+      external_id: string | null;
+      sources: Rel<{ type?: string }>;
+      signal_analysis: Rel<{ id: string }>;
+    }>;
+  }>).flatMap((l) => one(l.signals) ?? []);
   // Every source that answered counts as covered; only discussion rows count as signals to analyze
   // (demand-only rows are never extracted, so they would read as permanently unanalyzed).
   const distinctSources = new Set(allRows.map((s) => s.source_id)).size;
-  const signalRows = allRows.filter((s) => !isDemandOnly({ source_type: s.sources?.type, external_id: s.external_id }));
-  const signalIds = signalRows.map((s) => s.id);
+  const signalRows = allRows.filter((s) => !isDemandOnly({ source_type: one(s.sources)?.type, external_id: s.external_id }));
+  const analyzedCount = signalRows.filter((s) => one(s.signal_analysis)).length;
 
-  let analyzedCount = 0;
-  let marketIds: string[] = [];
+  const [{ data: markets }, { data: opps }] = await Promise.all([
+    supabase.from("markets").select("id").eq("run_id", runId),
+    supabase.from("opportunities").select("id").eq("run_id", runId),
+  ]);
+  const marketIds = (markets ?? []).map((m) => m.id as string);
+  const oppIds = (opps ?? []).map((o) => o.id as string);
 
-  if (signalIds.length > 0) {
-    // 2. Analyzed signals
-    const { count, error: saErr } = await supabase
-      .from("signal_analysis")
-      .select("signal_id", { count: "exact", head: true })
-      .in("signal_id", signalIds);
-
-    if (!saErr && count != null) {
-      analyzedCount = count;
-    }
-
-    // 3. Linked markets via market_signals
-    const { data: msData } = await supabase
-      .from("market_signals")
-      .select("market_id")
-      .in("signal_id", signalIds);
-
-    if (msData) {
-      marketIds = [...new Set(msData.map((m) => m.market_id))];
-    }
-  }
-
-  // 4. Opportunities for those markets
-  let opportunitiesCount = 0;
-  let oppIds: string[] = [];
-
-  if (marketIds.length > 0) {
-    const { data: opps } = await supabase
-      .from("opportunities")
-      .select("id")
-      .in("market_id", marketIds);
-
-    if (opps) {
-      opportunitiesCount = opps.length;
-      oppIds = opps.map((o) => o.id);
-    }
-  }
-
-  // 5. Evidence rows
+  // Evidence of the run: its markets, its opportunities, and competitors attached to the run only.
   let evidenceCount = 0;
   let evidenceBackedOpportunitiesCount = 0;
-
-  const entityIdsToCheck = [...marketIds, ...oppIds];
-  if (entityIdsToCheck.length > 0) {
-    const { data: evRows } = await supabase
-      .from("evidence")
-      .select("id, entity_type, entity_id")
-      .in("entity_id", entityIdsToCheck);
-
-    if (evRows) {
-      evidenceCount = evRows.length;
-      const backedOppIds = new Set(
-        evRows.filter((e) => e.entity_type === "opportunity").map((e) => e.entity_id),
-      );
-      evidenceBackedOpportunitiesCount = backedOppIds.size;
-    }
+  const { data: evRows } = await supabase
+    .from("evidence")
+    .select("id, entity_type, entity_id")
+    .in("entity_id", [runId, ...marketIds, ...oppIds]);
+  if (evRows) {
+    evidenceCount = evRows.length;
+    evidenceBackedOpportunitiesCount = new Set(
+      evRows.filter((e) => e.entity_type === "opportunity").map((e) => e.entity_id),
+    ).size;
   }
 
   return calculateCompleteness({
@@ -159,7 +121,7 @@ export async function fetchRunCompleteness(
     signalsCollected: signalRows.length,
     signalsAnalyzed: analyzedCount,
     marketsIdentified: marketIds.length,
-    opportunitiesGenerated: opportunitiesCount,
+    opportunitiesGenerated: oppIds.length,
     evidenceCount,
     evidenceBackedOpportunitiesCount,
   });

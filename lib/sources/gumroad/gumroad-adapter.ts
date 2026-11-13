@@ -17,7 +17,7 @@ export const GUMROAD_KEY = "gumroad";
 export const SERPER_ENDPOINT = "https://google.serper.dev/search";
 export const CACHE_TTL_MS = 60 * 60 * 1000; // 1h
 export const MIN_INTERVAL_MS = 1000;
-const MAX_LIMIT = 20;
+const MAX_LIMIT = 10; // Serper answers HTTP 400 to a `site:` query asking for more (seen live 2026-11-13)
 
 export interface GumroadOrganicResult {
   title?: string;

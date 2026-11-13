@@ -46,10 +46,13 @@ export async function fetchReportExportData(
   // 2. Fetch market
   let marketQuery = supabase
     .from("markets")
-    .select("id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at");
+    .select("id, run_id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at");
 
   if (targetMarketId) {
     marketQuery = marketQuery.eq("id", targetMarketId);
+  } else if (runId) {
+    // The run's strongest market leads its report (Part 6.7).
+    marketQuery = marketQuery.eq("run_id", runId).order("demand_score", { ascending: false });
   } else if (queryText) {
     marketQuery = marketQuery.ilike("name", `%${queryText}%`).order("created_at", { ascending: false });
   } else {
@@ -81,25 +84,14 @@ export async function fetchReportExportData(
     return s ? [s] : [];
   });
 
-  // 4. Fetch opportunities for this market (or related markets if single market has < 25)
-  let { data: oppRows } = await supabase
+  // 4. Opportunities: the whole run's when the market belongs to one, else this market's only.
+  // Never another run's rows (Part 6.7).
+  const scopedRunId = (marketData.run_id as string | null) ?? null;
+  let oppQuery = supabase
     .from("opportunities")
-    .select("id, market_id, title, target_audience, problem, solution, format, price_range, opportunity_score, confidence, created_at")
-    .eq("market_id", targetMarketId)
-    .order("opportunity_score", { ascending: false });
-
-  // If this specific market record has fewer than 25 opportunities, look for opportunities across the niche
-  if (!oppRows || oppRows.length < 25) {
-    const { data: allNicheOpps } = await supabase
-      .from("opportunities")
-      .select("id, market_id, title, target_audience, problem, solution, format, price_range, opportunity_score, confidence, created_at")
-      .order("opportunity_score", { ascending: false })
-      .limit(25);
-
-    if (allNicheOpps && allNicheOpps.length > (oppRows?.length || 0)) {
-      oppRows = allNicheOpps;
-    }
-  }
+    .select("id, market_id, title, target_audience, problem, solution, format, price_range, opportunity_score, confidence, created_at");
+  oppQuery = scopedRunId ? oppQuery.eq("run_id", scopedRunId) : oppQuery.eq("market_id", targetMarketId);
+  const { data: oppRows } = await oppQuery.order("opportunity_score", { ascending: false });
 
   const opportunitiesList = (oppRows ?? []).slice(0, 25);
   const oppIds = opportunitiesList.map((o) => o.id);
@@ -238,8 +230,9 @@ export async function fetchReportExportData(
   };
 
   try {
-    const runComp = await fetchRunCompleteness(supabase, queryText);
-    if (runComp.signalsCollected > 0) {
+    // Legacy markets have no run to recount against.
+    const runComp = scopedRunId ? await fetchRunCompleteness(supabase, scopedRunId) : null;
+    if (runComp && runComp.signalsCollected > 0) {
       baseCompleteness.sourcesCovered = Math.max(runComp.sourcesCovered, baseCompleteness.sourcesCovered);
       baseCompleteness.signalsCollected = Math.max(runComp.signalsCollected, baseCompleteness.signalsCollected);
       baseCompleteness.signalsAnalyzed = Math.max(runComp.signalsAnalyzed, baseCompleteness.signalsAnalyzed);

@@ -45,7 +45,20 @@ export interface MarketStats {
   totalSignals: number;
 }
 
+/** A completed Deep run that has markets (Part 6.7). */
+export interface MarketRun {
+  id: string;
+  query: string;
+  completedAt: string | null;
+  latest: boolean;
+}
+
 export interface FetchMarketsResult {
   markets: MarketRowData[];
   stats: MarketStats;
+  /** Completed runs with markets, newest first. */
+  runs: MarketRun[];
+  scope: string;
+  /** Markets stored before run scoping (`run_id` null). */
+  legacyCount: number;
 }

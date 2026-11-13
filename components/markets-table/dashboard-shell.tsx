@@ -4,6 +4,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Search,
   Terminal,
@@ -28,17 +29,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { ExplorerTable } from "./explorer-table";
 import { DeepResearchDialog } from "./deep-research-dialog";
-import type { MarketRowData, MarketStats, MarketTab } from "./types";
+import type { MarketRowData, MarketRun, MarketStats, MarketTab } from "./types";
 
 interface DashboardShellProps {
   initialMarkets: MarketRowData[];
   initialStats: MarketStats;
+  /** Completed Deep runs with markets, newest first (Part 6.7). */
+  runs?: MarketRun[];
+  scope?: string;
+  legacyCount?: number;
 }
 
 export function DashboardShell({
   initialMarkets,
   initialStats,
+  runs = [],
+  scope = "latest",
+  legacyCount = 0,
 }: DashboardShellProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [markets, setMarkets] = useState<MarketRowData[]>(initialMarkets);
   const [stats, setStats] = useState<MarketStats>(initialStats);
   const [searchQuery, setSearchQuery] = useState("");
@@ -222,7 +232,7 @@ export function DashboardShell({
   // Reload data from API after deep research
   async function refreshMarkets() {
     try {
-      const res = await fetch("/api/markets");
+      const res = await fetch(`/api/markets?run=${encodeURIComponent(scope)}`);
       if (res.ok) {
         const data = await res.json();
         setMarkets(data.markets || []);
@@ -412,6 +422,26 @@ export function DashboardShell({
             <span>Filters:</span>
           </div>
 
+          {/* Run Select: one Deep run at a time, never every run mixed (Part 6.7) */}
+          <NativeSelect
+            size="sm"
+            aria-label="Research run"
+            value={scope}
+            onChange={(e) => router.push(`${pathname}?run=${encodeURIComponent(e.target.value)}`)}
+          >
+            <NativeSelectOption value="latest">Latest run of each seed</NativeSelectOption>
+            {runs.map((r) => (
+              <NativeSelectOption key={r.id} value={r.id}>
+                {r.query}
+                {r.completedAt ? ` · ${r.completedAt.slice(0, 10)}` : ""}
+                {r.latest ? "" : " (older run)"}
+              </NativeSelectOption>
+            ))}
+            {legacyCount > 0 && (
+              <NativeSelectOption value="legacy">Before run scoping ({legacyCount} markets)</NativeSelectOption>
+            )}
+          </NativeSelect>
+
           {/* Trend Select */}
           <NativeSelect
             size="sm"
@@ -492,6 +522,17 @@ export function DashboardShell({
           )}
         </div>
       </div>
+
+      {/* No run-scoped Deep run has completed yet: say where the older markets are (Part 6.7). */}
+      {scope === "latest" && markets.length === 0 && legacyCount > 0 && (
+        <p role="status" className="text-sm text-muted-foreground">
+          No Deep run has completed since runs were separated.{" "}
+          <Link href={`${pathname}?run=legacy`} className="font-medium text-foreground underline underline-offset-4">
+            Show the {legacyCount} markets stored before that
+          </Link>
+          .
+        </p>
+      )}
 
       {/* 6. Explorer Table */}
       <ExplorerTable

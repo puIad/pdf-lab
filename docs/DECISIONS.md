@@ -364,3 +364,45 @@ patch the affected guide/phase file (link the follow-up commit).
   with a recommended order (6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10; 6.13 any time).
   5.1 (auth) moves ahead of Phase 4. Still open inside the parts: DEC-001 (job provider, asked in
   6.10), deletion of stored fake rows (user's yes, 6.5), the megalibrary location (6.13).
+
+## DEC-015 — Chat model for extraction: `openai/gpt-oss-20b` on NVIDIA no longer answers
+
+- Date: 2026-11-13
+- Part: Phase 6 Part 6.7 (live acceptance), also 6.8 and 6.9
+- Expected: DEC-013: NVIDIA's hosted `openai/gpt-oss-20b` answers an extraction call in 4 to 7 s
+  (about 7 signals a minute); `openrouter/free` is the fallback (DEC-012).
+- Found (2026-11-13, measured):
+  1. `openai/gpt-oss-20b`: the key is valid (`GET /v1/models` 200 in 0.3 s) but a 20-token chat
+     call got no response in 75 s. Through the router: 60 s timeout, then OpenRouter "returned no
+     assistant content" or timed out. Same symptom as the listing-description note in STATE 3.10.
+  2. Two live Deep runs failed in the extraction step: "budgeting" (10 unanalysed of 35
+     discussion signals, `extract timed out after 300000ms`) and "meal prep" (49 unanalysed,
+     timed out after 490 s). Ingest, `run_signals` and run-scoped counts worked.
+  3. NVIDIA's catalogue changed: `openai/gpt-oss-120b`, `meta/llama-3.3-70b-instruct` and
+     `meta/llama-3.1-8b-instruct` return 410 (end of life); several listed models return 404
+     for this account.
+  4. Candidates that answered, compared on 25 stored signals against the analyses stored
+     earlier by gpt-oss-20b (same prompt, single calls):
+     - `nvidia/nemotron-3.5-bolt-e4b`: 25 of 25 in 98 s; intent agrees 48 %, urgency 72 %,
+       `pdf_relevance` within 0.2 on 44 %.
+     - `minimaxai/minimax-m3.1-flash`: 10 of 25 answered through NVIDIA in 150 s (the rest
+       timed out or fell through); of those, intent agrees 100 %, urgency 90 %,
+       `pdf_relevance` within 0.2 on 70 %.
+     - `nvidia/nemotron-3.5-lightning-30b-a3b`: 0 of 25 (a reasoning model, it spends the
+       500-token budget before answering).
+     Agreement is against the previous model's output, not against hand labels.
+- Options: (a) keep `openai/gpt-oss-20b` and wait for NVIDIA; Deep runs only work on seeds whose
+  signals are already analysed. (b) `NVIDIA_CHEAP_MODEL=nvidia/nemotron-3.5-bolt-e4b`: fast and
+  reliable, but it rates intent differently from the stored analyses, so old and new rows would
+  not be comparable. (c) `NVIDIA_CHEAP_MODEL=minimaxai/minimax-m3.1-flash` with gpt-oss-20b and
+  OpenRouter behind it: closest to the stored analyses, but slow and it failed 60 % of calls
+  today. (d) buy OpenRouter credits ($10 lifts the free pool to 1000 calls a day, DEC-012) or
+  point `OPENAI_BASE_URL` at another paid provider. The switch in (b) and (c) is an env var
+  (`NVIDIA_CHEAP_MODEL`, `NVIDIA_STRONG_MODEL`), no code.
+- Recommendation: (c) for now, re-measured after Part 6.9 batches extraction (a batch of 10
+  needs 1 call instead of 10, so a 60 % failure rate costs far less), and (d) if it still fails.
+- Question for user: "gpt-oss-20b on NVIDIA has stopped answering. Switch extraction to
+  minimax-m3.1-flash (closest results, flaky), nemotron-3.5-bolt-e4b (fast, different
+  ratings), or wait?"
+- Resolution: _open_
+

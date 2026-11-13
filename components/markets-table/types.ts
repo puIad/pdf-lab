@@ -7,5 +7,6 @@ export type {
   MarketRowData,
   MarketTab,
   MarketStats,
+  MarketRun,
   FetchMarketsResult,
 } from "@/lib/markets/types";

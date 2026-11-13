@@ -10,29 +10,14 @@ import type { ClusterSignal } from "../cluster/types.ts";
 import { writeEvidence } from "../evidence/writer.ts";
 import { createServerEvidenceDeps } from "../evidence/service-deps.ts";
 import { fetchRunCompleteness } from "./completeness.ts";
-import { buildSearchFilter } from "../db/search.ts";
+import { loadRunSignals, recordRunSignals } from "./run-signals.ts";
+import { isStoreUrl } from "../competition/map.ts";
 import { generate25Opportunities, ideaCandidates, OPPORTUNITY_TARGET, type OpportunityMarketInput } from "../opportunities/index.ts";
 import { loadStoredIdeas } from "../ideas/stored.ts";
 import type { OrchestratorDeps, OrchestratorCompetitorItem } from "./orchestrator.ts";
 import { parseMarketplaceProduct } from "../sources/marketplace-helper.ts";
 
 const EXPECTED_EMBEDDING_DIM = 1536;
-
-function parseVector(v: unknown): number[] | null {
-  if (!v) return null;
-  if (Array.isArray(v)) return v.map(Number);
-  if (typeof v === "string") {
-    try {
-      const trimmed = v.trim();
-      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-        return JSON.parse(trimmed).map(Number);
-      }
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
 
 export function createServerOrchestratorDeps(): OrchestratorDeps {
   const supabase = createServiceSupabaseClient();
@@ -70,9 +55,13 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
       }
     },
 
-    ingest: async ({ query, limit, sourceKeys }) => {
+    ingest: async ({ runId, query, limit, sourceKeys }) => {
       const ingestDeps = createServerIngestDeps();
-      const res = await runIngest({ query, limit, sourceKeys }, ingestDeps);
+      const collected = new Map<string, string[]>();
+      const res = await runIngest({ query, limit, sourceKeys }, ingestDeps, (key, signals) =>
+        collected.set(key, signals.map((s) => s.source_id)),
+      );
+      await recordRunSignals(supabase, runId, collected);
       return {
         collected: res.totals.collected,
         normalized: res.totals.normalized,
@@ -85,81 +74,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
       };
     },
 
-    getSignals: async (query) => {
-      const filter = buildSearchFilter(query);
-      let queryBuilder = supabase
-        .from("signals")
-        .select(`
-          id, title, content, url, source_id, external_id, published_at,
-          sources ( type ),
-          signal_analysis (
-            id, audience, problem, intent, urgency, pdf_relevance, embedding
-          )
-        `);
-
-      if (filter) {
-        queryBuilder = queryBuilder.or(filter);
-      }
-
-      const { data, error } = await queryBuilder.order("collected_at", { ascending: false });
-
-      if (error) {
-        throw new Error(`Failed to fetch signals for run: ${error.message}`);
-      }
-
-      const rows = (data || []) as unknown as Array<{
-        id: string;
-        title: string | null;
-        content: string | null;
-        url: string | null;
-        source_id: string;
-        external_id: string | null;
-        published_at: string | null;
-        sources?: { type: string } | null;
-        signal_analysis?: Array<{
-          id: string;
-          audience: string;
-          problem: string;
-          intent: string;
-          urgency: string;
-          pdf_relevance: number;
-          embedding: unknown;
-        }> | {
-          id: string;
-          audience: string;
-          problem: string;
-          intent: string;
-          urgency: string;
-          pdf_relevance: number;
-          embedding: unknown;
-        } | null;
-      }>;
-
-      return rows.map((r) => {
-        const sa = Array.isArray(r.signal_analysis) ? r.signal_analysis[0] : r.signal_analysis;
-        return {
-          id: r.id,
-          title: r.title,
-          content: r.content,
-          url: r.url,
-          source_id: r.source_id,
-          source_type: r.sources?.type || "web",
-          external_id: r.external_id,
-          published_at: r.published_at,
-          analysis: sa
-            ? {
-                id: sa.id,
-                audience: sa.audience,
-                problem: sa.problem,
-                intent: sa.intent,
-                urgency: sa.urgency,
-                pdf_relevance: sa.pdf_relevance,
-                embedding: parseVector(sa.embedding),
-              }
-            : null,
-        };
-      });
-    },
+    getSignals: (runId) => loadRunSignals(supabase, runId),
 
     extract: async (signals) => {
       const inputs = signals.map((s) => ({
@@ -258,13 +173,14 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
       }));
     },
 
-    saveMarkets: async (markets) => {
+    saveMarkets: async (markets, runId) => {
       const savedList: Array<{ id: string; name: string }> = [];
 
       for (const m of markets) {
         const { data: marketRow, error } = await supabase
           .from("markets")
           .insert({
+            run_id: runId,
             name: m.name,
             description: `Audience problems evidenced by ${m.signals.length} market signals.`,
             trend: m.trend,
@@ -355,7 +271,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
       }));
     },
 
-    saveOpportunities: async (opportunities) => {
+    saveOpportunities: async (opportunities, runId) => {
       const saved: Array<{ id: string; title: string }> = [];
 
       for (const opp of opportunities) {
@@ -363,6 +279,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           .from("opportunities")
           .insert({
             id: opp.id,
+            run_id: runId,
             market_id: opp.marketId,
             title: opp.title,
             target_audience: opp.targetAudience,
@@ -396,12 +313,8 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           sig.source_type === "gumroad" ||
           sig.source_type === "kdp";
 
-        const isWebProduct =
-          sig.source_type === "web" &&
-          sig.url &&
-          /guide|handbook|manual|checklist|book|workbook|template|cheat sheet|troubleshooting/i.test(
-            sig.title || "",
-          );
+        // A web result is a product only on a known store; anywhere else it is a discussion (Part 6.7).
+        const isWebProduct = sig.source_type === "web" && isStoreUrl(sig.url);
 
         if ((isMarketplace || isWebProduct) && sig.url) {
           const platform =
@@ -420,6 +333,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           });
 
           observed.push({
+            signalId: sig.id,
             platform,
             title: parsed.title,
             url: parsed.url,
@@ -443,6 +357,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         const { data, error } = await supabase
           .from("competitors")
           .insert({
+            run_id: c.run_id,
             market_id: c.market_id,
             platform: c.platform,
             title: c.title,
@@ -461,8 +376,6 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
       return saved;
     },
 
-    fetchCompleteness: async (runId, query) => {
-      return fetchRunCompleteness(supabase, query);
-    },
+    fetchCompleteness: (runId) => fetchRunCompleteness(supabase, runId),
   };
 }
