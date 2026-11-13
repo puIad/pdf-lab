@@ -7,6 +7,7 @@ import { writeEvidence } from "./writer.ts";
 import { formatEvidenceClaim, parseEvidenceClaim } from "./types.ts";
 import {
   enforceRule1_OpportunityEvidence,
+  sourcedEvidenceCount,
   enforceRule2_TrendTemporalEvidence,
   enforceRule3_CompetitionObserved,
   enforceRule4_DemandCounts,
@@ -130,11 +131,29 @@ describe("QC Rules 1–5 Enforcement (06-EVIDENCE-CONTRACT.md)", () => {
       {
         entityType: "opportunity",
         entityId: "opp-real-1",
+        sourceId: "src-reddit",
+        url: "https://reddit.com/r/buildapc/1",
         claim: "Supported by multiple boot failure troubleshooting signals",
       },
     ];
 
     assert.doesNotThrow(() => enforceRule1_OpportunityEvidence(opp, evidence));
+  });
+
+  it("Rule 1: a row with no source, or with neither url nor excerpt, does not count (Part 6.8)", () => {
+    const opp = { id: "opp-1", title: "Budget planner" };
+    const row = { entityType: "opportunity" as const, entityId: "opp-1", claim: "directly addresses market cluster" };
+    const blocked = (evidence: EvidenceInput[]) =>
+      assert.throws(
+        () => enforceRule1_OpportunityEvidence(opp, evidence),
+        (err: unknown) => err instanceof QCViolationError && err.ruleNumber === 1,
+      );
+    blocked([row]);
+    blocked([{ ...row, url: "https://example.com/a", excerpt: "quote" }]); // no source
+    blocked([{ ...row, sourceId: "src-1" }]); // a source but nothing quoted or linked
+    blocked([{ ...row, entityId: "another-opportunity", sourceId: "src-1", url: "https://example.com/a" }]);
+    assert.doesNotThrow(() => enforceRule1_OpportunityEvidence(opp, [row, { ...row, sourceId: "src-1", excerpt: "quote" }]));
+    assert.equal(sourcedEvidenceCount("opp-1", [row, { ...row, sourceId: "src-1", excerpt: "quote" }]), 1);
   });
 
   it("Rule 2: Blocks trend claims without temporal evidence (< 2 time windows)", () => {

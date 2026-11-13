@@ -9,7 +9,9 @@ import {
   enforceRule1_OpportunityEvidence,
   enforceRule4_DemandCounts,
   enforceRule5_SeparationOfConcerns,
+  sourcedEvidenceCount,
 } from "../evidence/qc.ts";
+import { matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
 import { classifyFormat } from "../ideas/ideas.ts";
 import { IDEA_FORMAT_MAP } from "./from-ideas.ts";
 import {
@@ -42,6 +44,8 @@ export interface GenerationResult {
   opportunities: GeneratedOpportunity[];
   diversification: DiversificationStats;
   totalCandidatesGenerated: number;
+  /** Candidates removed before selection because no evidence row had a source and a url or excerpt. */
+  droppedUnsourced: number;
 }
 
 function normalizeKey(str: string): string {
@@ -92,27 +96,90 @@ export function observedPriceRange(prices: Array<string | null | undefined>): st
   return lo === hi ? `${cur}${lo}` : `${cur}${lo}–${cur}${hi}`;
 }
 
+/** `pain_point` only when extraction found a problem on the signal; otherwise the source's own type. */
+export function evidenceSignalType(sig: { source_type?: string; analysis?: { problem?: string | null } | null }): string {
+  return sig.analysis?.problem?.trim() ? "pain_point" : sig.source_type || "general";
+}
+
 function signalEvidence(
   oppId: string,
   title: string,
   signals: OpportunitySignalInput[],
   confidence: number,
 ): EvidenceInput[] {
-  return signals.slice(0, 3).map((sig) => ({
+  return signals.map((sig) => ({
     entityType: "opportunity",
     entityId: oppId,
     sourceId: sig.source_id ?? null,
     claim: `Opportunity "${title}" addresses observed signal: "${sig.title || sig.content?.slice(0, 60)}"`,
     excerpt: sig.content ? sig.content.slice(0, 300) : null,
     url: sig.url,
-    signalType: "pain_point",
+    signalType: evidenceSignalType(sig),
     confidence,
   }));
 }
 
+/** The evidence fields of a candidate: the matched signals, their count, and which rows are its own. */
+function matchedEvidence(
+  oppId: string,
+  title: string,
+  own: OpportunitySignalInput[],
+  match: SignalMatch,
+  confidence: number,
+): Pick<GeneratedOpportunity, "evidence" | "matchingSignals" | "marketSignals" | "evidenceSignalIds" | "ownSignalIds"> {
+  return {
+    evidence: signalEvidence(oppId, title, match.signals, confidence),
+    matchingSignals: match.matchCount,
+    marketSignals: match.marketTotal,
+    evidenceSignalIds: match.signals.map((s) => s.id),
+    ownSignalIds: own.map((s) => s.id),
+  };
+}
+
+/**
+ * Two opportunities with different problems must not cite the identical set of signals
+ * (Part 6.8). The later one falls back to the signals it was built from; when that set is taken
+ * too, it has no evidence of its own and is dropped. Markets of 3 signals or fewer are exempt:
+ * there is nothing else to cite.
+ */
+export function distinctEvidenceSets(
+  candidates: GeneratedOpportunity[],
+  marketSizes: Map<string, number>,
+): GeneratedOpportunity[] {
+  const taken = new Map<string, string>(); // market + signal set -> problem that holds it
+  const setKey = (c: GeneratedOpportunity, ids: string[]) => `${c.marketId}::${[...ids].sort().join(",")}`;
+  const out: GeneratedOpportunity[] = [];
+  for (const c of candidates) {
+    const ids = c.evidenceSignalIds;
+    if (!ids || (marketSizes.get(c.marketId) ?? 0) <= 3) {
+      out.push(c);
+      continue;
+    }
+    const problem = normalizeKey(c.problem);
+    const holder = taken.get(setKey(c, ids));
+    if (holder === undefined || holder === problem) {
+      taken.set(setKey(c, ids), problem);
+      out.push(c);
+      continue;
+    }
+    const own = new Set(c.ownSignalIds ?? []);
+    const ownIds = ids.filter((id) => own.has(id));
+    const ownHolder = taken.get(setKey(c, ownIds));
+    if (ownIds.length === 0 || (ownHolder !== undefined && ownHolder !== problem)) continue;
+    taken.set(setKey(c, ownIds), problem);
+    out.push({
+      ...c,
+      evidence: c.evidence.filter((_, i) => own.has(ids[i])),
+      evidenceSignalIds: ownIds,
+    });
+  }
+  return out;
+}
+
 /**
  * Candidates built only from stored rows: one per distinct (audience, problem) that extraction
- * found on a market's signals, backed by those signals. A signal without both fields yields
+ * found on a market's signals, backed by the market's signals that match that problem
+ * (`matchSignals`, at most 5, its own first). A signal without both fields yields
  * nothing, so a thin market gives few candidates and an unanalysed one gives none. Format is a
  * suggestion read from the wording (`classifyFormat`: "guide" when no format word appears).
  * Price is the market's observed competitor range or null.
@@ -156,7 +223,7 @@ export function generateCandidatePool(
         urgency: observedUrgency(signals),
         opportunityScore: Math.max(0, Math.min(100, Math.round(market.demandScore))),
         confidence: market.confidence,
-        evidence: signalEvidence(oppId, title, signals, market.confidence),
+        ...matchedEvidence(oppId, title, signals, matchSignals(problem, signals, market.signals), market.confidence),
       });
     }
   }
@@ -305,12 +372,16 @@ export async function generate25Opportunities(
     ? await generateWithAIRouter(markets, options.router, options.tier ?? "strong").catch(() => [])
     : [];
   const seenKeys = new Set<string>();
-  const candidatePool = [...fromModel, ...generateCandidatePool(markets)].filter((c) => {
+  const deduped = [...fromModel, ...generateCandidatePool(markets)].filter((c) => {
     const key = `${normalizeKey(c.targetAudience)}::${normalizeKey(c.problem)}::${c.format}`;
     return !seenKeys.has(key) && Boolean(seenKeys.add(key));
   });
+  deduped.push(...(options.extraCandidates ?? []));
 
-  candidatePool.push(...(options.extraCandidates ?? []));
+  // A candidate without a sourced evidence row is dropped here, not saved (QC Rule 1, Part 6.8),
+  // and no two different problems may cite the identical signal set.
+  const sourced = deduped.filter((c) => sourcedEvidenceCount(c.id, c.evidence) > 0);
+  const candidatePool = distinctEvidenceSets(sourced, new Map(markets.map((m) => [m.id, m.signals.length])));
 
   // Step 2: Select a diversified set of at most targetCount
   const finalOpportunities = selectDiversifiedOpportunities(candidatePool, targetCount);
@@ -320,8 +391,8 @@ export async function generate25Opportunities(
     // QC Rule 1: No opportunity without evidence!
     enforceRule1_OpportunityEvidence(opp, opp.evidence);
 
-    // QC Rule 4: Demand must cite signal counts (> 0)
-    enforceRule4_DemandCounts(opp.title, opp.evidence.length);
+    // QC Rule 4: demand cites the count of signals matching this opportunity's problem (> 0)
+    enforceRule4_DemandCounts(opp.title, opp.matchingSignals);
 
     // QC Rule 5: Structural separation
     enforceRule5_SeparationOfConcerns({
@@ -343,6 +414,7 @@ export async function generate25Opportunities(
     opportunities: finalOpportunities,
     diversification,
     totalCandidatesGenerated: candidatePool.length,
+    droppedUnsourced: deduped.length - sourced.length,
   };
 }
 
@@ -438,12 +510,17 @@ ${JSON.stringify(marketSummaries, null, 2)}`;
     const market = marketMap.get(raw.marketId);
     if (!market) continue;
 
-    // The audience must be one extraction stored on this market's signals; those signals are the
-    // candidate's evidence. A model-invented audience has no such signals and is skipped.
+    // The audience must be one extraction stored on this market's signals. A model-invented
+    // audience has no such signals and is skipped.
     const audienceKey = normalizeKey(raw.targetAudience);
-    const signals = market.signals.filter(
+    const audienceSignals = market.signals.filter(
       (s) => s.analysis?.audience && normalizeKey(s.analysis.audience) === audienceKey,
     );
+    if (audienceSignals.length === 0) continue;
+    // Its evidence is the signals that speak about the model's problem wording (Part 6.8).
+    // No stored embedding exists for new wording, so its own signals are found by shared words;
+    // a problem none of that audience's signals mentions has no evidence and is skipped.
+    const signals = audienceSignals.filter((s) => problemOverlap(raw.problem, s) >= MIN_TOKEN_MATCH);
     if (signals.length === 0) continue;
 
     const format = raw.format.toLowerCase().trim() as OpportunityFormat;
@@ -457,7 +534,7 @@ ${JSON.stringify(marketSummaries, null, 2)}`;
       id: oppId,
       marketId: market.id,
       title,
-      targetAudience: signals[0].analysis!.audience!.trim(), // stored wording
+      targetAudience: audienceSignals[0].analysis!.audience!.trim(), // stored wording
       problem: raw.problem.trim(),
       solution: raw.solution.trim(),
       format,
@@ -468,7 +545,7 @@ ${JSON.stringify(marketSummaries, null, 2)}`;
       urgency: observedUrgency(signals),
       opportunityScore: market.demandScore,
       confidence: market.confidence,
-      evidence: signalEvidence(oppId, title, signals, market.confidence),
+      ...matchedEvidence(oppId, title, signals, matchSignals(raw.problem, signals, market.signals), market.confidence),
     });
   }
 

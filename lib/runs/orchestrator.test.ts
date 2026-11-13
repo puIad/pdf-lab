@@ -310,32 +310,62 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
     assert.equal(lastTrace.state, "failed");
   });
 
-  it("Acceptance Gate: QC Rule 1 blocks opportunity without evidence during run", async () => {
-    // Attempting to generate an opportunity with 0 evidence
-    const { deps, state } = createMockOrchestratorDeps({
-      generateOpportunities: async () => [
+  it("Acceptance Gate: QC Rule 1 drops an opportunity without sourced evidence, it is never saved (Part 6.8)", async () => {
+    const hallucinated = {
+      id: "opp-hallucinated",
+      marketId: "market-1",
+      title: "Fake Opportunity With Zero Evidence",
+      targetAudience: "Nobody",
+      problem: "Invented problem",
+      solution: "Imaginary PDF",
+      format: "guide",
+      opportunityScore: 99,
+      confidence: 0.9,
+    };
+    const saved: string[] = [];
+    const { deps } = createMockOrchestratorDeps({
+      // The generator reports what it removed itself (4 here); the loop adds what still slips through.
+      generateOpportunities: async () => Object.assign([
+        { opportunity: hallucinated, evidence: [] }, // no evidence at all
         {
-          opportunity: {
-            id: "opp-hallucinated",
-            marketId: "market-1",
-            title: "Fake Opportunity With Zero Evidence",
-            targetAudience: "Nobody",
-            problem: "Invented problem",
-            solution: "Imaginary PDF",
-            format: "guide",
-            opportunityScore: 99,
-            confidence: 0.9,
-          },
-          evidence: [], // VIOLATION OF QC RULE 1
+          // one row, but it names no source: "directly addresses market cluster" used to pass
+          opportunity: { ...hallucinated, id: "opp-sourceless", title: "Source-less" },
+          evidence: [{ entityType: "opportunity" as const, entityId: "opp-sourceless", claim: "directly addresses market cluster" }],
         },
-      ],
+        {
+          opportunity: { ...hallucinated, id: "opp-real", title: "Backed", matchingSignals: 7, marketSignals: 31 },
+          evidence: [{ entityType: "opportunity" as const, entityId: "opp-real", sourceId: "src-reddit", claim: "c", excerpt: "quote", url: "https://reddit.com/1" }],
+        },
+      ], { droppedUnsourced: 4 }),
+      saveOpportunities: async (items) => {
+        saved.push(...items.map((i) => i.id));
+        return items.map((i) => ({ id: i.id, title: i.title }));
+      },
     });
 
     const result = await executeResearchRun({ query: "pc troubleshooting" }, deps);
 
+    assert.equal(result.status, "completed", result.error ?? "");
+    assert.deepEqual(saved, ["opp-real"]);
+    const report = result.trace.find((t) => t.state === "report_generation");
+    assert.equal(report?.counts?.opportunitiesDroppedUnsourced, 6);
+  });
+
+  it("QC Rule 4: an opportunity whose problem matches no signal fails the run (Part 6.8)", async () => {
+    const { deps, state } = createMockOrchestratorDeps({
+      generateOpportunities: async () => [
+        {
+          opportunity: {
+            id: "opp-0", marketId: "market-1", title: "No matching signal", targetAudience: "a", problem: "p",
+            solution: "s", format: "guide", opportunityScore: 50, confidence: 0.5, matchingSignals: 0, marketSignals: 31,
+          },
+          evidence: [{ entityType: "opportunity", entityId: "opp-0", sourceId: "src-reddit", claim: "c", excerpt: "quote" }],
+        },
+      ],
+    });
+    const result = await executeResearchRun({ query: "pc troubleshooting" }, deps);
     assert.equal(result.status, "failed");
-    assert.ok(result.error?.includes("QC Rule 1 Violation"));
-    assert.ok(result.error?.includes("0 evidence rows"));
+    assert.ok(result.error?.includes("QC Rule 4 Violation"));
     assert.equal(state.runStatus, "failed");
   });
 

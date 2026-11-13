@@ -17,21 +17,32 @@ export class QCViolationError extends Error {
   }
 }
 
+/** Evidence rows of this opportunity that name a stored source and quote or link it (Part 6.8). */
+export function sourcedEvidenceCount(
+  opportunityId: string,
+  evidence: Array<EvidenceInput | EvidenceRow>,
+): number {
+  return evidence.filter((e) => {
+    const entityId = "entityId" in e ? e.entityId : e.entity_id;
+    const sourceId = "entityId" in e ? e.sourceId : e.source_id;
+    return entityId === opportunityId && Boolean(sourceId) && Boolean(e.url || e.excerpt);
+  }).length;
+}
+
 /**
  * QC Rule 1: No opportunity without evidence.
- * An opportunity cannot exist or be persisted unless backed by at least 1 verified evidence item.
+ * An opportunity cannot exist or be persisted unless at least 1 of its evidence rows has a
+ * `source_id` and a url or excerpt. A row with no source does not count (Part 6.8).
  */
 export function enforceRule1_OpportunityEvidence(
   opportunity: { id: string; title: string },
   evidence: Array<EvidenceInput | EvidenceRow>,
 ): void {
-  const matching = evidence.filter(
-    (e) => ("entityId" in e ? e.entityId : e.entity_id) === opportunity.id,
-  );
-  if (matching.length === 0) {
+  const sourced = sourcedEvidenceCount(opportunity.id, evidence);
+  if (sourced === 0) {
     throw new QCViolationError(
       1,
-      `Opportunity "${opportunity.title}" (${opportunity.id}) has 0 evidence rows. Opportunities without evidence are forbidden.`,
+      `Opportunity "${opportunity.title}" (${opportunity.id}) has 0 evidence rows with a source and a url or excerpt. Opportunities without sourced evidence are forbidden.`,
       { opportunityId: opportunity.id, title: opportunity.title },
     );
   }
@@ -111,7 +122,8 @@ export function enforceRule3_CompetitionObserved(
 
 /**
  * QC Rule 4: No demand claim from AI opinion alone.
- * Demand claims or scores MUST cite countable signals (count > 0).
+ * Demand claims or scores MUST cite countable signals (count > 0). For an opportunity the count is
+ * the signals that match its problem, not the evidence rows attached to it (Part 6.8).
  */
 export function enforceRule4_DemandCounts(
   demandDescription: string,

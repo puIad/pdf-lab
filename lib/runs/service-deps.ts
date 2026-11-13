@@ -232,6 +232,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           content: s.content,
           url: s.url,
           published_at: s.published_at,
+          embedding: s.analysis?.embedding ?? null,
           analysis: s.analysis ? {
             audience: s.analysis.audience,
             problem: s.analysis.problem,
@@ -254,7 +255,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         extraCandidates: stored ? ideaCandidates(seed, stored.result.ideas, marketInputs, stored.refs) : [],
       });
 
-      return res.opportunities.map((opp) => ({
+      const pairs = res.opportunities.map((opp) => ({
         opportunity: {
           id: opp.id,
           marketId: opp.marketId,
@@ -266,9 +267,12 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           priceRange: opp.priceRange,
           opportunityScore: opp.opportunityScore,
           confidence: opp.confidence,
+          matchingSignals: opp.matchingSignals,
+          marketSignals: opp.marketSignals,
         },
         evidence: opp.evidence,
       }));
+      return Object.assign(pairs, { droppedUnsourced: res.droppedUnsourced });
     },
 
     saveOpportunities: async (opportunities, runId) => {
@@ -289,6 +293,8 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
             price_range: opp.priceRange ?? null,
             opportunity_score: opp.opportunityScore,
             confidence: opp.confidence,
+            matching_signals: opp.matchingSignals ?? null,
+            market_signal_count: opp.marketSignals ?? null,
           })
           .select("id, title")
           .single();

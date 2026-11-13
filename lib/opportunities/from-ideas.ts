@@ -94,6 +94,8 @@ export function ideaCandidates(
       opportunityScore: idea.opportunity,
       confidence: idea.confidence,
       evidence,
+      matchingSignals: evidence.length, // phrase rows observed for this idea, not market discussions
+      marketSignals: null,
     } satisfies GeneratedOpportunity;
   });
 }

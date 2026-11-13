@@ -3,6 +3,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  distinctEvidenceSets,
+  evidenceSignalType,
   generate25Opportunities,
   generateCandidatePool,
   IDEA_CLAIM_PREFIX,
@@ -10,6 +12,7 @@ import {
   observedPriceRange,
   pickDistinctIdeas,
   type OpportunityMarketInput,
+  type OpportunitySignalInput,
 } from "./index.ts";
 import type { AIRouter } from "../ai/router.ts";
 import { enforceRule1_OpportunityEvidence, QCViolationError } from "../evidence/qc.ts";
@@ -231,6 +234,7 @@ test("Opportunity generator: observed fields only, never padded (Part 6.4)", asy
       confidence: 0.5,
       signals: Array.from({ length: 40 }, (_, i) => ({
         id: `s${i}`,
+        source_id: "src-1",
         title: i % 2 ? `budget planner ${i}` : `saving checklist ${i}`,
         content: null,
         url: `https://example.com/${i}`,
@@ -275,6 +279,111 @@ test("Opportunity generator: observed fields only, never padded (Part 6.4)", asy
     assert.equal(observedPriceRange(["$7"]), "$7");
     assert.equal(observedPriceRange(["Free", null, "n/a"]), null);
     assert.equal(observedPriceRange([]), null);
+  });
+});
+
+test("Evidence belongs to the opportunity (Part 6.8)", async (t) => {
+  const sig = (id: string, audience: string, problem: string, embedding: number[], extra: Partial<OpportunitySignalInput> = {}): OpportunitySignalInput => ({
+    id,
+    source_id: "src-reddit",
+    source_type: "reddit",
+    title: problem,
+    content: `${problem} (post ${id})`,
+    url: `https://reddit.com/${id}`,
+    analysis: { audience, problem },
+    embedding,
+    ...extra,
+  });
+  // One tight cluster: every signal is within the embedding threshold of every other.
+  const tight: OpportunityMarketInput = {
+    id: "m-tight",
+    name: "Monthly budgeting",
+    demandScore: 60,
+    confidence: 0.6,
+    signals: [
+      sig("a1", "couples", "overspending on groceries", [1, 0.02]),
+      sig("a2", "couples", "overspending on groceries", [1, 0.03]),
+      sig("b1", "students", "rent takes the whole budget", [1, 0.04]),
+      sig("b2", "students", "rent takes the whole budget", [1, 0.05]),
+      sig("c1", "freelancers", "irregular income", [1, 0.06]),
+    ],
+  };
+  const evidenceKey = (o: { evidence: Array<{ url?: string | null }> }) => o.evidence.map((e) => e.url).sort().join("|");
+
+  await t.test("no two opportunities with different problems cite the identical evidence set", async () => {
+    const res = await generate25Opportunities([tight]);
+    assert.equal(res.opportunities.length, 3);
+    assert.equal(new Set(res.opportunities.map(evidenceKey)).size, 3);
+    for (const o of res.opportunities) {
+      assert.ok(o.evidence.length >= 1 && o.evidence.length <= 5);
+      assert.equal(o.marketSignals, 5);
+      assert.equal(o.matchingSignals, 5); // QC Rule 4 count: every signal of this cluster matches
+    }
+  });
+
+  await t.test("a market of 3 signals or fewer may share its evidence", async () => {
+    const small = { ...tight, id: "m-small", signals: [tight.signals[0], tight.signals[2], tight.signals[4]] };
+    const res = await generate25Opportunities([small]);
+    assert.equal(res.opportunities.length, 3);
+    assert.equal(new Set(res.opportunities.map(evidenceKey)).size, 1);
+  });
+
+  await t.test("evidence is the signals about this problem, not the market's first rows", () => {
+    const market: OpportunityMarketInput = {
+      id: "m-wide",
+      name: "Money",
+      demandScore: 50,
+      confidence: 0.5,
+      signals: [
+        sig("g1", "couples", "overspending on groceries", [1, 0, 0]),
+        sig("g2", "parents", "grocery bill keeps growing", [0.96, 0.28, 0]),
+        sig("r1", "students", "rent takes the whole budget", [0, 1, 0]),
+        sig("r2", "renters", "rent increase every year", [0.1, 0.99, 0]),
+      ],
+    };
+    const pool = generateCandidatePool([market]);
+    const groceries = pool.find((c) => c.problem === "overspending on groceries")!;
+    assert.deepEqual(groceries.evidence.map((e) => e.url), ["https://reddit.com/g1", "https://reddit.com/g2"]);
+    assert.equal(groceries.matchingSignals, 2);
+    assert.equal(groceries.marketSignals, 4);
+    const rent = pool.find((c) => c.problem === "rent takes the whole budget")!;
+    assert.deepEqual(rent.evidence.map((e) => e.url), ["https://reddit.com/r1", "https://reddit.com/r2"]);
+  });
+
+  await t.test("a candidate with no sourced evidence row is dropped, not saved", async () => {
+    const market: OpportunityMarketInput = {
+      id: "m-src",
+      name: "Money",
+      demandScore: 50,
+      confidence: 0.5,
+      signals: [
+        sig("ok", "couples", "overspending on groceries", [1, 0]),
+        sig("nosrc", "students", "rent takes the whole budget", [0, 1], { source_id: null }),
+        sig("bare", "freelancers", "irregular income", [0.7, -0.7], { url: null, content: null }),
+      ],
+    };
+    const res = await generate25Opportunities([market]);
+    assert.deepEqual(res.opportunities.map((o) => o.problem), ["overspending on groceries"]);
+    assert.equal(res.droppedUnsourced, 2);
+    for (const o of res.opportunities) assert.doesNotThrow(() => enforceRule1_OpportunityEvidence(o, o.evidence));
+  });
+
+  await t.test("signal type follows the signal: pain_point only when a problem was extracted", () => {
+    assert.equal(evidenceSignalType({ source_type: "reddit", analysis: { problem: "rent is too high" } }), "pain_point");
+    assert.equal(evidenceSignalType({ source_type: "gtrends", analysis: null }), "gtrends");
+    assert.equal(evidenceSignalType({ source_type: "web", analysis: { problem: "  " } }), "web");
+    assert.equal(evidenceSignalType({}), "general");
+  });
+
+  await t.test("distinctEvidenceSets: a second problem on the same set falls back to its own signals, a third is dropped", () => {
+    const base = generateCandidatePool([tight]);
+    const same = { evidenceSignalIds: base[0].evidenceSignalIds, ownSignalIds: base[0].ownSignalIds };
+    const second = { ...base[0], id: "second", problem: "a second problem", ...same };
+    const third = { ...base[0], id: "third", problem: "a third problem", ...same };
+    const out = distinctEvidenceSets([base[0], second, third], new Map([[tight.id, 5]]));
+    assert.deepEqual(out.map((c) => c.id), [base[0].id, "second"]);
+    assert.deepEqual(out[1].evidenceSignalIds, ["a1", "a2"]);
+    assert.equal(out[1].evidence.length, 2);
   });
 });
 

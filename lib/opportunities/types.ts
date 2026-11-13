@@ -35,6 +35,8 @@ export interface OpportunitySignalInput {
   content: string | null;
   url: string | null;
   published_at?: string | null;
+  /** Stored `signal_analysis.embedding`; ranks a market's signals against one opportunity (Part 6.8). */
+  embedding?: number[] | null;
   analysis?: {
     audience?: string | null;
     problem?: string | null;
@@ -76,6 +78,15 @@ export interface GeneratedOpportunity {
   opportunityScore: number;
   confidence: number;
   evidence: EvidenceInput[];
+  /**
+   * How many of the market's signals speak about this problem, out of `marketSignals` (QC Rule 4).
+   * For a quick-idea candidate: the phrase rows behind the idea, with `marketSignals` null.
+   */
+  matchingSignals: number;
+  marketSignals: number | null;
+  /** Signal behind each evidence row, same order; and the ones the candidate was built from. */
+  evidenceSignalIds?: string[];
+  ownSignalIds?: string[];
 }
 
 export interface OpportunityRow {
