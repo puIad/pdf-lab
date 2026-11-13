@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResearchCompleteness } from "./types.ts";
-import { isDemandOnly } from "../sources/demand-only.ts";
+import { isDemandOnly, isListing } from "../sources/demand-only.ts";
 
 export interface CompletenessRawCounts {
   sourcesCovered: number;
@@ -90,9 +90,13 @@ export async function fetchRunCompleteness(
     }>;
   }>).flatMap((l) => one(l.signals) ?? []);
   // Every source that answered counts as covered; only discussion rows count as signals to analyze
-  // (demand-only rows are never extracted, so they would read as permanently unanalyzed).
+  // (demand-only rows and marketplace listings are never extracted, so they would read as
+  // permanently unanalyzed).
   const distinctSources = new Set(allRows.map((s) => s.source_id)).size;
-  const signalRows = allRows.filter((s) => !isDemandOnly({ source_type: one(s.sources)?.type, external_id: s.external_id }));
+  const signalRows = allRows.filter((s) => {
+    const row = { source_type: one(s.sources)?.type, external_id: s.external_id };
+    return !isDemandOnly(row) && !isListing(row);
+  });
   const analyzedCount = signalRows.filter((s) => one(s.signal_analysis)).length;
 
   const [{ data: markets }, { data: opps }] = await Promise.all([
@@ -116,13 +120,23 @@ export async function fetchRunCompleteness(
     ).size;
   }
 
-  return calculateCompleteness({
-    sourcesCovered: distinctSources,
-    signalsCollected: signalRows.length,
-    signalsAnalyzed: analyzedCount,
-    marketsIdentified: marketIds.length,
-    opportunitiesGenerated: oppIds.length,
-    evidenceCount,
-    evidenceBackedOpportunitiesCount,
-  });
+  // Analysed rows without an embedding never reached a cluster.
+  const { count: unembedded } = await supabase
+    .from("run_signals")
+    .select("signals!inner ( signal_analysis!inner ( id ) )", { count: "exact", head: true })
+    .eq("run_id", runId)
+    .is("signals.signal_analysis.embedding", null);
+
+  return {
+    ...calculateCompleteness({
+      sourcesCovered: distinctSources,
+      signalsCollected: signalRows.length,
+      signalsAnalyzed: analyzedCount,
+      marketsIdentified: marketIds.length,
+      opportunitiesGenerated: oppIds.length,
+      evidenceCount,
+      evidenceBackedOpportunitiesCount,
+    }),
+    signalsUnembedded: unembedded ?? 0,
+  };
 }

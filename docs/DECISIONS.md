@@ -404,5 +404,10 @@ patch the affected guide/phase file (link the follow-up commit).
 - Question for user: "gpt-oss-20b on NVIDIA has stopped answering. Switch extraction to
   minimax-m3.1-flash (closest results, flaky), nemotron-3.5-bolt-e4b (fast, different
   ratings), or wait?"
+- Added 2026-11-13 (Part 6.9, batched extraction, 30 stored signals, read-only):
+  `nvidia/nemotron-3.5-bolt-e4b` single calls 30 calls / 96 s / 30 of 30; batches of 10: 3 calls /
+  77 s / 30 of 30, agreeing with its own single calls on 70 % of intents. Batches of 5 agreed on
+  44 %, so the spread is the model's own noise. `minimaxai/minimax-m3.1-flash` answered 6 of 30
+  single and 10 of 30 batched (NVIDIA timeouts, then OpenRouter HTTP 429): batching did not make it
+  usable, which weakens the earlier recommendation of (c). What works today is (b), or (d).
 - Resolution: _open_
-

@@ -169,7 +169,7 @@ export async function POST(req: Request) {
   // 3. Upsert one analysis row per SUCCEEDED signal (failures: no row, reported).
   if (job.successes.length > 0) {
     const { error } = await supabase.from("signal_analysis").upsert(
-      job.successes.map((s) => ({ signal_id: s.signalId, ...s.analysis, embedding: null })),
+      job.successes.map((s) => ({ signal_id: s.signalId, ...s.analysis, embedding: null, prompt_version: job.promptVersion })),
       { onConflict: "signal_id" },
     );
     if (error) return NextResponse.json({ error: `analysis upsert failed: ${error.message}` }, { status: 500 });
@@ -184,6 +184,7 @@ export async function POST(req: Request) {
       total: job.total,
       succeeded: job.succeeded,
       failed: job.failed,
+      calls: job.calls,
       cost: job.cost,
     }),
   );
@@ -195,6 +196,7 @@ export async function POST(req: Request) {
     upserted: job.successes.length,
     failed: job.failed,
     failures: job.failures,
+    calls: job.calls,
     cost: job.cost,
     costLog: job.costLog,
   });

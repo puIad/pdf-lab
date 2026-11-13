@@ -32,6 +32,8 @@ export interface ResearchCompleteness {
   evidenceCount: number;
   evidenceBackedOpportunitiesCount: number;
   completenessPercentage: number;
+  /** Analysed signals with no stored embedding: the clusterer skipped them (Part 6.9). */
+  signalsUnembedded?: number;
 }
 
 export interface ResearchRunRecord {

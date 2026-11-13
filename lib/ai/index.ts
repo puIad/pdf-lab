@@ -39,6 +39,8 @@ export {
   URGENCY_VALUES,
   buildExtractionUserText,
   runExtractionJob,
+  validateBatchExtraction,
+  DEFAULT_BATCH_SIZE,
   validateExtraction,
 } from "./extraction.ts";
 export type {
