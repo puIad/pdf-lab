@@ -50,7 +50,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
     .from("opportunities")
     .select(`
       id, market_id, title, target_audience, problem, solution, format,
-      price_range, opportunity_score, confidence, created_at,
+      price_range, opportunity_score, confidence, created_at, matching_signals, market_signal_count,
       markets (
         id, name, trend, demand_score, pdf_fit_score
       )
@@ -186,6 +186,15 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
             </div>
             <div>Opportunity Score: <span className="font-bold text-foreground font-mono">{score} / 100</span></div>
             <div>Direct Citations: <span className="font-bold text-foreground font-mono">{directEvidence.length} verified rows</span></div>
+            {opp.matching_signals != null && opp.market_signal_count != null && (
+              <div>
+                Demand:{" "}
+                <span className="font-bold text-foreground font-mono">
+                  {opp.matching_signals} of {opp.market_signal_count}
+                </span>{" "}
+                discussions in this market mention this problem
+              </div>
+            )}
           </div>
         </div>
 

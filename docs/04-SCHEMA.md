@@ -99,6 +99,8 @@ create table opportunities (
   format text,                 -- checklist|guide|planner|workbook|template|...
   price_range text,
   opportunity_score float,
+  matching_signals int,        -- market signals that match this problem (Part 6.8); null = not counted
+  market_signal_count int,     -- of this many signals in the market at generation time
   confidence float not null,   -- REQUIRED, PRD §16: never show score without it
   created_at timestamptz not null default now()
 );

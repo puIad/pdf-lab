@@ -12,12 +12,13 @@ import {
   enforceRule3_CompetitionObserved,
   enforceRule4_DemandCounts,
   enforceRule5_SeparationOfConcerns,
+  sourcedEvidenceCount,
 } from "../evidence/qc.ts";
 import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 import { marketForCompetitor } from "../competition/map.ts";
 import { isDemandOnly } from "../sources/demand-only.ts";
 import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
-import { observedPriceRange } from "../opportunities/generator.ts";
+import { evidenceSignalType, observedPriceRange } from "../opportunities/generator.ts";
 import { OPPORTUNITY_TARGET } from "../opportunities/types.ts";
 
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -101,6 +102,9 @@ export interface OrchestratorOpportunityItem {
   priceRange?: string | null;
   opportunityScore: number;
   confidence: number;
+  /** Signals of the market that match this problem, of `marketSignals` (QC Rule 4, Part 6.8). */
+  matchingSignals?: number | null;
+  marketSignals?: number | null;
 }
 export interface OrchestratorCompetitorItem {
   /** The stored listing row this competitor was read from. */
@@ -266,7 +270,7 @@ export async function executeResearchRun(
           claim: `Market "${saved.name}" evidenced by discussion: ${sig.title || "signal"}`,
           excerpt: sig.content ? sig.content.slice(0, 300) : null,
           url: sig.url,
-          signalType: "pain_point",
+          signalType: evidenceSignalType(sig),
           confidence: candidate.confidence,
         });
       }
@@ -423,12 +427,20 @@ export async function executeResearchRun(
     const validOpportunitiesToSave: OrchestratorOpportunityItem[] = [];
     const oppEvidenceToSave: EvidenceInput[] = [];
 
+    let droppedUnsourced = 0;
     for (const pair of generatedPairs) {
-      // Enforce QC Rule 1: No opportunity without evidence!
+      // QC Rule 1: an opportunity with no sourced evidence row is dropped, not saved (Part 6.8).
+      if (sourcedEvidenceCount(pair.opportunity.id, pair.evidence) === 0) {
+        droppedUnsourced++;
+        continue;
+      }
       enforceRule1_OpportunityEvidence(pair.opportunity, pair.evidence);
 
-      // Enforce QC Rule 4: Demand must cite signal counts
-      enforceRule4_DemandCounts(pair.opportunity.title, pair.evidence.length);
+      // QC Rule 4: demand cites the signals that match this opportunity's problem, not its row count.
+      enforceRule4_DemandCounts(
+        pair.opportunity.title,
+        pair.opportunity.matchingSignals ?? sourcedEvidenceCount(pair.opportunity.id, pair.evidence),
+      );
 
       // Enforce QC Rule 5: Separation of concerns
       enforceRule5_SeparationOfConcerns({
@@ -462,6 +474,7 @@ export async function executeResearchRun(
       counts: {
         opportunities: savedOppsCount,
         opportunitiesFromIdeas: fromIdeas,
+        opportunitiesDroppedUnsourced: droppedUnsourced,
         evidenceCreated: totalEvidenceCreated,
       },
       message:

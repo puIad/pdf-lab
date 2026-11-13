@@ -21,6 +21,8 @@ export type {
 
 export {
   computeDiversificationStats,
+  distinctEvidenceSets,
+  evidenceSignalType,
   generate25Opportunities,
   generateCandidatePool,
   observedPriceRange,
