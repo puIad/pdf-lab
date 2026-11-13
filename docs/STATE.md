@@ -85,7 +85,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 | 6.10 | Deep runs as a background job | blocked | — | Waits on DEC-001 (job provider) and a measured post-6.9 run duration. [log](log/part-6.10.md) |
 | 6.11 | Score honesty + calibration from stored competition checks | pending | — | Demand independent of the fetch limit, intent over analysed signals, calibration from stored competition checks. [log](log/part-6.11.md) |
 | 6.12 | Ideas-first home + shared navigation | pending | — | Ideas-first home and one shared header. [log](log/part-6.12.md) |
-| 6.13 | Lighter process docs | in_progress | — | STATE notes moved to docs/log, open-defects table added. The megalibrary path waits on DEC-016. [log](log/part-6.13.md) |
+| 6.13 | Lighter process docs | blocked | 12e791c | STATE notes moved to docs/log, open-defects table added. The megalibrary path waits on DEC-016. [log](log/part-6.13.md) |
 | 6.14 | Report pages: remove hard-coded PC copy and invented values | done | 878caea | Report pages show stored values or "Not observed"; panel counts equal the stored rows. [log](log/part-6.14.md) |
 
 Order after DEC-014: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10, with 6.13 and 6.14 any time.
