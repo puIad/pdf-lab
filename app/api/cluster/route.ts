@@ -246,7 +246,6 @@ export async function POST(req: Request) {
         description: `Audience: ${cluster.audience ?? "Not observed"}. Evidenced by ${cluster.frequency} signals. Primary problem: ${cluster.language[0] || cluster.name}`,
         trend: cluster.trend,
         demand_score: cluster.scoring.factors.demand,
-        competition_score: cluster.scoring.factors.competitiveDensity,
         pdf_fit_score: Math.round(cluster.scoring.factors.pdfSuitability * 100),
         confidence: cluster.scoring.confidence,
       })

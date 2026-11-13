@@ -86,6 +86,7 @@ export async function clusterSignals(
     const summarized = await summarizeCluster(id, cluster.signals, cluster.centroid, {
       router: opts.router,
       tier: "cheap",
+      totalSignals: rawClusters.reduce((n, c) => n + c.signals.length, 0),
     });
     out.push(summarized);
   }

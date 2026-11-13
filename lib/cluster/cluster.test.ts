@@ -162,3 +162,32 @@ describe("summarizeCluster without a model (Part 6.4)", () => {
   });
 });
 
+
+describe("cluster trend comes from observed Trends rows (Part 6.11)", () => {
+  const row = (id: string, sourceType: string, engagement: Record<string, unknown> | null): ClusterSignal => ({
+    id,
+    sourceType,
+    title: `budget ${id}`,
+    content: null,
+    url: null,
+    publishedAt: null,
+    analysis: { audience: "households", problem: "cannot stick to a budget", intent: "strong", urgency: "medium", pdf_relevance: 0.7 },
+    embedding: [1, 0],
+    engagement,
+  });
+  const trendOf = async (signals: ClusterSignal[]) => (await summarizeCluster("c1", signals, [1, 0])).trend;
+
+  it("no Trends row is unknown, not stable", async () => {
+    assert.equal(await trendOf([row("a", "reddit", { upvotes: 10 }), row("b", "web", { position: 1 })]), "unknown");
+  });
+
+  it("a Trends row without a direction is stable; it no longer means accelerating", async () => {
+    assert.equal(await trendOf([row("a", "reddit", null), row("g", "gtrends", { interest_value: 40, rising: false })]), "stable");
+  });
+
+  it("a rising related query or a rising interest summary is accelerating; falling is declining", async () => {
+    assert.equal(await trendOf([row("g", "gtrends", { interest_value: 300, rising: true })]), "accelerating");
+    assert.equal(await trendOf([row("g", "gtrends", { avg_interest: 50, direction: "rising" })]), "accelerating");
+    assert.equal(await trendOf([row("g", "gtrends", { avg_interest: 50, direction: "falling" })]), "declining");
+  });
+});

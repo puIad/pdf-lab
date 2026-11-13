@@ -233,16 +233,21 @@ export default async function MarketPage(props: MarketPageProps) {
           <Card>
             <CardHeader className="pb-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Market Demand</span>
+                <span className="text-xs font-medium text-muted-foreground">Observed Signals</span>
                 <BarChart3 className="size-4 text-primary" />
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-1.5">
-              <div className="text-2xl font-bold tracking-tight">{demandScore} / 100</div>
+              {/* Raw counts first, the index second and labeled (Part 6.11) */}
+              <div className="text-2xl font-bold tracking-tight">{observed.totalSignals}</div>
+              <span className="text-[11px] text-muted-foreground">
+                {observed.analysedSignals} analysed of {observed.totalSignals}, from {observed.sources.length}{" "}
+                {observed.sources.length === 1 ? "source" : "sources"}
+              </span>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div className="h-full bg-primary" style={{ width: `${demandScore}%` }} />
               </div>
-              <span className="text-[11px] text-muted-foreground">Based on {signalsList.length} observed signals</span>
+              <span className="text-[11px] text-muted-foreground">Demand index (rule-based): {demandScore} / 100</span>
             </CardContent>
           </Card>
 

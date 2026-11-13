@@ -280,8 +280,9 @@ describe("card ticks (Part 3.8)", () => {
 
   it("competition stays blank until a check has run (QC Rule 3)", () => {
     assert.equal(ideaTicks(plan).at(-1)!.status, "blank");
-    assert.equal(ideaTicks(plan, { listings: 30, reviewed: 10 }).at(-1)!.status, "pass");
-    assert.equal(ideaTicks(plan, { listings: 30, reviewed: 11 }).at(-1)!.status, "fail");
+    assert.equal(ideaTicks(plan, { listings: 30, reviewed: TICK_THRESHOLDS.reviewedMax }).at(-1)!.status, "pass");
+    assert.equal(ideaTicks(plan, { listings: 30, reviewed: TICK_THRESHOLDS.reviewedMax + 1 }).at(-1)!.status, "fail");
+    assert.equal(TICK_THRESHOLDS.reviewedMax, 5); // the calibration sample's median (Part 6.11)
     assert.equal(ideaTicks(plan, { listings: 30, reviewed: 4 }).at(-1)!.count, "4 of 30 listings show reviews");
   });
 

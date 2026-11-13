@@ -78,6 +78,8 @@ export interface StoredSignalForRun {
   source_type: string;
   external_id?: string | null;
   published_at?: string | null;
+  /** Stored `signals.engagement`; scoring reads its named keys (Part 6.11). */
+  engagement?: Record<string, unknown> | null;
   analysis?: {
     id: string;
     audience: string;

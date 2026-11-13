@@ -175,7 +175,7 @@ export function ExplorerTable({
                 {renderSortHeader("name", "Market")}
               </TableHead>
               <TableHead className="w-[150px] py-3">
-                {renderSortHeader("demand_score", "Demand")}
+                {renderSortHeader("demand_score", "Demand index")}
               </TableHead>
               <TableHead className="w-[140px] py-3">
                 {renderSortHeader("trend", "Trend")}

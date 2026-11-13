@@ -39,8 +39,26 @@ INPUT niche → 50 candidate problems → search web+Reddit each → collect evi
 ## Opportunity score (PRD §16) — concept formula + storage rule
 
 ```text
-score = Demand × TrendMomentum × ProblemFrequency × BuyerIntent × PDFSuitability ÷ CompetitiveDensity
+score = Demand × TrendMomentum × ProblemFrequency × BuyerIntent × PDFSuitability
 ```
+
+Part 6.11 (`lib/scoring/scoring.ts`): the score is a rule-based index, not a measurement.
+
+- **Demand (0..100)** comes from four observed quantities that do not grow with the fetch limit:
+  the median reactions of a discussion (only the engagement keys named per source in
+  `lib/sources/engagement.ts`), the highest Google Trends interest among the market's Trends rows,
+  the share of question phrasings, and the number of source types (capped at 3). Weights 35 / 35 /
+  15 / 15. Engagement and Trends are left out when not observed, never counted as zero.
+- **ProblemFrequency** is the market's share of the run's clustered signals (1.0 at 25 %).
+- **BuyerIntent** is the mean over analysed signals only, reported with "n analysed of m". No
+  analysed signal means intent is not observed and the score is 0.
+- **TrendMomentum** uses a trend read from observed Trends rows (rising, falling, present, or
+  none = unknown) and validated under QC Rule 2 before it is stored.
+- **CompetitiveDensity was removed.** It was never fed and always 1. Competition is shown as raw
+  stored listing counts (DEC-010), not folded into the score.
+- UI order: the raw counts first, the index second and labeled as rule-based.
+- Weights and thresholds are `shortcut:` guesses until calibrated; see
+  `docs/research/2026-11-13-score-calibration.md`.
 
 - Never display as pseudo-science: ALWAYS store/show the triple
   `{ opportunity_score, confidence (0..1), evidence_count }`.

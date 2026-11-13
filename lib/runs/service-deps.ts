@@ -144,6 +144,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
           content: s.content,
           url: s.url,
           publishedAt: s.published_at,
+          engagement: s.engagement ?? null,
           analysis: {
             audience: s.analysis!.audience,
             problem: s.analysis!.problem,
