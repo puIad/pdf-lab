@@ -38,6 +38,8 @@ export interface DetectTrendInput {
 
 const DAY_MS = 86_400_000;
 const EPSILON = 2.0;
+// Fewer dated signals than this cannot carry a trend claim (QC Rule 2): classification stays "unknown".
+export const MIN_TREND_SIGNALS = 3;
 
 function toTimestamp(d: string | Date | number): number {
   if (typeof d === "number") return d;
@@ -175,7 +177,7 @@ export function detectTopicTrend(input: DetectTrendInput): TopicTrendAnalysis {
 
   // 11. Trend Classification
   let classification: TrendClassification = "unknown";
-  if (input.signals.length < 3 || confidence < 0.25) {
+  if (input.signals.length < MIN_TREND_SIGNALS || confidence < 0.25) {
     classification = "unknown";
   } else if (seasonality.isSeasonal && wowDeltaPercent >= 15) {
     classification = "seasonal";

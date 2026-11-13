@@ -8,7 +8,7 @@ import type {
   TimeWindow,
   TopicTrendAnalysis,
 } from "./types.ts";
-import { detectTopicTrend, type SignalRecord } from "./detector.ts";
+import { detectTopicTrend, MIN_TREND_SIGNALS, type SignalRecord } from "./detector.ts";
 import { buildRadarSnapshot } from "./radar-calculator.ts";
 import { predictUpcomingSeasonalSurges } from "./seasonality.ts";
 
@@ -18,6 +18,12 @@ export interface MarketTopicData {
   category: string;
   signals: SignalRecord[];
   competitorCount: number;
+}
+
+/** Empty-state line for a radar with no classifiable market: the stored counts, never a sample. */
+export function thinRadarMessage(topics: MarketTopicData[]): string {
+  const signals = topics.reduce((n, t) => n + t.signals.length, 0);
+  return `${signals} dated ${signals === 1 ? "signal is" : "signals are"} stored across ${topics.length} ${topics.length === 1 ? "market" : "markets"}. A market needs at least ${MIN_TREND_SIGNALS} dated signals before the radar shows a trend.`;
 }
 
 export class TrendingRadarService {
@@ -79,6 +85,11 @@ export class TrendingRadarService {
 
     // Sort by momentum score descending
     return analyses.sort((a, b) => b.momentumScore - a.momentumScore);
+  }
+
+  /** False when every topic is "unknown": too few dated signals to plot a radar (QC Rule 2). */
+  hasTrend(): boolean {
+    return this.getAnalyzedTopics().some((a) => a.classification !== "unknown");
   }
 
   /**

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadStoredMarketTopics } from "./load.ts";
+import { getTrendingRadarService, loadStoredMarketTopics } from "./load.ts";
+import { TrendingRadarService, thinRadarMessage } from "./service.ts";
 
 const DAY = 86_400_000;
 const iso = (d: number) => new Date(Date.now() - d * DAY).toISOString();
@@ -39,4 +40,31 @@ test("loads only dated discussion rows and drops markets with none", async () =>
 
 test("no stored markets gives no topics", async () => {
   assert.deepEqual(await loadStoredMarketTopics(fakeSupabase({})), []);
+});
+
+test("radar topics are stored market ids, and a market with one dated signal has trend unknown", async () => {
+  const many = ["a", "b", "c", "d", "e"].map((id) => ({ market_id: "m2", ...sig(id) }));
+  const radar = await getTrendingRadarService(
+    fakeSupabase({
+      markets: [{ id: "m1", name: "A" }, { id: "m2", name: "B" }, { id: "m3", name: "C" }],
+      market_signals: [{ market_id: "m1", ...sig("only") }, ...many],
+    }),
+  );
+  const topics = radar.getAnalyzedTopics();
+  assert.deepEqual(topics.map((t) => t.marketId).sort(), ["m1", "m2"]);
+  assert.equal(topics.find((t) => t.marketId === "m1")?.classification, "unknown");
+  assert.notEqual(topics.find((t) => t.marketId === "m2")?.classification, "unknown");
+});
+
+test("thin data: no trend to plot, and the empty state states the stored counts", async () => {
+  const topics = await loadStoredMarketTopics(
+    fakeSupabase({
+      markets: [{ id: "m1", name: "A" }, { id: "m2", name: "B" }],
+      market_signals: [{ market_id: "m1", ...sig("x") }, { market_id: "m2", ...sig("y") }, { market_id: "m2", ...sig("z") }],
+    }),
+  );
+  assert.equal(new TrendingRadarService(topics).hasTrend(), false);
+  assert.match(thinRadarMessage(topics), /^3 dated signals are stored across 2 markets\. A market needs at least 3 /);
+  assert.equal(new TrendingRadarService([]).hasTrend(), false);
+  assert.match(thinRadarMessage([]), /^0 dated signals are stored across 0 markets/);
 });
