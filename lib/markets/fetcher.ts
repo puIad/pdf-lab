@@ -61,10 +61,8 @@ export async function fetchMarketsData(
   }
 
   const allMarkets = marketsData ?? [];
-  const completedRuns = await listCompletedRuns(supabase);
-  const latest = new Set(completedRuns.filter((r) => r.latest).map((r) => r.id));
-  const runsWithMarkets = new Set(allMarkets.map((m) => m.run_id as string | null).filter(Boolean));
-  const runs = completedRuns.filter((r) => runsWithMarkets.has(r.id));
+  const runs = await listCompletedRuns(supabase);
+  const latest = new Set(runs.filter((r) => r.latest).map((r) => r.id));
   const legacyCount = allMarkets.filter((m) => !m.run_id).length;
 
   const rawMarkets = allMarkets.filter((m) => {

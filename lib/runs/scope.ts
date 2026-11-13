@@ -14,17 +14,22 @@ export interface CompletedRun {
 
 export const seedKey = (query: string): string => query.trim().toLowerCase();
 
-/** Completed Deep runs, newest first. */
+/**
+ * Completed Deep runs that saved at least one market, newest first. A run that completed with no
+ * market (extraction failed, or it predates run scoping) is not listed: it must not replace the
+ * last good run of its seed.
+ */
 export async function listCompletedRuns(supabase: SupabaseClient): Promise<CompletedRun[]> {
   const { data, error } = await supabase
     .from("research_runs")
-    .select("id, query, completed_at, started_at")
+    .select("id, query, completed_at, started_at, markets ( id )")
     .eq("mode", "deep")
     .eq("status", "completed")
     .order("started_at", { ascending: false });
   if (error) throw new Error(`Failed to list runs: ${error.message}`);
   const seen = new Set<string>();
-  return (data ?? []).map((r) => {
+  const withMarkets = (data ?? []).filter((r) => Array.isArray(r.markets) && r.markets.length > 0);
+  return withMarkets.map((r) => {
     const key = seedKey(r.query as string);
     const latest = !seen.has(key);
     seen.add(key);
