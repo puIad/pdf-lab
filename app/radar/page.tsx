@@ -8,7 +8,8 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadarContainer } from "@/components/radar/radar-container";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { getTrendingRadarService } from "@/lib/trends/load";
+import { loadStoredMarketTopics } from "@/lib/trends/load";
+import { TrendingRadarService, thinRadarMessage } from "@/lib/trends/service";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +21,20 @@ export const metadata = {
 
 export default async function RadarPage() {
   // Stored markets + dated signals only. Nothing stored (or the DB unreachable) shows an honest empty state.
-  let radar: Awaited<ReturnType<typeof getTrendingRadarService>> | null = null;
+  let radar: TrendingRadarService | null = null;
   let loadError: string | null = null;
+  let thinMessage = "";
   try {
-    radar = await getTrendingRadarService(createServiceSupabaseClient());
+    const topics = await loadStoredMarketTopics(createServiceSupabaseClient());
+    thinMessage = thinRadarMessage(topics);
+    radar = new TrendingRadarService(topics);
   } catch (err) {
     loadError = err instanceof Error ? err.message : String(err);
   }
-  const snapshots = radar?.getFourWindowSnapshots();
+  // Thin data (every node would read "unknown") gets the empty state with the stored counts.
+  const hasData = radar?.hasTrend() ?? false;
+  const snapshots = hasData ? radar?.getFourWindowSnapshots() : undefined;
   const upcomingSeasonal = radar?.getUpcomingSeasonalSurges() ?? [];
-  const hasData = !!snapshots && snapshots["12m"].summary.totalTopics > 0;
 
   return (
     <main className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6 lg:px-8">
@@ -68,7 +73,7 @@ export default async function RadarPage() {
             <p className="text-sm text-muted-foreground max-w-xl mx-auto">
               {loadError
                 ? `The stored signals could not be read (${loadError}). No sample data is shown.`
-                : "The radar only plots markets that have dated signals stored in the database. None qualify yet. Run a research or an ingest, then come back."}
+                : `${thinMessage} Run a research or an ingest, then come back.`}
             </p>
           </section>
         )}
