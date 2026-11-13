@@ -257,7 +257,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         extraCandidates: stored ? ideaCandidates(seed, stored.result.ideas, marketInputs, stored.refs) : [],
       });
 
-      return res.opportunities.map((opp) => ({
+      const pairs = res.opportunities.map((opp) => ({
         opportunity: {
           id: opp.id,
           marketId: opp.marketId,
@@ -274,6 +274,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
         },
         evidence: opp.evidence,
       }));
+      return Object.assign(pairs, { droppedUnsourced: res.droppedUnsourced });
     },
 
     saveOpportunities: async (opportunities, runId) => {

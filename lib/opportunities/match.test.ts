@@ -2,7 +2,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { matchSignals, MAX_EVIDENCE_SIGNALS } from "./match.ts";
+import { matchSignals, MAX_EVIDENCE_SIGNALS, MIN_TOKEN_MATCH, problemOverlap } from "./match.ts";
 import type { OpportunitySignalInput } from "./types.ts";
 
 const sig = (id: string, problem: string, embedding?: number[]): OpportunitySignalInput => ({
@@ -42,3 +42,16 @@ test("keeps at most five signals but counts every match", () => {
   assert.equal(match.signals[0].id, "own");
   assert.equal(match.matchCount, 9);
 });
+
+test("a long post title does not hide a problem stated word for word (PR #13 review)", () => {
+  const longTitle = {
+    ...sig("long", "overspending on groceries"),
+    title: "We sat down last night after the kids went to bed and went through three months of bank statements line by line",
+  };
+  assert.equal(problemOverlap("overspending on groceries", longTitle), 1);
+  // A paraphrase sharing half of the problem's words still matches; an unrelated signal does not.
+  assert.ok(problemOverlap("rent takes the whole budget", sig("p", "the budget goes to rent every month")) >= MIN_TOKEN_MATCH);
+  assert.ok(problemOverlap("rent takes the whole budget", sig("u", "weekly grocery bill too high")) < MIN_TOKEN_MATCH);
+  assert.equal(problemOverlap("", longTitle), 0);
+});
+

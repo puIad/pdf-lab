@@ -1,15 +1,15 @@
 // lib/opportunities/match.ts — which of a market's signals back one opportunity (Part 6.8).
 // An opportunity cites the discussions that talk about ITS problem, not the market's first rows.
 
-import { jaccard, tokens } from "../ideas/ideas.ts";
+import { tokens } from "../ideas/ideas.ts";
 import type { OpportunitySignalInput } from "./types.ts";
 
 export const MAX_EVIDENCE_SIGNALS = 5;
 // shortcut: both thresholds are first guesses, tune them against hand-checked runs.
 /** Cosine similarity to the centroid of the candidate's own signals. */
 export const MIN_EMBEDDING_MATCH = 0.8;
-/** Share of content words in common, used when a signal has no embedding. */
-export const MIN_TOKEN_MATCH = 0.2;
+/** Share of the problem's content words found in a signal, used when a signal has no embedding. */
+export const MIN_TOKEN_MATCH = 0.5;
 
 export interface SignalMatch {
   /** Best matches, own signals first, at most MAX_EVIDENCE_SIGNALS. */
@@ -39,9 +39,14 @@ function centroid(vectors: number[][]): number[] {
 
 const signalText = (s: OpportunitySignalInput): string => `${s.analysis?.problem ?? ""} ${s.title ?? ""}`;
 
-/** Token overlap between a problem statement and one signal. */
+/**
+ * Share of the problem's own content words that appear in the signal (its stored problem + title).
+ * Containment, not jaccard: a long post title must not push a word-for-word problem under the bar.
+ */
 export function problemOverlap(problem: string, signal: OpportunitySignalInput): number {
-  return jaccard(tokens(problem), tokens(signalText(signal)));
+  const words = [...new Set(tokens(problem))];
+  const hay = new Set(tokens(signalText(signal)));
+  return words.length ? words.filter((t) => hay.has(t)).length / words.length : 0;
 }
 
 /**

@@ -364,6 +364,7 @@ test("Evidence belongs to the opportunity (Part 6.8)", async (t) => {
     };
     const res = await generate25Opportunities([market]);
     assert.deepEqual(res.opportunities.map((o) => o.problem), ["overspending on groceries"]);
+    assert.equal(res.droppedUnsourced, 2);
     for (const o of res.opportunities) assert.doesNotThrow(() => enforceRule1_OpportunityEvidence(o, o.evidence));
   });
 
