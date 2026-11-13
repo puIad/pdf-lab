@@ -324,18 +324,19 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
     };
     const saved: string[] = [];
     const { deps } = createMockOrchestratorDeps({
-      generateOpportunities: async () => [
+      // The generator reports what it removed itself (4 here); the loop adds what still slips through.
+      generateOpportunities: async () => Object.assign([
         { opportunity: hallucinated, evidence: [] }, // no evidence at all
         {
           // one row, but it names no source: "directly addresses market cluster" used to pass
           opportunity: { ...hallucinated, id: "opp-sourceless", title: "Source-less" },
-          evidence: [{ entityType: "opportunity", entityId: "opp-sourceless", claim: "directly addresses market cluster" }],
+          evidence: [{ entityType: "opportunity" as const, entityId: "opp-sourceless", claim: "directly addresses market cluster" }],
         },
         {
           opportunity: { ...hallucinated, id: "opp-real", title: "Backed", matchingSignals: 7, marketSignals: 31 },
-          evidence: [{ entityType: "opportunity", entityId: "opp-real", sourceId: "src-reddit", claim: "c", excerpt: "quote", url: "https://reddit.com/1" }],
+          evidence: [{ entityType: "opportunity" as const, entityId: "opp-real", sourceId: "src-reddit", claim: "c", excerpt: "quote", url: "https://reddit.com/1" }],
         },
-      ],
+      ], { droppedUnsourced: 4 }),
       saveOpportunities: async (items) => {
         saved.push(...items.map((i) => i.id));
         return items.map((i) => ({ id: i.id, title: i.title }));
@@ -347,7 +348,7 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
     assert.equal(result.status, "completed", result.error ?? "");
     assert.deepEqual(saved, ["opp-real"]);
     const report = result.trace.find((t) => t.state === "report_generation");
-    assert.equal(report?.counts?.opportunitiesDroppedUnsourced, 2);
+    assert.equal(report?.counts?.opportunitiesDroppedUnsourced, 6);
   });
 
   it("QC Rule 4: an opportunity whose problem matches no signal fails the run (Part 6.8)", async () => {

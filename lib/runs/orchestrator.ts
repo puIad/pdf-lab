@@ -155,10 +155,11 @@ export interface OrchestratorDeps {
   saveMarkets: (markets: OrchestratorMarketItem[], runId: string) => Promise<Array<{ id: string; name: string }>>;
   saveEvidence: (items: EvidenceInput[]) => Promise<EvidenceRow[]>;
   /** `seed`: the stored quick ideas of this seed join the candidate pool (Part 3.8). */
+  /** The array may carry `droppedUnsourced`: candidates the generator removed for lacking sourced evidence. */
   generateOpportunities: (markets: OrchestratorMarketItem[], seed: string) => Promise<Array<{
     opportunity: OrchestratorOpportunityItem;
     evidence: EvidenceInput[];
-  }>>;
+  }> & { droppedUnsourced?: number }>;
   saveOpportunities: (items: OrchestratorOpportunityItem[], runId: string) => Promise<Array<{ id: string; title: string }>>;
   observeCompetition: (signals: StoredSignalForRun[]) => Promise<OrchestratorCompetitorItem[]>;
   saveCompetitors?: (competitors: Array<{
@@ -427,7 +428,7 @@ export async function executeResearchRun(
     const validOpportunitiesToSave: OrchestratorOpportunityItem[] = [];
     const oppEvidenceToSave: EvidenceInput[] = [];
 
-    let droppedUnsourced = 0;
+    let droppedUnsourced = generatedPairs.droppedUnsourced ?? 0;
     for (const pair of generatedPairs) {
       // QC Rule 1: an opportunity with no sourced evidence row is dropped, not saved (Part 6.8).
       if (sourcedEvidenceCount(pair.opportunity.id, pair.evidence) === 0) {

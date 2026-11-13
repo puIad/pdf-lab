@@ -44,6 +44,8 @@ export interface GenerationResult {
   opportunities: GeneratedOpportunity[];
   diversification: DiversificationStats;
   totalCandidatesGenerated: number;
+  /** Candidates removed before selection because no evidence row had a source and a url or excerpt. */
+  droppedUnsourced: number;
 }
 
 function normalizeKey(str: string): string {
@@ -378,10 +380,8 @@ export async function generate25Opportunities(
 
   // A candidate without a sourced evidence row is dropped here, not saved (QC Rule 1, Part 6.8),
   // and no two different problems may cite the identical signal set.
-  const candidatePool = distinctEvidenceSets(
-    deduped.filter((c) => sourcedEvidenceCount(c.id, c.evidence) > 0),
-    new Map(markets.map((m) => [m.id, m.signals.length])),
-  );
+  const sourced = deduped.filter((c) => sourcedEvidenceCount(c.id, c.evidence) > 0);
+  const candidatePool = distinctEvidenceSets(sourced, new Map(markets.map((m) => [m.id, m.signals.length])));
 
   // Step 2: Select a diversified set of at most targetCount
   const finalOpportunities = selectDiversifiedOpportunities(candidatePool, targetCount);
@@ -414,6 +414,7 @@ export async function generate25Opportunities(
     opportunities: finalOpportunities,
     diversification,
     totalCandidatesGenerated: candidatePool.length,
+    droppedUnsourced: deduped.length - sourced.length,
   };
 }
 
