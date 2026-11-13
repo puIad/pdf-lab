@@ -13,7 +13,8 @@ export interface FactsInterpretationSuggestionProps {
     sampleExcerpts: Array<{ quote: string; source?: string | null; url?: string | null }>;
   };
   interpretation: {
-    demandScore: number;
+    /** Stored score, or null when none is stored ("Not observed"). */
+    demandScore: number | null;
     trendLabel: string;
     urgency: string;
     confidence: number;
@@ -58,12 +59,12 @@ export function FactsInterpretationSuggestion({
           </CardHeader>
           <CardContent className="flex flex-col gap-2.5 text-xs text-foreground">
             <div className="flex justify-between border-b border-sky-200/40 dark:border-sky-800/40 pb-1.5">
-              <span className="text-muted-foreground">Observed Signals:</span>
-              <span className="font-semibold">{facts.signalsCount} discussions</span>
+              <span className="text-muted-foreground">Evidence rows:</span>
+              <span className="font-semibold">{facts.signalsCount}</span>
             </div>
             <div className="flex justify-between border-b border-sky-200/40 dark:border-sky-800/40 pb-1.5">
-              <span className="text-muted-foreground">Sources Monitored:</span>
-              <span className="font-semibold">{facts.sourcesCount} platform{facts.sourcesCount === 1 ? "" : "s"}</span>
+              <span className="text-muted-foreground">Sources cited:</span>
+              <span className="font-semibold">{facts.sourcesCount}</span>
             </div>
 
             {facts.sampleExcerpts.length > 0 && (
@@ -88,8 +89,10 @@ export function FactsInterpretationSuggestion({
           </CardHeader>
           <CardContent className="flex flex-col gap-2.5 text-xs text-foreground">
             <div className="flex justify-between border-b border-amber-200/40 dark:border-amber-800/40 pb-1.5">
-              <span className="text-muted-foreground">Demand Calculation:</span>
-              <span className="font-semibold">{interpretation.demandScore} / 100</span>
+              <span className="text-muted-foreground">Score (rule-based index):</span>
+              <span className="font-semibold">
+                {interpretation.demandScore === null ? "Not observed" : `${interpretation.demandScore} / 100`}
+              </span>
             </div>
             <div className="flex justify-between border-b border-amber-200/40 dark:border-amber-800/40 pb-1.5">
               <span className="text-muted-foreground">Trend Velocity:</span>

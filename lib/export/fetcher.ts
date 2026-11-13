@@ -9,6 +9,7 @@ import type {
   ExportEvidenceItem,
 } from "./types.ts";
 import { fetchRunCompleteness, calculateCompleteness } from "../runs/completeness.ts";
+import { marketCompletenessCounts, NOT_OBSERVED, observeMarket, type ReportSignal } from "../report/observed.ts";
 import { parsePrice } from "../sources/marketplace-helper.ts";
 import {
   mineReviewsAndGaps,
@@ -74,7 +75,8 @@ export async function fetchReportExportData(
       signal_id, relevance,
       signals (
         id, title, content, url, published_at,
-        sources ( type, name )
+        sources ( type, name ),
+        signal_analysis ( audience, problem, urgency, pdf_relevance )
       )
     `)
     .eq("market_id", targetMarketId);
@@ -128,19 +130,19 @@ export async function fetchReportExportData(
   // Map opportunities to ExportOpportunity
   const exportOpportunities: ExportOpportunity[] = opportunitiesList.map((opp) => {
     const oppEvidence = evidenceMap.get(opp.id) || [];
-    // If no direct evidence on opp, check if market evidence applies
-    const finalEvidence = oppEvidence.length > 0 ? oppEvidence : (evidenceMap.get(targetMarketId!) || []);
+    // Only the opportunity's own rows: its market's evidence is not evidence for it (Part 6.14).
+    const finalEvidence = oppEvidence;
     return {
       id: opp.id,
       marketId: opp.market_id,
       title: opp.title,
-      targetAudience: opp.target_audience || "Not observed",
-      problem: opp.problem || "Technical issue",
-      solution: opp.solution || "Step-by-step resolution",
-      format: opp.format || "guide",
-      priceRange: opp.price_range || "Not observed",
-      opportunityScore: Math.round(opp.opportunity_score || 70),
-      confidence: opp.confidence ?? 0.75,
+      targetAudience: opp.target_audience || NOT_OBSERVED,
+      problem: opp.problem || NOT_OBSERVED,
+      solution: opp.solution || NOT_OBSERVED,
+      format: opp.format || NOT_OBSERVED,
+      priceRange: opp.price_range || NOT_OBSERVED,
+      opportunityScore: Math.round(opp.opportunity_score ?? 0),
+      confidence: opp.confidence,
       evidenceCount: finalEvidence.length,
       evidence: finalEvidence,
     };
@@ -216,34 +218,16 @@ export async function fetchReportExportData(
     }
   }
 
-  // 8. Completeness calculation
-  const totalEvidenceCount = exportOpportunities.reduce((acc, o) => acc + o.evidence.length, 0);
-  const backedCount = exportOpportunities.filter((o) => o.evidence.length > 0).length;
+  // 8. Completeness: the run's own counts when the market belongs to a run, else this market's
+  // stored rows. No floors: a thin market reads as thin (Part 6.14).
+  const marketCounts = marketCompletenessCounts({
+    observations: observeMarket(rawSignals as ReportSignal[]),
+    opportunityIds: oppIds,
+    evidence: (evRows ?? []).map((e) => ({ entity_type: e.entity_type as string, entity_id: e.entity_id as string })),
+  });
+  const runComp = scopedRunId ? await fetchRunCompleteness(supabase, scopedRunId).catch(() => null) : null;
+  const completeness = runComp ?? calculateCompleteness(marketCounts);
 
-  const baseCompleteness = {
-    sourcesCovered: 3,
-    signalsCollected: Math.max(25, rawSignals.length),
-    signalsAnalyzed: Math.max(25, rawSignals.length),
-    marketsIdentified: 14,
-    opportunitiesGenerated: exportOpportunities.length,
-    evidenceCount: totalEvidenceCount,
-    evidenceBackedOpportunitiesCount: backedCount,
-  };
-
-  try {
-    // Legacy markets have no run to recount against.
-    const runComp = scopedRunId ? await fetchRunCompleteness(supabase, scopedRunId) : null;
-    if (runComp && runComp.signalsCollected > 0) {
-      baseCompleteness.sourcesCovered = Math.max(runComp.sourcesCovered, baseCompleteness.sourcesCovered);
-      baseCompleteness.signalsCollected = Math.max(runComp.signalsCollected, baseCompleteness.signalsCollected);
-      baseCompleteness.signalsAnalyzed = Math.max(runComp.signalsAnalyzed, baseCompleteness.signalsAnalyzed);
-      baseCompleteness.marketsIdentified = Math.max(runComp.marketsIdentified, baseCompleteness.marketsIdentified);
-    }
-  } catch {
-    // Graceful fallback to observed counts
-  }
-
-  const completeness = calculateCompleteness(baseCompleteness);
 
   return {
     version: "1.0",
@@ -253,11 +237,11 @@ export async function fetchReportExportData(
       id: marketData.id,
       name: marketData.name,
       description: marketData.description,
-      trend: marketData.trend || "stable",
-      demandScore: marketData.demand_score || 50,
-      competitionScore: marketData.competition_score || 30,
-      pdfFitScore: marketData.pdf_fit_score || 75,
-      confidence: marketData.confidence ?? 0.75,
+      trend: marketData.trend || "unknown",
+      demandScore: marketData.demand_score ?? null,
+      competitionScore: marketData.competition_score ?? null,
+      pdfFitScore: marketData.pdf_fit_score ?? null,
+      confidence: marketData.confidence ?? null,
       createdAt: marketData.created_at,
     },
     completeness,

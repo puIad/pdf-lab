@@ -34,6 +34,13 @@ export const MIN_ANALYZED_SHARE = 0.5;
 function discussionsOnly<T extends { source_type: string; external_id?: string | null }>(rows: T[]): T[] {
   return rows.filter((s) => !isDemandOnly(s) && !isListing(s));
 }
+/** QC Rule 2: a trend other than "unknown" needs at least 2 dated observations. */
+function validatedTrend(market: { trend: string; signals: StoredSignalForRun[] }): { trend: string; temporalCount: number } {
+  const temporalCount = market.signals.filter((s) => s.published_at || s.source_type === "gtrends").length;
+  const proposed = temporalCount < 2 ? "unknown" : market.trend || "unknown";
+  return { trend: enforceRule2_TrendTemporalEvidence(proposed, temporalCount), temporalCount };
+}
+
 function withTimeout<T>(p: Promise<T>, label: string, ms = STEP_TIMEOUT_MS): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -282,6 +289,8 @@ export async function executeResearchRun(
     const marketCandidates = await withTimeout(deps.clusterAndScore(freshSignals), "clusterAndScore");
     // The clusterer skips a signal with no embedding; say how many (clusterAndScore fills them in place).
     const unembedded = freshSignals.filter((s) => s.analysis && !s.analysis.embedding?.length).length;
+    // Validate before saving: the stored trend is the checked one, never the summarizer's guess.
+    for (const market of marketCandidates) market.trend = validatedTrend(market).trend;
     const savedMarkets = await deps.saveMarkets(marketCandidates, runId);
 
     // Write evidence for each market from its supporting signals
@@ -321,24 +330,17 @@ export async function executeResearchRun(
 
     const trendEvidenceItems: EvidenceInput[] = [];
     for (const market of marketCandidates) {
-      // Evaluate temporal evidence
-      const temporalSignals = market.signals.filter((s) => s.published_at || s.source_type === "gtrends");
-      const proposedTrend = temporalSignals.length < 2 ? "unknown" : (market.trend || "unknown");
-      const validatedTrend = enforceRule2_TrendTemporalEvidence(
-        proposedTrend,
-        temporalSignals.length,
-      );
-      market.trend = validatedTrend;
+      const { trend: validatedTrendLabel, temporalCount } = validatedTrend(market);
 
       trendEvidenceItems.push({
         entityType: "trend",
         entityId: market.id,
         claim:
-          validatedTrend === "unknown"
-            ? `Trend classified as "unknown" due to insufficient temporal history (${temporalSignals.length} observations, requires >= 2 per PRD §53/§54)`
-            : `Trend verified as "${validatedTrend}" supported by ${temporalSignals.length} temporal data points`,
+          validatedTrendLabel === "unknown"
+            ? `Trend classified as "unknown" due to insufficient temporal history (${temporalCount} observations, requires >= 2 per PRD §53/§54)`
+            : `Trend verified as "${validatedTrendLabel}" supported by ${temporalCount} temporal data points`,
         signalType: "trend_signal",
-        confidence: validatedTrend === "unknown" ? 0.25 : market.confidence,
+        confidence: validatedTrendLabel === "unknown" ? 0.25 : market.confidence,
       });
     }
 

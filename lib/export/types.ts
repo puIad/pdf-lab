@@ -56,10 +56,11 @@ export interface ExportMarket {
   name: string;
   description: string | null;
   trend: string;
-  demandScore: number;
-  competitionScore: number;
-  pdfFitScore: number;
-  confidence: number;
+  /** Stored scores; null = not stored ("Not observed"), never a default. */
+  demandScore: number | null;
+  competitionScore: number | null;
+  pdfFitScore: number | null;
+  confidence: number | null;
   createdAt: string;
 }
 
