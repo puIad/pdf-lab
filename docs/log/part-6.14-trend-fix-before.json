@@ -1,0 +1,250 @@
+[
+ {
+  "id": "edf939f7-8cf9-490e-9a6b-abb122238511",
+  "name": "Standing Desk PC Cable Faults",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "6f5fa2a7-e7d3-4a05-9645-b0218b2bf145",
+  "name": "Intermittent Motherboard Lights and Slow Wi-Fi",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "bc16186d-c6ed-4dea-b82d-7cdef7b4e0ba",
+  "name": "PC Gaming Performance Bottleneck Diagnosis",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "4ca31003-d476-41e1-924b-229f86153d16",
+  "name": "Overlooked Basic PC Power Controls",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "ff1ae851-f0dc-47ab-a795-6f01f5c8e64d",
+  "name": "Mac Troubleshooting for PC Technicians",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "de18ea7d-51ca-458c-88cb-88280c71d131",
+  "name": "PC Overheating Diagnosis and Cooling",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "54bd84b7-e7fc-4068-afbd-1e10c7de4f67",
+  "name": "First PC Build No Display",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "46b2072c-694d-414d-bd28-927c4084c4cf",
+  "name": "Dropped Desktop No-Display Recovery",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "0cf4e33a-a9be-413b-aba2-19228c67d821",
+  "name": "Windows Troubleshooter Repair Toolkit",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "2a68dec5-d72a-4577-8519-0e1fa1752aa5",
+  "name": "General PC Troubleshooting and Builds",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "ed170051-b08d-455a-969f-c2883ad79fea",
+  "name": "Windows users troubleshooting program compatibility Troubleshooting",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "0fd661e2-8734-4e54-b323-92d0d644fc87",
+  "name": "Display & GPU Diagnostic Issues",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "4ffbf702-98cb-44b4-b5aa-80fbb1a8c863",
+  "name": "Windows PC users seeking troubleshooting support Troubleshooting",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "274961a6-43c4-4339-a527-fc9a1bf7b805",
+  "name": "Gaming & System Performance Optimization",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "18802a73-472b-4e9f-81f0-748e493aa4d8",
+  "name": "Display & GPU Diagnostic Issues",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "95724800-2892-4b7d-a5c5-5cac3be96156",
+  "name": "Windows PC users seeking troubleshooting support Troubleshooting",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "01e8d531-66a7-4560-af61-b2fde2ce7421",
+  "name": "Gaming & System Performance Optimization",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "5d789e5b-716e-4489-9529-0a9039b0039a",
+  "name": "Specific Problem Family Name",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "1e1e8cc2-6f92-4b6b-a8fd-9e3458d95fbc",
+  "name": "people interested in personal finance Troubleshooting",
+  "from": "accelerating",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "a30aab54-43fa-4ed2-8f43-23bba38958dc",
+  "name": "individuals seeking to create or improve a personal budget Troubleshooting",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "d7ccbb7e-137a-48a1-bf1d-288f553d2af6",
+  "name": "people seeking to create or improve a personal budget Troubleshooting",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "81455f69-7a22-4c1a-bc4a-7827a357eccd",
+  "name": "Specific Problem Family Name",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "c43e1560-318f-46a7-a6cb-68b9d958a44b",
+  "name": "Budget & Savings Mastery",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "c8a9bc43-e789-4b24-9e79-1366ad8dc897",
+  "name": "Budgeting Habit Value",
+  "from": "accelerating",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "9573ea8d-1fcf-4d9e-932a-4cde9d9b2ce0",
+  "name": "Budget Tracking & Optimization",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "5d972c19-32b8-44fc-9f23-4860ab5c9c3c",
+  "name": "Online DWP Budgeting Loan Guide",
+  "from": "accelerating",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "d51cf074-9b2a-427c-8fd5-e1d88552e562",
+  "name": "Student Aid Budget Mastery",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "1d563973-97af-4d14-bca8-ccf7386115ae",
+  "name": "Budget Myth Busters",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "704fc088-e7d0-405f-a33f-5020bb3ae4fb",
+  "name": "Budgeting Strategy Application",
+  "from": "stable",
+  "to": "unknown",
+  "temporal": 0,
+  "signals": 1
+ },
+ {
+  "id": "745ce6f3-c82d-482b-ac40-32bf32bbcca7",
+  "name": "Budget Adherence Factors",
+  "from": "accelerating",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ },
+ {
+  "id": "dc9e918f-88c7-4676-ac17-44f7aab04f18",
+  "name": "Budgeting for Low & Irregular Income",
+  "from": "accelerating",
+  "to": "unknown",
+  "temporal": 1,
+  "signals": 1
+ }
+]
