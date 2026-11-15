@@ -73,6 +73,6 @@ decision request (see `01-PHILOSOPHY.md` §4) instead of guessing.
 3. **Problem stops work.** Unknown API shape, dead library, cost surprise, PRD ambiguity →
    decision request in `DECISIONS.md`, work halts on that part until answered.
 4. **STATE.md is updated in the same turn work finishes.** An unlogged completion didn't happen.
-5. **Frontend AI Mega Library.** ALWAYS and ONLY use components, UI primitives, and directing
-   prompts from `C:\Users\pulad\Desktop\frontend-ai-megalibrary` for all frontend development,
-   UI design, styling, and page components.
+5. **Frontend from `components/ui`.** Build all frontend, UI design, styling and page components
+   from the UI primitives in `components/ui` (taken from the frontend megalibrary in Part 3.1; the
+   library folder is gone, DEC-016). Add a primitive there before reaching for another source.

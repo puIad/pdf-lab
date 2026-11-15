@@ -16,8 +16,8 @@ Every task, in this order:
 Rules: evidence before synthesis; adapters own source code; problems halt into
 `docs/DECISIONS.md`; one part = one commit (`phase-<N>-part-<M>: <summary>`).
 Frontend rule: build all frontend, UI design, styling, and page components in this project
-from the components, UI primitives, and directing prompts in
-`C:\Users\pulad\Desktop\frontend-ai-megalibrary`, not from other sources.
+from the UI primitives in `components/ui` (taken from the frontend megalibrary in Part 3.1; the
+library folder itself is gone, DEC-016). Add a primitive there before reaching for another source.
 
 Docs freshness: `docs/03-STACK.md` + `docs/guides/*` are plans, not build-time truth —
 re-verify via Context7 (resolve library ID, then query-docs) AND the canonical doc links

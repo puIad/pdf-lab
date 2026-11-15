@@ -21,3 +21,10 @@ DEC-014. Includes the missing megalibrary path (decision request)
 - Task 4: the megalibrary folder is still missing. DEC-016 asks where it lives; the path in
   `AGENTS.md` and `00-START-HERE.md` is unchanged until answered.
 - Checks: docs only; 316/316 tests, lint and typecheck unchanged from 6.14.
+
+## 2026-11-14: task 4 answered, part done
+
+DEC-016 resolved: the library folder is gone and the frontend rule points at `components/ui`
+(`AGENTS.md`, `00-START-HERE.md` rule 5). PRs #13 to #17 were merged on the user's word without a
+review run (the review action failed to start on each).
+

@@ -85,7 +85,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 | 6.10 | Deep runs as a background job | blocked | — | Waits on DEC-001 (job provider) and a measured post-6.9 run duration. [log](log/part-6.10.md) |
 | 6.11 | Score honesty + calibration from stored competition checks | done | 2ff8833 | Demand no longer grows with the fetch limit, intent averages analysed signals, competition tick recut from 30 stored checks. [log](log/part-6.11.md) |
 | 6.12 | Ideas-first home + shared navigation | pending | — | Ideas-first home and one shared header. [log](log/part-6.12.md) |
-| 6.13 | Lighter process docs | blocked | 12e791c | STATE notes moved to docs/log, open-defects table added. The megalibrary path waits on DEC-016. [log](log/part-6.13.md) |
+| 6.13 | Lighter process docs | done | 12e791c | STATE notes moved to docs/log, open-defects table added. Frontend rule now points at components/ui (DEC-016). [log](log/part-6.13.md) |
 | 6.14 | Report pages: remove hard-coded PC copy and invented values | done | 878caea | Report pages show stored values or "Not observed"; panel counts equal the stored rows. [log](log/part-6.14.md) |
 
 Order after DEC-014: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10, with 6.13 and 6.14 any time.
@@ -104,16 +104,15 @@ Known defects and their owner. A fixed defect leaves this table (its story stays
 | Most stored budgeting "discussions" are Trends related-query rows; stored markets keep scores from the old formula | 6.8, 6.11 | unowned (a new run rewrites them) |
 | Home page is the explorer over old markets; no shared navigation | DEC-014 | 6.12 |
 | Explorer header buttons overflow by 223 px at 375 px | 6.7 | 6.12 |
-| `frontend-ai-megalibrary` path in `AGENTS.md` is missing on this machine | 3.10 | DEC-016 (user) |
 | Production Reddit needs its own app id | 1.1 | DEC-005 (external approval) |
 | Vercel project not connected to the repo for auto-deploys | 0.3 | unowned (user, dashboard) |
-| Stored legacy markets keep an unvalidated trend (e.g. "accelerating" beside evidence saying "unknown") | 6.14 | unowned (data fix needs the user's yes) |
 | Outline headings can repeat a theme ("why X is important" / "why X matters") | 3.6, 3.10 | unowned |
 | Trends related queries bring off-topic ideas into a scan | 3.9 | unowned |
 | Validate's competitor count can include listings stored by competition checks | 3.9 | unowned |
 | `classifyFormat` reads "plan" as planner and defaults to guide | 6.4 | unowned |
 | `observeCompetition` keeps only a run's first 10 listings | 6.7 | unowned |
 | Radar plots `unknown` nodes; the client filter refetch can show an all-unknown radar | 6.6 | unowned |
+| 12 stored markets read "accelerating" from the old any-Trends-row rule (they pass QC Rule 2, but no rising row was checked) | 6.11 | unowned (a new run rewrites them) |
 | Quality panel lines R2 to R5 are fixed statements; completeness gives 15 points to any market page | 6.14 | unowned |
 | Editing an adapter under `next dev` throws "SourceAdapter already registered" until restart | 3.9 | unowned (dev only) |
 | The `claude / review` GitHub action fails to start on some pushes (PR #13) | 6.8 | unowned (user, CI) |

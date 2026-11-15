@@ -427,5 +427,6 @@ patch the affected guide/phase file (link the follow-up commit).
 - Recommendation: (b) unless the folder still exists somewhere, because (a) and (c) need it.
 - Question for user: "The frontend megalibrary folder is missing. Has it moved (new path?), or
   should the rule point at `components/ui` instead?"
-- Resolution: _open_
+- Resolution: _resolved 2026-11-14_ — user: "components/ui (Recommended)", option (b). `AGENTS.md`
+  and `00-START-HERE.md` rule 5 now point at `components/ui`. Part 6.13 is done; 6.12 can start.
 
