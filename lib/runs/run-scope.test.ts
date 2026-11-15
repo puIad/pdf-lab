@@ -51,6 +51,19 @@ describe("marketForCompetitor", () => {
     assert.equal(marketForCompetitor({ title: "Budgeting" }, markets, "budgeting"), null);
     assert.equal(marketForCompetitor({ title: "Debt tracker" }, [], "budgeting"), null);
   });
+
+  // Part 6.16, from the 2026-11-15 live run on "home workout": the no-equipment printables went to
+  // the videos market, whose one long snippet shared two words with them.
+  it("a title holding a market's whole name goes there, the longest name first", () => {
+    const run: CompetitorMarket[] = [
+      { id: "m-videos", name: "Follow-along workout videos", signalIds: [], texts: ["free full length home fitness workouts that are easy to follow and need no equipment, exercise sessions"] },
+      { id: "m-noeq", name: "No equipment home workouts", signalIds: [], texts: ["a home workout that needs no equipment"] },
+      { id: "m-gear", name: "Home workout equipment", signalIds: [], texts: ["equipment to work out at home"] },
+    ];
+    assert.equal(marketForCompetitor({ title: "Beginner Home Workout Printable, No Equipment Exercise" }, run, "home workout"), "m-noeq");
+    assert.equal(marketForCompetitor({ title: "Home Workout Equipment Buying Guide" }, run, "home workout"), "m-gear");
+    assert.equal(marketForCompetitor({ title: "Ultimate Home Workout Guide" }, run, "home workout"), null); // seed and product words only
+  });
 });
 
 describe("isStoreUrl", () => {
