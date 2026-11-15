@@ -371,3 +371,29 @@ Recommended order: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1 (auth, pulled ahead o
      `AGENTS.md` and `00-START-HERE.md`. Refresh the stale status block.
 - Acceptance: `STATE.md` is under 150 lines; no text was lost (line counts of moved notes
   recorded); every observation has an owner or is listed as unowned.
+
+## Part 6.15 — Deep runs analysed by a pasted model reply
+
+- Deps: 6.7, 6.9 (code done). Touches: `lib/runs/orchestrator.ts`, `lib/runs/service-deps.ts`,
+  `lib/runs/completeness.ts`, new `lib/runs/pasted.ts` and `lib/runs/pasted-run.ts`, new
+  `app/api/deep/*` and `app/deep/*`, `components/markets-table/deep-research-dialog.tsx`,
+  `app/ideas/ideas-view.tsx`, new `components/ui/textarea.tsx`. Added 2026-11-14 because of
+  DEC-015.
+- Findings:
+  1. No chat model answers through the router (DEC-015), so extraction fails and no Deep run
+     completes.
+  2. The Deep research dialog and the button on `/ideas` post without a key and always get 401.
+- Tasks:
+  1. Split the run in two requests. The first collects signals, stops in `classifying` and
+     returns one prompt made of stored signal text only. The second takes the pasted reply.
+  2. Validate the reply item by item with the extraction validator. Wrong and missing items are
+     listed, never guessed. Under `MIN_ANALYZED_SHARE` valid: store nothing, keep waiting.
+  3. The reply names each signal's market; group by that name instead of embeddings. A signal
+     the model marks `none` joins no market. Scoring, trend, competition, opportunities and the
+     report are the same code as a model run; the generator gets no router.
+  4. A `/deep` page with the three steps; the run id in the URL so a reload keeps the run.
+     Point both Deep research buttons at it.
+- Acceptance: a live run on a real seed completes with no model call from PDF Lab; the page's
+  counts equal a recount of the stored rows; an unrelated signal becomes no market; a truncated
+  reply stores nothing; the one-request model run still passes its tests; 0 px overflow at
+  375 px.

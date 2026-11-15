@@ -450,26 +450,6 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("all");
   const [sort, setSort] = useState<"opportunity" | "demand" | "az">("opportunity");
   const [shown, setShown] = useState(24);
-  const [deep, setDeep] = useState<{ loading: boolean; runId: string | null; error: string | null }>({ loading: false, runId: null, error: null });
-
-  // Deep run on the seed: its stored quick ideas join the opportunity candidate pool (Part 3.8).
-  async function deepResearch(s: string) {
-    setDeep({ loading: true, runId: null, error: null });
-    try {
-      const res = await fetch("/api/research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: s, mode: "deep" }),
-      });
-      const body = (await res.json()) as { runId?: string; error?: string };
-      if (res.status === 401) setDeep({ loading: false, runId: null, error: "Deep research needs the internal API key until Phase 5 auth lands (POST /api/research with x-api-key)." });
-      else if (!res.ok) setDeep({ loading: false, runId: body.runId ?? null, error: body.error ?? `Deep run failed (${res.status})` });
-      else setDeep({ loading: false, runId: body.runId ?? null, error: null });
-    } catch (err) {
-      setDeep({ loading: false, runId: null, error: err instanceof Error ? err.message : "Request failed" });
-    }
-  }
-
   async function scan(value: string, where: RegionCode = region) {
     const s = value.trim();
     if (s.length < 2 || loading) return;
@@ -655,28 +635,14 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
                     CSV
                   </Button>
                 )}
-                <Button
-                  size="xs"
-                  variant="outline"
-                  className="cursor-pointer"
-                  disabled={deep.loading}
-                  title="Full pipeline on this seed; its top quick ideas join the opportunity candidates. Takes a few minutes."
-                  onClick={() => deepResearch(data.seed)}
-                >
-                  {deep.loading ? <Loader2 className="animate-spin" /> : <Microscope />}
-                  {deep.loading ? "Deep research running…" : "Deep research"}
-                </Button>
+                {/* Deep research runs on its own page: the analysis is a pasted model reply (Part 6.15). */}
+                <Link href={`/deep?seed=${encodeURIComponent(data.seed)}`}>
+                  <Button size="xs" variant="outline" className="cursor-pointer" title="Collect this seed's signals and have a chat model analyse them; its top quick ideas join the opportunity candidates.">
+                    <Microscope />
+                    Deep research
+                  </Button>
+                </Link>
               </div>
-              {deep.runId && !deep.error && (
-                <p className="text-xs">
-                  Deep run finished:{" "}
-                  <Link href="/" className="underline underline-offset-2">
-                    its opportunities are in the explorer
-                  </Link>{" "}
-                  <span className="font-mono text-muted-foreground">({deep.runId.slice(0, 8)})</span>
-                </p>
-              )}
-              {deep.error && <p className="text-xs text-rose-600 dark:text-rose-400">{deep.error}</p>}
               {data.topic.length ? (
                 data.topic.map((t) => (
                   <p key={t.evidence.source_id} className="text-xs text-muted-foreground">

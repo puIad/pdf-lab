@@ -120,7 +120,7 @@ export function validateExtraction(raw: unknown): ExtractionResult {
   };
 }
 
-const FIELD_RULES = `- "audience": who has this problem (short noun phrase, as the text itself describes them). Max 200 chars.
+export const FIELD_RULES = `- "audience": who has this problem (short noun phrase, as the text itself describes them). Max 200 chars.
 - "problem": the SPECIFIC problem evidenced IN THE TEXT (one sentence, concrete, no generic filler). Max 500 chars.
 - "intent": buyer-intent ladder —
   - "weak": browsing, curiosity, venting, memes, general discussion; no action or solution language.
@@ -130,7 +130,7 @@ const FIELD_RULES = `- "audience": who has this problem (short noun phrase, as t
 - "urgency": "low" (no time pressure) | "medium" (wants it resolved soon, recurring annoyance) | "high" (blocked, deadline, data loss, can't work).
 - "pdf_relevance": 0..1 — how well a STATIC PDF (checklist, guide, planner, template, workbook, cheat-sheet, tracker) could solve this. Score HIGH for procedural/learnable problems; score LOW for physical repair, realtime/interactive needs, human services, or complex software.`;
 
-const GROUNDING_RULE = `Rules: use ONLY the provided text — never invent details, never restate the task. If the text is thin, say what IS evidenced and choose weak/low with pdf_relevance near 0.`;
+export const GROUNDING_RULE = `Rules: use ONLY the provided text — never invent details, never restate the task. If the text is thin, say what IS evidenced and choose weak/low with pdf_relevance near 0.`;
 
 const SYSTEM_PROMPT = `You analyze ONE stored market-research signal (a forum post, search trend, or article snippet) for a PDF-product research engine.
 

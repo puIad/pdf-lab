@@ -57,9 +57,10 @@ decision request (see `01-PHILOSOPHY.md` §4) instead of guessing.
 
 ## Status in one glance
 
-- Refreshed 2026-11-13. The app is built through Phase 3 and most of Phase 6 hardening: quick
+- Refreshed 2026-11-15. The app is built through Phase 3 and most of Phase 6 hardening: quick
   ideas → Validate → competition check → brief works end to end; Deep runs are run-scoped,
-  batched and evidence-matched but none completes until a chat model is chosen (DEC-015).
+  batched and evidence-matched. They complete through a pasted model reply on `/deep` (Part 6.15);
+  through the router none completes until a chat model is chosen (DEC-015).
 - MVP cut line: **PRD §51–§52** — niche in → up to 25 opportunities, limited by evidence, plus
   the market / trend / pain / competition / evidence report, at near-zero cost per run.
 - Current position: see `STATE.md`, never this block. If `STATE.md` says an earlier dependency is

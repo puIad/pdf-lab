@@ -3,7 +3,7 @@
 // QUEUED -> COLLECTING -> NORMALIZING -> CLASSIFYING -> CLUSTERING -> TREND_ANALYSIS
 //   -> COMPETITION_ANALYSIS -> OPPORTUNITY_GENERATION -> REPORT_GENERATION -> COMPLETED
 
-import type { LifecycleState, ResearchCompleteness, RunSummary } from "./types.ts";
+import type { LifecycleState, LifecycleTraceStep, ResearchCompleteness, RunSummary } from "./types.ts";
 import { LifecycleTracker } from "./lifecycle.ts";
 import type { EvidenceInput, EvidenceRow } from "../evidence/types.ts";
 import {
@@ -31,7 +31,7 @@ export const MIN_ANALYZED_SHARE = 0.5;
 
 // Demand measurements and marketplace listings are not discussions: they must not go through
 // extraction or clustering, or become market evidence. Listings feed competition analysis instead.
-function discussionsOnly<T extends { source_type: string; external_id?: string | null }>(rows: T[]): T[] {
+export function discussionsOnly<T extends { source_type: string; external_id?: string | null }>(rows: T[]): T[] {
   return rows.filter((s) => !isDemandOnly(s) && !isListing(s));
 }
 /** QC Rule 2: a trend other than "unknown" needs at least 2 dated observations. */
@@ -191,16 +191,24 @@ export interface OrchestratorDeps {
   fetchCompleteness: (runId: string) => Promise<ResearchCompleteness>;
 }
 
-export async function executeResearchRun(
-  options: ResearchRunOptions,
-  deps: OrchestratorDeps,
-): Promise<RunSummary> {
+/** What every phase of one run needs to know about it. */
+export interface RunFrame {
+  runId: string;
+  query: string;
+  mode: string;
+  startedAt: string;
+  /** The seed as the user typed it; its stored quick ideas join the candidate pool. */
+  seed: string;
+}
+
+type ExtractionCounts = { failed: number; calls?: number };
+
+async function openRun(options: ResearchRunOptions, deps: OrchestratorDeps): Promise<{ frame: RunFrame; tracker: LifecycleTracker }> {
   const query = options.query?.trim();
   if (!query) {
     throw new Error("Research run requires a non-empty query");
   }
   const mode = options.mode || "deep";
-  const limit = options.limit || 25;
 
   // 1. QUEUED
   const runRecord = await deps.createRun({
@@ -210,55 +218,119 @@ export async function executeResearchRun(
     promptVersion: options.promptVersion,
     plan: options.plan,
   });
-  const runId = runRecord.id;
-  const tracker = new LifecycleTracker("queued", `Research run queued for "${query}"`);
+  return {
+    frame: { runId: runRecord.id, query, mode, startedAt: runRecord.started_at, seed: options.seed?.trim() || query },
+    tracker: new LifecycleTracker("queued", `Research run queued for "${query}"`),
+  };
+}
 
+/** States collecting → normalizing → classifying. Returns the run's discussion signals. */
+async function collectSignals(
+  frame: RunFrame,
+  options: ResearchRunOptions,
+  deps: OrchestratorDeps,
+  tracker: LifecycleTracker,
+  classifyingMessage: string,
+) {
+  const { runId, query } = frame;
+
+  // 2. COLLECTING
+  tracker.transition("collecting", { message: `Collecting signals from adapters for "${query}"` });
+  await deps.updateRunStatus(runId, "collecting");
+  const ingestResult = await withTimeout(deps.ingest({
+    runId,
+    query,
+    limit: options.limit || 25,
+    sourceKeys: options.sourceKeys,
+  }), "ingest");
+
+  // 3. NORMALIZING
+  tracker.transition("normalizing", {
+    counts: {
+      collected: ingestResult.collected,
+      normalized: ingestResult.normalized,
+      inserted: ingestResult.inserted,
+    },
+    message: `Normalized ${ingestResult.normalized} signals across ${ingestResult.sources.length} sources`,
+  });
+  await deps.updateRunStatus(runId, "normalizing");
+
+  const signals = discussionsOnly(await deps.getSignals(runId));
+
+  // 4. CLASSIFYING
+  tracker.transition("classifying", {
+    counts: { signalsAvailable: signals.length },
+    message: classifyingMessage,
+  });
+  await deps.updateRunStatus(runId, "classifying");
+  return { signals, ingestResult };
+}
+
+/** Marks the run failed and builds its summary. */
+async function failRun(
+  frame: RunFrame,
+  deps: OrchestratorDeps,
+  tracker: LifecycleTracker,
+  err: unknown,
+  evidenceCreated: number,
+): Promise<RunSummary> {
+  const { runId, query, mode } = frame;
+  const errorMsg = err instanceof Error ? err.message : String(err);
+  if (tracker.getCurrentState() !== "failed") {
+    tracker.transition("failed", { message: errorMsg });
+  }
+  await deps.updateRunStatus(runId, "failed");
+
+  const completeness = await deps
+    .fetchCompleteness(runId)
+    .catch(() => ({
+      sourcesCovered: 0,
+      signalsCollected: 0,
+      signalsAnalyzed: 0,
+      marketsIdentified: 0,
+      opportunitiesGenerated: 0,
+      evidenceCount: evidenceCreated,
+      evidenceBackedOpportunitiesCount: 0,
+      completenessPercentage: 0,
+    }));
+
+  return {
+    runId,
+    query,
+    mode,
+    status: "failed",
+    startedAt: frame.startedAt,
+    completedAt: null,
+    error: errorMsg,
+    trace: tracker.getTrace(),
+    completeness,
+    counts: {
+      sources: completeness.sourcesCovered,
+      signalsCollected: completeness.signalsCollected,
+      signalsAnalyzed: completeness.signalsAnalyzed,
+      marketsCreated: completeness.marketsIdentified,
+      opportunitiesCreated: completeness.opportunitiesGenerated,
+      evidenceCount: evidenceCreated,
+    },
+  };
+}
+
+/**
+ * Everything after classification: the analysed-share gate, clustering, trend, competition,
+ * opportunities, report. Reads the run's signals from the DB, so it also finishes a run whose
+ * analyses arrived in a later request (a pasted reply, Part 6.15).
+ */
+async function finishRun(
+  frame: RunFrame,
+  deps: OrchestratorDeps,
+  tracker: LifecycleTracker,
+  extraction: ExtractionCounts,
+): Promise<RunSummary> {
+  const { runId, query, mode } = frame;
   let totalEvidenceCreated = 0;
   const allCreatedEvidence: EvidenceRow[] = [];
 
   try {
-    // 2. COLLECTING
-    tracker.transition("collecting", { message: `Collecting signals from adapters for "${query}"` });
-    await deps.updateRunStatus(runId, "collecting");
-    const ingestResult = await withTimeout(deps.ingest({
-      runId,
-      query,
-      limit,
-      sourceKeys: options.sourceKeys,
-    }), "ingest");
-
-    // 3. NORMALIZING
-    tracker.transition("normalizing", {
-      counts: {
-        collected: ingestResult.collected,
-        normalized: ingestResult.normalized,
-        inserted: ingestResult.inserted,
-      },
-      message: `Normalized ${ingestResult.normalized} signals across ${ingestResult.sources.length} sources`,
-    });
-    await deps.updateRunStatus(runId, "normalizing");
-
-    const signals = discussionsOnly(await deps.getSignals(runId));
-
-    // 4. CLASSIFYING
-    tracker.transition("classifying", {
-      counts: { signalsAvailable: signals.length },
-      message: `Analyzing signals with AIRouter for intent, urgency, and PDF relevance`,
-    });
-    await deps.updateRunStatus(runId, "classifying");
-
-    const unanalyzedSignals = signals.filter((s) => !s.analysis);
-    let extraction: { failed: number; calls?: number } = { failed: 0, calls: 0 };
-    if (unanalyzedSignals.length > 0) {
-      extraction = await withTimeout(deps.extract(
-        unanalyzedSignals.map((s) => ({
-          id: s.id,
-          title: s.title,
-          content: s.content,
-          url: s.url,
-        })),
-      ), "extract", Math.max(STEP_TIMEOUT_MS, unanalyzedSignals.length * EXTRACT_MS_PER_SIGNAL));
-    }
     const runSignals = await deps.getSignals(runId);
     const freshSignals = discussionsOnly(runSignals);
 
@@ -289,8 +361,10 @@ export async function executeResearchRun(
     await deps.updateRunStatus(runId, "clustering");
 
     const marketCandidates = await withTimeout(deps.clusterAndScore(freshSignals), "clusterAndScore");
-    // The clusterer skips a signal with no embedding; say how many (clusterAndScore fills them in place).
-    const unembedded = freshSignals.filter((s) => s.analysis && !s.analysis.embedding?.length).length;
+    // Analysed signals that ended up in no market: the clusterer skips one with no embedding, and a
+    // pasted reply can mark one as unrelated to the topic. Say how many.
+    const clustered = new Set(marketCandidates.flatMap((m) => m.signals.map((s) => s.id)));
+    const notClustered = freshSignals.filter((s) => s.analysis && !clustered.has(s.id)).length;
     // Validate before saving: the stored trend is the checked one, never the summarizer's guess.
     for (const market of marketCandidates) market.trend = validatedTrend(market).trend;
     const savedMarkets = await deps.saveMarkets(marketCandidates, runId);
@@ -325,7 +399,7 @@ export async function executeResearchRun(
 
     // 6. TREND_ANALYSIS
     tracker.transition("trend_analysis", {
-      counts: { marketsChecked: marketCandidates.length, signalsUnembedded: unembedded },
+      counts: { marketsChecked: marketCandidates.length, signalsNotClustered: notClustered },
       message: `Evaluating temporal evidence and trend velocity`,
     });
     await deps.updateRunStatus(runId, "trend_analysis");
@@ -371,7 +445,7 @@ export async function executeResearchRun(
         signalIds: m.signals.map((s) => s.id),
         texts: m.signals.map((s) => s.analysis?.problem || s.title || ""),
       }));
-      const seedText = options.seed?.trim() || query;
+      const seedText = frame.seed;
       const assigned = observedCompetitors.map((c) => ({
         competitor: c,
         marketId: marketForCompetitor(c, mapTargets, seedText),
@@ -457,7 +531,7 @@ export async function executeResearchRun(
     });
     await deps.updateRunStatus(runId, "opportunity_generation");
 
-    const generatedPairs = await deps.generateOpportunities(marketCandidates, options.seed?.trim() || query);
+    const generatedPairs = await deps.generateOpportunities(marketCandidates, frame.seed);
     const fromIdeas = generatedPairs.filter((p) => p.evidence.some((e) => e.claim.startsWith(IDEA_CLAIM_PREFIX))).length;
     const validOpportunitiesToSave: OrchestratorOpportunityItem[] = [];
     const oppEvidenceToSave: EvidenceInput[] = [];
@@ -543,7 +617,7 @@ export async function executeResearchRun(
       query,
       mode,
       status: "completed",
-      startedAt: runRecord.started_at,
+      startedAt: frame.startedAt,
       completedAt,
       trace: tracker.getTrace(),
       completeness,
@@ -557,43 +631,62 @@ export async function executeResearchRun(
       },
     };
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    if (tracker.getCurrentState() !== "failed") {
-      tracker.transition("failed", { message: errorMsg });
-    }
-    await deps.updateRunStatus(runId, "failed");
-
-    const completeness = await deps
-      .fetchCompleteness(runId)
-      .catch(() => ({
-        sourcesCovered: 0,
-        signalsCollected: 0,
-        signalsAnalyzed: 0,
-        marketsIdentified: 0,
-        opportunitiesGenerated: 0,
-        evidenceCount: totalEvidenceCreated,
-        evidenceBackedOpportunitiesCount: 0,
-        completenessPercentage: 0,
-      }));
-
-    return {
-      runId,
-      query,
-      mode,
-      status: "failed",
-      startedAt: runRecord.started_at,
-      completedAt: null,
-      error: errorMsg,
-      trace: tracker.getTrace(),
-      completeness,
-      counts: {
-        sources: completeness.sourcesCovered,
-        signalsCollected: completeness.signalsCollected,
-        signalsAnalyzed: completeness.signalsAnalyzed,
-        marketsCreated: completeness.marketsIdentified,
-        opportunitiesCreated: completeness.opportunitiesGenerated,
-        evidenceCount: totalEvidenceCreated,
-      },
-    };
+    return failRun(frame, deps, tracker, err, totalEvidenceCreated);
   }
+}
+
+/** A Deep run in one request: collect, extract with the AIRouter, analyse, report. */
+export async function executeResearchRun(
+  options: ResearchRunOptions,
+  deps: OrchestratorDeps,
+): Promise<RunSummary> {
+  const { frame, tracker } = await openRun(options, deps);
+  let extraction: ExtractionCounts = { failed: 0, calls: 0 };
+  try {
+    const { signals } = await collectSignals(frame, options, deps, tracker, "Analyzing signals with AIRouter for intent, urgency, and PDF relevance");
+    const unanalyzedSignals = signals.filter((s) => !s.analysis);
+    if (unanalyzedSignals.length > 0) {
+      extraction = await withTimeout(deps.extract(
+        unanalyzedSignals.map((s) => ({
+          id: s.id,
+          title: s.title,
+          content: s.content,
+          url: s.url,
+        })),
+      ), "extract", Math.max(STEP_TIMEOUT_MS, unanalyzedSignals.length * EXTRACT_MS_PER_SIGNAL));
+    }
+  } catch (err) {
+    return failRun(frame, deps, tracker, err, 0);
+  }
+  return finishRun(frame, deps, tracker, extraction);
+}
+
+export interface PausedRun {
+  status: "awaiting_reply";
+  frame: RunFrame;
+  /** The run's discussion signals; `promptSignals` (lib/runs/pasted.ts) fixes their prompt order. */
+  signals: StoredSignalForRun[];
+  sources: Array<{ key: string; status: string; count: number }>;
+  trace: LifecycleTraceStep[];
+}
+
+/**
+ * First half of a Deep run whose analysis is done outside PDF Lab (Part 6.15, DEC-015): collect,
+ * then stop in `classifying` and hand back the signals for the prompt. No model is called.
+ */
+export async function startPastedRun(options: ResearchRunOptions, deps: OrchestratorDeps): Promise<PausedRun | RunSummary> {
+  const { frame, tracker } = await openRun(options, deps);
+  try {
+    const { signals, ingestResult } = await collectSignals(frame, options, deps, tracker, "Waiting for the pasted model reply");
+    if (signals.length === 0) throw new Error("No discussion signal was collected for this seed; there is nothing to analyse.");
+    return { status: "awaiting_reply", frame, signals, sources: ingestResult.sources, trace: tracker.getTrace() };
+  } catch (err) {
+    return failRun(frame, deps, tracker, err, 0);
+  }
+}
+
+/** Second half: the analyses are stored; cluster, score and report. `failed` = items the reply got wrong. */
+export async function finishPastedRun(frame: RunFrame, deps: OrchestratorDeps, failed: number): Promise<RunSummary> {
+  const tracker = new LifecycleTracker("classifying", "Pasted model reply stored");
+  return finishRun(frame, deps, tracker, { failed, calls: 0 });
 }

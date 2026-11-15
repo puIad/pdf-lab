@@ -87,8 +87,9 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 | 6.12 | Ideas-first home + shared navigation | pending | — | Ideas-first home and one shared header. [log](log/part-6.12.md) |
 | 6.13 | Lighter process docs | done | 12e791c | STATE notes moved to docs/log, open-defects table added. Frontend rule now points at components/ui (DEC-016). [log](log/part-6.13.md) |
 | 6.14 | Report pages: remove hard-coded PC copy and invented values | done | 878caea | Report pages show stored values or "Not observed"; panel counts equal the stored rows. [log](log/part-6.14.md) |
+| 6.15 | Deep runs analysed by a pasted model reply | done | — | Collect, copy one prompt into a chat model, paste the reply back; markets come from the reply's names. No model call. [log](log/part-6.15.md) |
 
-Order after DEC-014: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10, with 6.13 and 6.14 any time.
+Order after DEC-014: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10, with 6.13, 6.14 and 6.15 any time.
 Phase 4 starts after 6.7 and 5.1. Details per part: `phases/phase-6-hardening.md`.
 
 ## Open defects
@@ -99,7 +100,9 @@ Known defects and their owner. A fixed defect leaves this table (its story stays
 |---|---|---|
 | No chat model answers: extraction fails and no Deep run completes | 6.7 | DEC-015 (user) |
 | Deep run does not fit a Vercel function; a timed-out step keeps writing | 3.8 | 6.10 |
-| Deep Research dialog posts without a key and always gets 401 | 3.4 | 6.10, then 5.1 |
+| `/deep` and `/api/deep` need the internal key when deployed, so pasted Deep runs work on a local dev server only | 6.15 | 5.1 |
+| A pasted run re-analyses signals an earlier run analysed: the stored analysis is replaced and its embedding cleared | 6.15 | unowned |
+| A pasted run's second request took 41 s of its 60 s limit on 34 signals | 6.15 | 6.10 |
 | PDF fit threshold and verdict thresholds are not supported by the calibration data; idea opportunity score adds nothing over demand | 6.11 | unowned (needs 3.11's file or more checks) |
 | Most stored budgeting "discussions" are Trends related-query rows; stored markets keep scores from the old formula | 6.8, 6.11 | unowned (a new run rewrites them) |
 | Home page is the explorer over old markets; no shared navigation | DEC-014 | 6.12 |

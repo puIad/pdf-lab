@@ -66,13 +66,14 @@ recommended because the MVP gate lives there.
 | 6.12 | Ideas-first home + shared navigation | 3.10, 6.7 | §7, §40 |
 | 6.13 | Lighter process docs | none | — |
 | 6.14 | Report pages: remove hard-coded PC copy and invented values (found in 6.4) | 6.4 | §47, §53 |
+| 6.15 | Deep runs analysed by a pasted model reply (DEC-015) | 6.7, 6.9 | §13, §38–§39 |
 
 Order after DEC-014 (2026-11-10 evaluation): 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10,
 with 6.13 any time. Phase 4 starts after 6.7 and 5.1: watchlists and schedules need run-scoped
 data and a signed-in user. 6.4 also changes the MVP gate below from "25" to "up to 25, limited
 by evidence".
 
-Total: **44 parts** (6.14 added 2026-11-10 during 6.4; 6.4 to 6.13 added 2026-11-10, DEC-014; before that 33: 3.5 and 3.6 added 2026-10-24 from the PDFMinter teardown; 3.7 to 3.11 and 5.4 added the same day from the competitor sweep, DEC-010; the earlier "24" was a miscount). Each phase file repeats its rows with full task detail.
+Total: **45 parts** (6.15 added 2026-11-14 because of DEC-015; 6.14 added 2026-11-10 during 6.4; 6.4 to 6.13 added 2026-11-10, DEC-014; before that 33: 3.5 and 3.6 added 2026-10-24 from the PDFMinter teardown; 3.7 to 3.11 and 5.4 added the same day from the competitor sweep, DEC-010; the earlier "24" was a miscount). Each phase file repeats its rows with full task detail.
 
 ## MVP cut line (PRD §51–§52, §62)
 

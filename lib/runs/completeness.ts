@@ -120,12 +120,13 @@ export async function fetchRunCompleteness(
     ).size;
   }
 
-  // Analysed rows without an embedding never reached a cluster.
-  const { count: unembedded } = await supabase
-    .from("run_signals")
-    .select("signals!inner ( signal_analysis!inner ( id ) )", { count: "exact", head: true })
-    .eq("run_id", runId)
-    .is("signals.signal_analysis.embedding", null);
+  // Analysed signals of the run that are linked to none of its markets.
+  let notClustered = 0;
+  if (marketIds.length > 0) {
+    const { data: linked } = await supabase.from("market_signals").select("signal_id").in("market_id", marketIds);
+    const inMarket = new Set((linked ?? []).map((l) => l.signal_id as string));
+    notClustered = signalRows.filter((s) => one(s.signal_analysis) && !inMarket.has(s.id)).length;
+  }
 
   return {
     ...calculateCompleteness({
@@ -137,6 +138,6 @@ export async function fetchRunCompleteness(
       evidenceCount,
       evidenceBackedOpportunitiesCount,
     }),
-    signalsUnembedded: unembedded ?? 0,
+    signalsNotClustered: notClustered,
   };
 }

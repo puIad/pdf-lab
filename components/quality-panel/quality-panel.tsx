@@ -141,9 +141,9 @@ export function QualityPanel({
                 Partial: {completeness.signalsCollected - completeness.signalsAnalyzed} not analysed
               </p>
             )}
-            {(completeness.signalsUnembedded ?? 0) > 0 && (
+            {(completeness.signalsNotClustered ?? 0) > 0 && (
               <p className="text-[11px] text-muted-foreground">
-                {completeness.signalsUnembedded} analysed but not clustered (no embedding)
+                {completeness.signalsNotClustered} analysed but in no market
               </p>
             )}
           </div>

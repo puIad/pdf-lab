@@ -32,8 +32,8 @@ export interface ResearchCompleteness {
   evidenceCount: number;
   evidenceBackedOpportunitiesCount: number;
   completenessPercentage: number;
-  /** Analysed signals with no stored embedding: the clusterer skipped them (Part 6.9). */
-  signalsUnembedded?: number;
+  /** Analysed signals that are in none of the run's markets (no embedding, or unrelated to the topic). */
+  signalsNotClustered?: number;
 }
 
 export interface ResearchRunRecord {

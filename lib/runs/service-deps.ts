@@ -6,6 +6,8 @@ import { runIngest } from "../ingest/pipeline.ts";
 import { getServiceDeps as createServerIngestDeps } from "../ingest/service-deps.ts";
 import { getRouter, runExtractionJob } from "../ai/index.ts";
 import { clusterSignals } from "../cluster/clusterer.ts";
+import { summarizeCluster } from "../cluster/summarizer.ts";
+import { groupByMarket } from "./pasted.ts";
 import type { ClusterSignal } from "../cluster/types.ts";
 import { writeEvidence } from "../evidence/writer.ts";
 import { createServerEvidenceDeps } from "../evidence/service-deps.ts";
@@ -19,9 +21,19 @@ import { parseMarketplaceProduct } from "../sources/marketplace-helper.ts";
 
 const EXPECTED_EMBEDDING_DIM = 1536;
 
-export function createServerOrchestratorDeps(): OrchestratorDeps {
+export interface ServerDepsOptions {
+  /**
+   * Signal id → market name from a pasted model reply (Part 6.15). When set, the run makes no
+   * model call: markets are the reply's groups (no embeddings) and opportunities come from the
+   * observed pool only.
+   */
+  marketLabels?: Map<string, string>;
+}
+
+export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): OrchestratorDeps {
   const supabase = createServiceSupabaseClient();
   const router = getRouter();
+  const { marketLabels } = options;
 
   return {
     createRun: async ({ query, mode, userId, promptVersion, plan }) => {
@@ -110,6 +122,49 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
     },
 
     clusterAndScore: async (signals) => {
+      if (marketLabels) {
+        // Pasted run: the model named each signal's market; group by that name, score as usual.
+        const analysed = signals.filter((s) => s.analysis);
+        const groups = groupByMarket(analysed, marketLabels);
+        const out = [];
+        for (let i = 0; i < groups.length; i++) {
+          const group = groups[i];
+          const c = await summarizeCluster(
+            `cluster-${i + 1}`,
+            group.signals.map((s) => ({
+              id: s.id,
+              sourceType: s.source_type,
+              title: s.title,
+              content: s.content,
+              url: s.url,
+              publishedAt: s.published_at,
+              engagement: s.engagement ?? null,
+              analysis: {
+                audience: s.analysis!.audience,
+                problem: s.analysis!.problem,
+                intent: s.analysis!.intent,
+                urgency: s.analysis!.urgency,
+                pdf_relevance: s.analysis!.pdf_relevance,
+              },
+              embedding: [],
+            })),
+            [],
+            { totalSignals: analysed.length },
+          );
+          out.push({
+            id: c.id,
+            name: group.name,
+            clusterId: c.id,
+            trend: c.trend,
+            demandScore: c.scoring.factors.demand,
+            confidence: c.scoring.confidence,
+            pdfFitScore: Math.round(c.scoring.factors.pdfSuitability * 100),
+            signals: group.signals,
+          });
+        }
+        return out;
+      }
+
       // 1. Ensure embeddings exist
       const missingEmbeds = signals.filter(
         (s) => !s.analysis?.embedding || s.analysis.embedding.length !== EXPECTED_EMBEDDING_DIM,
@@ -253,7 +308,7 @@ export function createServerOrchestratorDeps(): OrchestratorDeps {
       });
       const res = await generate25Opportunities(marketInputs, {
         targetCount: OPPORTUNITY_TARGET,
-        router,
+        router: marketLabels ? undefined : router,
         tier: "strong",
         extraCandidates: stored ? ideaCandidates(seed, stored.result.ideas, marketInputs, stored.refs) : [],
       });

@@ -454,7 +454,7 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
       extractionCalls: 1,
     });
     assert.match(clustering?.message ?? "", /^Partial: 2 of 3 signals analysed/);
-    assert.equal(result.trace.find((t) => t.state === "trend_analysis")?.counts?.signalsUnembedded, 0);
+    assert.equal(result.trace.find((t) => t.state === "trend_analysis")?.counts?.signalsNotClustered, 0);
   });
 
   it("keeps search-suggestion, Serper phrase and pageview rows out of extraction and clustering", async () => {

@@ -410,6 +410,10 @@ patch the affected guide/phase file (link the follow-up commit).
   44 %, so the spread is the model's own noise. `minimaxai/minimax-m3.1-flash` answered 6 of 30
   single and 10 of 30 batched (NVIDIA timeouts, then OpenRouter HTTP 429): batching did not make it
   usable, which weakens the earlier recommendation of (c). What works today is (b), or (d).
+- Added 2026-11-15 (Part 6.15): Deep runs now complete without the router. PDF Lab writes one
+  prompt, the user pastes it into a chat model and pastes the JSON reply back (`/deep`). Live
+  run "meal prep": 34 of 34 analysed, 8 markets, 25 opportunities. The router's model is still
+  not chosen, so `POST /api/research` and `/api/runs` Deep runs still fail in extraction.
 - Resolution: _open_
 
 ## DEC-016 — Where the frontend megalibrary lives
