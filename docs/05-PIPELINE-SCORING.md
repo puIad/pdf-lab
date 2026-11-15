@@ -14,7 +14,12 @@ QUEUED → COLLECTING → NORMALIZING → CLASSIFYING → CLUSTERING → TREND_A
 - CLASSIFYING → FAILED when fewer than half of the run's discussion signals end up analysed
   (`MIN_ANALYZED_SHARE` in `lib/runs/orchestrator.ts`, Part 6.9). Above that share the run goes
   on and is marked partial: the trace and the completeness panel give analysed, not analysed and
-  not clustered (no embedding) counts.
+  "in no market" counts.
+- Pasted run (Part 6.15, DEC-015): the same states in two requests. `POST /api/deep` stops in
+  CLASSIFYING and returns one prompt of stored signal text; `POST /api/deep/<runId>` takes the
+  pasted reply, validates each item, stores the analyses (`prompt_version = extract-v3-paste`)
+  and runs CLUSTERING to COMPLETED. Markets are the reply's market names, not embedding
+  clusters; a signal the reply marks `none` is in no market. PDF Lab calls no model.
 
 ## Deep-research pipeline (PRD §39) — the 9 phases every `pdf-lab <niche>` run executes
 
