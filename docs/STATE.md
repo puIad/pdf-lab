@@ -88,7 +88,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 | 6.13 | Lighter process docs | done | 12e791c | STATE notes moved to docs/log, open-defects table added. Frontend rule now points at components/ui (DEC-016). [log](log/part-6.13.md) |
 | 6.14 | Report pages: remove hard-coded PC copy and invented values | done | 878caea | Report pages show stored values or "Not observed"; panel counts equal the stored rows. [log](log/part-6.14.md) |
 | 6.15 | Deep runs analysed by a pasted model reply | done | bddcb53 | Collect, copy one prompt into a chat model, paste the reply back; markets come from the reply's names. No model call. [log](log/part-6.15.md) |
-| 6.16 | Three matchers corrected after the live checks | done | — | Idea filing, the no-embedding word match and the competitor mapper; replayed on two stored runs. [log](log/part-6.16.md) |
+| 6.16 | Three matchers corrected after the live checks | done | c67c624 | Idea filing, the no-embedding word match and the competitor mapper; replayed on two stored runs. [log](log/part-6.16.md) |
 
 Order after DEC-014: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1, 6.12, 6.10, with 6.13 to 6.16 any time.
 Phase 4 starts after 6.7 and 5.1. Details per part: `phases/phase-6-hardening.md`.
