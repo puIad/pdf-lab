@@ -98,7 +98,8 @@ export function parsePastedReply(text: string, count: number): ParsedReply {
   return { items, problems: problems.filter((p) => !items.has(p.n)), missing };
 }
 
-const marketKey = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+/** A market name without case or punctuation: "None." and "(none)" are both NO_MARKET. */
+export const marketKey = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 /**
  * Groups signals by the market name the model gave them (case and punctuation ignored), largest

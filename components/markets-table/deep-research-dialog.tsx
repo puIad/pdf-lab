@@ -7,21 +7,13 @@ import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface DeepResearchDialogProps {
-  /** Kept for the existing call sites; a finished run is opened from the /deep page. */
-  onSuccess?: () => void;
-  triggerButton?: React.ReactNode;
-}
-
-export function DeepResearchDialog({ triggerButton }: DeepResearchDialogProps) {
+export function DeepResearchDialog() {
   return (
     <Link href="/deep">
-      {triggerButton ?? (
-        <Button size="sm" className="gap-1.5 cursor-pointer">
-          <Sparkles className="size-4" />
-          <span>Deep research</span>
-        </Button>
-      )}
+      <Button size="sm" className="gap-1.5 cursor-pointer">
+        <Sparkles className="size-4" />
+        <span>Deep research</span>
+      </Button>
     </Link>
   );
 }

@@ -3,7 +3,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildPastePrompt, groupByMarket, parsePastedReply, promptSignals } from "./pasted.ts";
+import { buildPastePrompt, groupByMarket, marketKey, NO_MARKET, parsePastedReply, promptSignals } from "./pasted.ts";
 import {
   executeResearchRun,
   finishPastedRun,
@@ -91,6 +91,11 @@ describe("parsePastedReply", () => {
 });
 
 describe("groupByMarket", () => {
+  it("reads \"none\" the same way for grouping and for the page's count", () => {
+    for (const name of ["none", "None.", "(none)", " NONE "]) assert.equal(marketKey(name), NO_MARKET);
+    assert.deepEqual(groupByMarket([{ id: "s1" }], new Map([["s1", "(None.)"]])), []);
+  });
+
   it("groups by the model's name, ignoring case and punctuation, largest first", () => {
     const signals = ["s1", "s2", "s3", "s4"].map((id) => ({ id }));
     const groups = groupByMarket(

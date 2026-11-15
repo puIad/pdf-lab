@@ -120,13 +120,14 @@ export async function fetchRunCompleteness(
     ).size;
   }
 
-  // Analysed signals of the run that are linked to none of its markets.
-  let notClustered = 0;
+  // Analysed signals of the run that are linked to none of its markets. With no market at all,
+  // that is every analysed signal.
+  const inMarket = new Set<string>();
   if (marketIds.length > 0) {
     const { data: linked } = await supabase.from("market_signals").select("signal_id").in("market_id", marketIds);
-    const inMarket = new Set((linked ?? []).map((l) => l.signal_id as string));
-    notClustered = signalRows.filter((s) => one(s.signal_analysis) && !inMarket.has(s.id)).length;
+    for (const l of linked ?? []) inMarket.add(l.signal_id as string);
   }
+  const notClustered = signalRows.filter((s) => one(s.signal_analysis) && !inMarket.has(s.id)).length;
 
   return {
     ...calculateCompleteness({

@@ -84,8 +84,7 @@ signal with no embedding and a signal the reply marked `none`.
    server. The page says so on a 401.
 4. Parts 6.7, 6.8 and 6.9 are blocked on DEC-015 for their live acceptance only. A pasted run
    completes, so those checks can now be run this way. They were not run here.
-5. `DeepResearchDialog` kept its name and an unused `onSuccess` prop so the call sites did not
-   change. It is a link now.
+5. `DeepResearchDialog` kept its name. It is a link now and takes no props.
 6. The dev server that had been running since 2026-11-14 stopped serving
    `/api/deep/[runId]` after `next build` ran next to it ("Failed to generate static paths",
    worker exceptions). The live check used `next start` on port 3001 with the test key from

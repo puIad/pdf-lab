@@ -49,8 +49,9 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [markets, setMarkets] = useState<MarketRowData[]>(initialMarkets);
-  const [stats, setStats] = useState<MarketStats>(initialStats);
+  // The page remounts this shell per scope (key), so the server's rows are the rows.
+  const markets = initialMarkets;
+  const stats = initialStats;
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<MarketTab>("trending");
   const [trendFilter, setTrendFilter] = useState("all");
@@ -229,20 +230,6 @@ export function DashboardShell({
     setPage(1);
   }
 
-  // Reload data from API after deep research
-  async function refreshMarkets() {
-    try {
-      const res = await fetch(`/api/markets?run=${encodeURIComponent(scope)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setMarkets(data.markets || []);
-        if (data.stats) setStats(data.stats);
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-8">
       {/* 1. Header & Branding */}
@@ -284,7 +271,7 @@ export function DashboardShell({
               <span>Ask PDF Lab</span>
             </Button>
           </Link>
-          <DeepResearchDialog onSuccess={refreshMarkets} />
+          <DeepResearchDialog />
         </div>
       </div>
 

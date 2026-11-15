@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { finishPastedRun, MIN_ANALYZED_SHARE } from "@/lib/runs/orchestrator";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
-import { NO_MARKET, parsePastedReply, PASTE_PROMPT_VERSION } from "@/lib/runs/pasted";
+import { marketKey, NO_MARKET, parsePastedReply, PASTE_PROMPT_VERSION } from "@/lib/runs/pasted";
 import { loadPastedRun, pastedRunState } from "@/lib/runs/pasted-run";
 
 export const dynamic = "force-dynamic";
@@ -69,7 +69,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ runId: string 
     }
     const { items, problems, missing } = parsed;
     // Signals the model found unrelated to the topic: analysed, but in no market.
-    const noMarket = [...items.values()].filter((i) => i.market.trim().toLowerCase() === NO_MARKET).length;
+    const noMarket = [...items.values()].filter((i) => marketKey(i.market) === NO_MARKET).length;
     const counts = { analysed: items.size, total: signals.length, noMarket, problems, missing };
 
     // Too little to report on: nothing is stored and the run keeps waiting, so the user can paste again.
