@@ -1,5 +1,5 @@
 // lib/trends/trends.test.ts — Unit and Acceptance tests for Phase 3.3 Trending Engine & Market Radar.
-// Specs: docs/phases/phase-3-explorer.md (Part 3.3 Acceptance), docs/05-PIPELINE-SCORING.md (QC Rule 2).
+// Specs: Part 3.3 (see docs/README.md, History), docs/PIPELINE-SCORING.md (QC Rule 2).
 
 import test from "node:test";
 import assert from "node:assert/strict";

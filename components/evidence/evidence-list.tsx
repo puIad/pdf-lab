@@ -1,4 +1,4 @@
-// components/evidence/evidence-list.tsx — Verifiable evidence citation list per PRD §30 & docs/06-EVIDENCE-CONTRACT.md.
+// components/evidence/evidence-list.tsx — Verifiable evidence citation list per PRD §30 & docs/EVIDENCE-CONTRACT.md.
 
 import React from "react";
 import { ExternalLink, Quote, ShieldCheck, Globe, MessageSquare, TrendingUp } from "lucide-react";

@@ -1,6 +1,6 @@
 // lib/ideas/stored.ts — rebuild a seed's quick ideas from the phrase rows already in `signals`
 // (Phase 3 Part 3.8). Every phrase source stores `engagement.seed`, so a Deep run on the seed reuses
-// what earlier scans and its own ingest stored. No stored row, no idea (06-EVIDENCE-CONTRACT).
+// what earlier scans and its own ingest stored. No stored row, no idea (EVIDENCE-CONTRACT).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MarketSignal, SignalEngagement } from "../sources/types.ts";

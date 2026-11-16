@@ -1,5 +1,5 @@
 // lib/cluster/similarity.ts — Vector math & cosine distance calculations.
-// Used for pgvector-aligned cosine similarity clustering (04-SCHEMA vector_cosine_ops).
+// Used for pgvector-aligned cosine similarity clustering (SCHEMA vector_cosine_ops).
 
 /**
  * Calculates cosine similarity between two numeric vectors in [-1, 1].

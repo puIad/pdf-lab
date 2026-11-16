@@ -1,4 +1,4 @@
-# 08 — SOURCE ADAPTER SPEC (PRD §10–§12)
+# SOURCE ADAPTER SPEC (PRD §10–§12)
 
 ## Why adapters (PRD §10, §62-final)
 

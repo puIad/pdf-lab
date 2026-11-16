@@ -1,4 +1,4 @@
-# 04 — DATA MODEL + SCHEMA (PRD §37, §12)
+# DATA MODEL + SCHEMA (PRD §37, §12)
 
 This is the normative schema. Migrations implement exactly this (naming kept snake_case as
 in the PRD). Changes require a `DECISIONS.md` entry.
@@ -17,7 +17,7 @@ create table users (
   plan text not null default 'free'  -- anon handled app-side; values: free | premium
 );
 
--- One row per research execution; drives the lifecycle in 05-PIPELINE-SCORING.md
+-- One row per research execution; drives the lifecycle in PIPELINE-SCORING.md
 create table research_runs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references users(id),
@@ -55,7 +55,7 @@ create table signals (
   unique (source_id, external_id)
 );
 
--- AI extraction per signal (PRD §13–§14). Embedding dim MUST match 07-AI-ROUTER.md.
+-- AI extraction per signal (PRD §13–§14). Embedding dim MUST match AI-ROUTER.md.
 create table signal_analysis (
   id uuid primary key default gen_random_uuid(),
   signal_id uuid references signals(id) on delete cascade not null unique,
@@ -175,7 +175,7 @@ create table usage_events (
 - One row per counted action. A quota is the count of rows in the current UTC day or month
   (`lib/quotas/quotas.ts`); a refused action writes no row. Service-role only, RLS on, no policy.
 - `public.users.id` equals `auth.users.id`, but there is no foreign key between them: deleting an
-  auth user leaves its `public.users` row (see Open defects in `STATE.md`).
+  auth user leaves its `public.users` row (issue #34).
 - Migration: `supabase/migrations/20261116000009_auth_quotas.sql`.
 
 ## Watchlist (Part 4.1)
@@ -216,4 +216,4 @@ create table watchlists (
 1. `opportunities.confidence` NOT NULL — a score without confidence is a schema violation.
 2. `(source_id, external_id)` unique on `signals` — dedup at the DB, not just in code.
 3. `signal_analysis.signal_id` unique — one extraction row per signal (re-runs UPDATE).
-4. Every score shown in UI joins to countable `evidence` rows (see `06-EVIDENCE-CONTRACT.md`).
+4. Every score shown in UI joins to countable `evidence` rows (see `EVIDENCE-CONTRACT.md`).

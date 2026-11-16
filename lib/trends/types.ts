@@ -1,5 +1,5 @@
 // lib/trends/types.ts — Normative types for Trend Detection & Market Radar.
-// Specs: docs/02-MASTER-PLAN.md (§22–§25) & Phase 3.3.
+// Specs: PRD §22–§25 & Phase 3.3.
 
 export type TimeWindow = "7d" | "30d" | "90d" | "12m";
 

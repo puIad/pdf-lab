@@ -1,5 +1,5 @@
 // lib/trends/detector.ts — Normative Trend Detection & Multi-Window Delta Algorithm.
-// Specs: docs/02-MASTER-PLAN.md (§22–§23), docs/05-PIPELINE-SCORING.md & Phase 3.3.
+// Specs: PRD §22–§23, docs/PIPELINE-SCORING.md & Phase 3.3.
 // Enforces QC Rule 2: No trend claim without temporal evidence.
 
 import type {

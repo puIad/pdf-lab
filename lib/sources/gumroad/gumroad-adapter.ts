@@ -1,5 +1,5 @@
 // lib/sources/gumroad/gumroad-adapter.ts — Tier-2 marketplace adapter for Gumroad.
-// Spec: docs/08-ADAPTERS.md, DEC-007 (web-search-backed targeted search, ToS-clean).
+// Spec: docs/ADAPTERS.md, DEC-007 (web-search-backed targeted search, ToS-clean).
 
 import { createHash } from "node:crypto";
 import type {

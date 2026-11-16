@@ -198,7 +198,7 @@ export function mineReviewsAndGaps(
     }
   }
 
-  // No fallback: text with no pattern match yields no gap (06-EVIDENCE-CONTRACT, QC Rule 3).
+  // No fallback: text with no pattern match yields no gap (EVIDENCE-CONTRACT, QC Rule 3).
   return {
     reviewMining: {
       likes: Array.from(likes).slice(0, 5),

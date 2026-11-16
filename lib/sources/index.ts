@@ -1,6 +1,6 @@
 // lib/sources/index.ts — pipeline entrypoint: registers all adapters.
 // Pipeline code imports from here (or ./registry); it never imports an
-// adapter module directly (docs/08-ADAPTERS.md rule 1).
+// adapter module directly (docs/ADAPTERS.md rule 1).
 
 import { RedditAdapter, redditConfigFromEnv } from "./reddit/index.ts";
 import { GTrendsAdapter, gtrendsConfigFromEnv } from "./gtrends/index.ts";

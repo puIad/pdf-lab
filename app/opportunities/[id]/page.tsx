@@ -1,4 +1,4 @@
-// app/opportunities/[id]/page.tsx — Opportunity detail report per PRD §47 & docs/09-UX-SPEC.md.
+// app/opportunities/[id]/page.tsx — Opportunity detail report per PRD §47 & docs/UX-SPEC.md.
 // Every block shows a stored value or "Not observed" (Part 6.14): no fixed copy, no default
 // scores, prices or page counts. Outline, bonus angles and keywords live in the brief, which builds
 // them from observed phrases.

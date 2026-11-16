@@ -1,5 +1,5 @@
 // lib/sources/types.ts — SourceAdapter + MarketSignal contracts.
-// Normative spec: docs/08-ADAPTERS.md ("The interface — implement exactly").
+// Normative spec: docs/ADAPTERS.md ("The interface — implement exactly").
 // Any change to these shapes requires a DECISIONS.md entry.
 
 /** Input to `SourceAdapter.collect`. */
@@ -44,7 +44,7 @@ export interface SignalEngagement {
  * pipeline scratch fields filled by later Phase 1 parts.
  *
  * `author` is a `sha256:<hex>` hash or `'anonymous'` — NEVER a raw
- * third-party username (docs/04-SCHEMA.md + docs/06-EVIDENCE-CONTRACT.md).
+ * third-party username (docs/SCHEMA.md + docs/EVIDENCE-CONTRACT.md).
  */
 export interface MarketSignal {
   /** Adapter key, e.g. 'reddit'. Matches `sources.type`. */

@@ -7,7 +7,7 @@ import { GumroadAdapter, gumroadConfigFromEnv, type GumroadAdapterConfig } from 
 import { SourceNotConfiguredError } from "../types.ts";
 
 const SAMPLE_GUMROAD_FIXTURE = {
-  _fixture: "SAMPLE DATA — Gumroad SERP response (docs/06-EVIDENCE-CONTRACT.md)",
+  _fixture: "SAMPLE DATA — Gumroad SERP response (docs/EVIDENCE-CONTRACT.md)",
   organic: [
     {
       title: "The Ultimate PC Troubleshooting & Diagnostic Handbook",

@@ -5,7 +5,8 @@
 ## Docs
 
 - [README.md](https://github.com/puIad/pdf-lab/blob/master/README.md): install, scope and the evidence-first rule
-- [docs/STATE.md](https://github.com/puIad/pdf-lab/blob/master/docs/STATE.md): live progress and current phase
+- [docs/README.md](https://github.com/puIad/pdf-lab/blob/master/docs/README.md): how work happens, rules and the spec file map
+- [Issues](https://github.com/puIad/pdf-lab/issues): open parts and defects
 - [AGENTS.md](https://github.com/puIad/pdf-lab/blob/master/AGENTS.md): rules for coding agents
 - [CLAUDE.md](https://github.com/puIad/pdf-lab/blob/master/CLAUDE.md): project instructions
 

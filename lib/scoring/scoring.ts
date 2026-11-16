@@ -1,5 +1,5 @@
 // lib/scoring/scoring.ts — Evidence-backed market scoring & confidence formula.
-// Normative specs: docs/05-PIPELINE-SCORING.md (§16, §53-§54) & PRD §16, §17.
+// Normative specs: docs/PIPELINE-SCORING.md (§16, §53-§54) & PRD §16, §17.
 //
 // Formula: score = Demand × TrendMomentum × ProblemFrequency × BuyerIntent × PDFSuitability
 // Part 6.11: every factor is a rate, a median, a maximum or a share, so collecting twice as many

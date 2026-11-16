@@ -1,7 +1,7 @@
 # PDF Lab
 
 > **Status: in development.** A personal project, built in public. Expect rough edges, schema
-> changes and half-finished phases. Live progress is tracked in [`docs/STATE.md`](docs/STATE.md).
+> changes and half-finished phases. Open work is tracked in the [issues](https://github.com/puIad/pdf-lab/issues).
 
 PDF Lab is a market-research engine for digital PDF products (guides, checklists, templates,
 workbooks). You give it a niche, and it collects real discussions, search trends and marketplace
@@ -46,11 +46,12 @@ Checks: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 
 ## How the project is organised
 
-`docs/` is the source of truth. Start with [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
-The work is split into phases and parts (`docs/02-MASTER-PLAN.md`), and each part lands as one
-commit named `phase-<N>-part-<M>: …`, so `git log` follows the plan.
+The plan is in the [issues](https://github.com/puIad/pdf-lab/issues): `part` for a planned unit,
+`defect` for a known fault. [`docs/`](docs/README.md) holds the rules, the specs and the decision
+log. Each issue lands as one commit.
 
 ## Roadmap
 
-Next up are watchlists, scheduled re-research and alerts (Phase 4). After that come accounts,
-quotas and bring-your-own-key model routing (Phase 5), then hardening and launch (Phase 6).
+Built: the research pipeline, reports, the explorer, quick ideas with Validate and briefs,
+sign-in with quotas, and the watchlist. Open: scheduled re-research and alerts, bring-your-own-key
+model routing, a premium stub, Google Docs export, metrics and the launch checklist.

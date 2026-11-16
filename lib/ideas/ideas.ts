@@ -7,7 +7,7 @@
 //   - specificity describes the phrase only. It is NOT a competition claim (QC Rule 3).
 // Part 3.7: Serper PAA / related-search phrases count like suggestions (demand cites the blocks),
 // plus a not-professional-advice flag and a "Timely" tag that is never a trend label (QC Rule 2).
-// Pure functions over MarketSignal engagement fields; no adapter imports (08-ADAPTERS rule 1).
+// Pure functions over MarketSignal engagement fields; no adapter imports (ADAPTERS rule 1).
 
 import type { MarketSignal } from "../sources/types.ts";
 

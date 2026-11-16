@@ -1,4 +1,4 @@
-# 05 — PIPELINE, LIFECYCLE & SCORING (PRD §16, §38–§39, §52–§55)
+# PIPELINE, LIFECYCLE & SCORING (PRD §16, §38–§39, §52–§55)
 
 ## Research-run lifecycle (PRD §38) — normative state machine
 
@@ -24,7 +24,7 @@ QUEUED → COLLECTING → NORMALIZING → CLASSIFYING → CLUSTERING → TREND_A
 ## Deep-research pipeline (PRD §39) — the 9 phases every `pdf-lab <niche>` run executes
 
 1. Candidate generation — broad candidate submarkets for the niche.
-2. Evidence collection — multi-source search (adapters from `08-ADAPTERS.md`).
+2. Evidence collection — multi-source search (adapters from `ADAPTERS.md`).
 3. Signal extraction — pain/intent/audience/urgency/pdf_relevance per signal (§13–§14).
 4. Trend calculation — compare 7d / 30d / 90d+12m windows (§22–§23).
 5. Competition — find existing PDF products (§20).

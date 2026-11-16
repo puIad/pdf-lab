@@ -41,7 +41,7 @@ function fakeProvider(
 }
 
 describe("AIRouter.resolveTier", () => {
-  it("defaults cheap tier to ollama (local-first per 07-AI-ROUTER)", () => {
+  it("defaults cheap tier to ollama (local-first per AI-ROUTER)", () => {
     const router = new AIRouter({} as NodeJS.ProcessEnv);
     router.register(fakeProvider("ollama"));
     router.register(fakeProvider("openrouter"));

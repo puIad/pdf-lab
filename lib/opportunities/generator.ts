@@ -1,6 +1,6 @@
 // lib/opportunities/generator.ts — opportunity generator (up to 25) with diversification constraints.
 // Part 6.4: every field comes from stored rows or is null; nothing is padded to reach the target.
-// Normative specs: PRD §18, §28–§29; docs/05-PIPELINE-SCORING.md; docs/06-EVIDENCE-CONTRACT.md.
+// Normative specs: PRD §18, §28–§29; docs/PIPELINE-SCORING.md; docs/EVIDENCE-CONTRACT.md.
 
 import type { AIRouter } from "../ai/router.ts";
 import { parsePriceText } from "../competition/check.ts";

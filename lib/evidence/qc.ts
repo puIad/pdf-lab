@@ -1,4 +1,4 @@
-// lib/evidence/qc.ts — Enforces the 5 normative QC rules from docs/06-EVIDENCE-CONTRACT.md.
+// lib/evidence/qc.ts — Enforces the 5 normative QC rules from docs/EVIDENCE-CONTRACT.md.
 // Violations throw QCViolationError, blocking ungrounded claims at write time.
 
 import type { EvidenceInput, EvidenceRow } from "./types.ts";

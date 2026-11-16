@@ -7,7 +7,7 @@ import { EtsyAdapter, etsyConfigFromEnv, type EtsyAdapterConfig } from "./etsy-a
 import { SourceNotConfiguredError } from "../types.ts";
 
 const SAMPLE_ETSY_FIXTURE = {
-  _fixture: "SAMPLE DATA — Etsy SERP response (docs/06-EVIDENCE-CONTRACT.md)",
+  _fixture: "SAMPLE DATA — Etsy SERP response (docs/EVIDENCE-CONTRACT.md)",
   organic: [
     {
       title: "PC Troubleshooting Flowchart & Diagnostic Guide Printable - Etsy",

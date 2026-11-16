@@ -109,7 +109,7 @@ describe("writeEvidence (injected deps)", () => {
   });
 });
 
-describe("QC Rules 1–5 Enforcement (06-EVIDENCE-CONTRACT.md)", () => {
+describe("QC Rules 1–5 Enforcement (EVIDENCE-CONTRACT.md)", () => {
   it("Rule 1: Blocks opportunity without evidence rows", () => {
     const opp = { id: "opp-fake-1", title: "Non-existent PDF Guide" };
     const evidence: EvidenceRow[] = [];

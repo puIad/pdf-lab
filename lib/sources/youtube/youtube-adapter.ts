@@ -1,5 +1,5 @@
 // lib/sources/youtube/youtube-adapter.ts — Tier-3 YouTube Comments adapter.
-// Normative specs: docs/08-ADAPTERS.md & Phase 3.3.
+// Normative specs: docs/ADAPTERS.md & Phase 3.3.
 //
 // Ingests YouTube video comments and comment threads searching for user questions,
 // tutorial friction, missing explanations, and explicit requests for PDF/guides.
@@ -9,7 +9,7 @@
 //
 // No YOUTUBE_API_KEY → collect() throws SourceNotConfiguredError and healthCheck()
 // reports ok:false; ingest records the source as `skipped`. It never returns
-// made-up comments (06-EVIDENCE-CONTRACT: no market claim without a real observation).
+// made-up comments (EVIDENCE-CONTRACT: no market claim without a real observation).
 
 import { createHash } from "node:crypto";
 import type {

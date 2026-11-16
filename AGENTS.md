@@ -1,29 +1,27 @@
 # PDF LAB — agent entrypoint
 
-This is the PDF Lab project. `docs/` is the single source of truth; the PRD vision
-(`../pdf-lab.md`, if present) defers to `docs/` on implementation detail.
+This is the PDF Lab project. The plan is in GitHub issues (`gh issue list`); `docs/` holds the
+rules, the specs and the decisions. The PRD vision (`../pdf-lab.md`, if present) defers to `docs/`
+on implementation detail.
 
 Every task, in this order:
-1. Read `docs/00-START-HERE.md` (load order + short-prompt contract).
-2. Read `docs/01-PHILOSOPHY.md` (session protocol).
-3. Read `docs/STATE.md` (what is done / next / blocked, open defects). Part notes are in
-   `docs/log/part-<N>.<M>.md`: open one only when working on or depending on that part.
-4. Read `docs/02-MASTER-PLAN.md` (where the part sits in the DAG).
-5. Read the requested phase file in `docs/phases/`, then follow its links.
-6. Do the work, update `docs/STATE.md` (one line) and the part's log same turn, run
-   `docs/REVIEW-CHECKLIST.md`.
+1. Read `docs/README.md` (how work happens, the rules, the review checklist, the file map).
+2. Read the issue being worked on (`gh issue view <n>`), then the specs in `docs/` it touches.
+3. Do the work and verify it for real. One issue = one commit: `phase-<N>-part-<M>: <summary>` for
+   a `part` issue, `fix: <summary>` for a `defect`. The pull request body says `Fixes #<n>`.
+4. Run the review checklist in `docs/README.md`. A fault found on the way becomes a new `defect`
+   issue.
 
 Rules: evidence before synthesis; adapters own source code; problems halt into
-`docs/DECISIONS.md`; one part = one commit (`phase-<N>-part-<M>: <summary>`).
+`docs/DECISIONS.md` (triggers and procedure in `docs/README.md`).
 Frontend rule: build all frontend, UI design, styling, and page components in this project
-from the UI primitives in `components/ui` (taken from the frontend megalibrary in Part 3.1; the
-library folder itself is gone, DEC-016). Add a primitive there before reaching for another source.
+from the UI primitives in `components/ui` (DEC-016). Add a primitive there before reaching for
+another source.
 
-Docs freshness: `docs/03-STACK.md` + `docs/guides/*` are plans, not build-time truth —
-re-verify via Context7 (resolve library ID, then query-docs) AND the canonical doc links
-before installing or using any library. Next.js additionally via
-`node_modules/next/dist/docs/`. On mismatch: decision-request trigger per
-`docs/01-PHILOSOPHY.md` §4a, never silently upgrade/downgrade.
+Docs freshness: `docs/STACK.md` is a plan, not build-time truth. Re-verify via Context7 (resolve
+library ID, then query-docs) AND the canonical doc links before installing or using any library.
+Next.js additionally via `node_modules/next/dist/docs/`. On mismatch: decision request, never
+silently upgrade/downgrade.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -1,5 +1,5 @@
 {
-  "_fixture": "SAMPLE DATA — canned google-trends-api responses for offline unit tests. Never touches the DB (docs/06-EVIDENCE-CONTRACT.md fixture rule).",
+  "_fixture": "SAMPLE DATA — canned google-trends-api responses for offline unit tests. Never touches the DB (docs/EVIDENCE-CONTRACT.md fixture rule).",
   "interestOverTime": {
     "default": {
       "timelineData": [

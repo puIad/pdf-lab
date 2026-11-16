@@ -1,5 +1,5 @@
 // lib/sources/registry.ts — adapter lookup by key, used by pipeline only.
-// Per docs/08-ADAPTERS.md: no source-specific imports outside `lib/sources/*`;
+// Per docs/ADAPTERS.md: no source-specific imports outside `lib/sources/*`;
 // pipeline code talks to these helpers, never to an adapter module directly.
 
 import type { SourceAdapter } from "./types.ts";

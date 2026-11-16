@@ -7,7 +7,7 @@ import { KdpAdapter, kdpConfigFromEnv, type KdpAdapterConfig } from "./kdp-adapt
 import { SourceNotConfiguredError } from "../types.ts";
 
 const SAMPLE_KDP_FIXTURE = {
-  _fixture: "SAMPLE DATA — Amazon KDP SERP response (docs/06-EVIDENCE-CONTRACT.md)",
+  _fixture: "SAMPLE DATA — Amazon KDP SERP response (docs/EVIDENCE-CONTRACT.md)",
   organic: [
     {
       title: "PC Repair & Troubleshooting Manual: 2026 Edition: Amazon.com: Books",

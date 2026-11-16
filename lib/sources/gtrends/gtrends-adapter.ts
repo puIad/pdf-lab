@@ -1,5 +1,5 @@
 // lib/sources/gtrends/gtrends-adapter.ts — Tier-1 Google Trends adapter.
-// Spec: docs/08-ADAPTERS.md + docs/guides/sources-reddit-trends-search.md.
+// Spec: docs/ADAPTERS.md.
 //
 // ⚠️ UNOFFICIAL API TERRITORY. There is no official Google Trends API; this
 // adapter sits on the community `google-trends-api` client (pinned exact in
@@ -7,14 +7,14 @@
 // this module (the package is never imported elsewhere), CACHED ≥24h, and
 // DEGRADES gracefully: any upstream breakage throws a descriptive error that
 // the ingest pipeline turns into honest per-source counts — never fake data.
-// Breakage follows the decision-request path (01-PHILOSOPHY §4a), not a hack.
+// Breakage follows the decision-request path (docs/README.md), not a hack.
 //
 // What it collects (MVP = ONE 90-day window; 7d/30d/90d+12m multi-window
 // trend math is deferred to Part 1.4 where the scoring actually needs it):
 //   1. interest-over-time → ONE summary signal (avg/max/min + direction).
 //   2. related queries (top + rising) → ONE signal each, up to the limit.
 // No authors exist here; `author` is always 'anonymous'. No raw usernames
-// anywhere (06-EVIDENCE-CONTRACT).
+// anywhere (EVIDENCE-CONTRACT).
 
 import { createHash } from "node:crypto";
 import googleTrends from "google-trends-api";

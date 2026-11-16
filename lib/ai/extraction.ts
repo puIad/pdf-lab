@@ -5,7 +5,7 @@
 // row, so a provider outage costs a few calls, not one per signal.
 // Per signal (title+content from the DB, NEVER invented): validated
 // {audience, problem, intent, urgency, pdf_relevance} → one `signal_analysis`
-// row per signal (04-SCHEMA invariant 3: re-runs UPDATE).
+// row per signal (SCHEMA invariant 3: re-runs UPDATE).
 //
 // Evidence contract (06): the model sees ONLY stored signal text; empty text
 // is reported as a failure, never padded with confabulation. Every call is
@@ -16,7 +16,7 @@ import type { CostLogEntry, TaskTier } from "./types.ts";
 import { summarizeCostLog } from "./types.ts";
 import type { CostLogSummary } from "./types.ts";
 
-/** Prompt version — bump + record when wording changes (07-AI-ROUTER). */
+/** Prompt version — bump + record when wording changes (AI-ROUTER). */
 export const EXTRACTION_PROMPT_VERSION = "extract-v2-batch";
 
 export const INTENT_VALUES = ["weak", "medium", "strong", "very_strong"] as const;
@@ -301,7 +301,7 @@ export async function runExtractionJob(opts: ExtractionJobOptions): Promise<Extr
   const costLog: CostLogEntry[] = [];
   const calls = { batch: 0, single: 0 };
 
-  // Empty text never reaches the model (06-EVIDENCE-CONTRACT: nothing to ground on).
+  // Empty text never reaches the model (EVIDENCE-CONTRACT: nothing to ground on).
   const withText: ExtractionInput[] = [];
   for (const signal of opts.signals) {
     if (buildExtractionUserText(signal)) withText.push(signal);

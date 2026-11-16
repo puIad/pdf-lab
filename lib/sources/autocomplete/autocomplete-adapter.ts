@@ -1,5 +1,5 @@
 // lib/sources/autocomplete/autocomplete-adapter.ts — search-suggestion miner (Phase 3 Part 3.5).
-// Spec: docs/phases/phase-3-explorer.md Part 3.5; method from the PDFMinter teardown
+// Spec: Part 3.5 (see docs/README.md, History); method from the PDFMinter teardown
 // (docs/research/2026-10-24-pdfminter-teardown.md).
 //
 // ⚠️ LOCAL-ONLY (DEC-008 option a). These are the unofficial suggest endpoints

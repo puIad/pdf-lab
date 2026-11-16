@@ -13,7 +13,7 @@ import { enforceQuota, refund } from "@/lib/quotas/guard";
 // Phrases come from autocomplete while its local-only guard is open (DEC-008), otherwise (always in
 // production) from Serper People-also-ask + related searches (DEC-010). Google Trends and Wikipedia
 // run either way. Only the signals that were stored are scored: no stored evidence, no idea
-// (06-EVIDENCE-CONTRACT). Counted as one idea scan against the caller's plan (Part 5.1).
+// (EVIDENCE-CONTRACT). Counted as one idea scan against the caller's plan (Part 5.1).
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // ~15 s suggestions + 2 throttled Trends calls

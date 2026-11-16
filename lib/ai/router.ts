@@ -1,5 +1,5 @@
 // lib/ai/router.ts — AIRouter: single server-side entry for all LLM calls.
-// Per docs/07-AI-ROUTER.md: app code calls router.generateObject /
+// Per docs/AI-ROUTER.md: app code calls router.generateObject /
 // router.generateText — NEVER a provider directly. Provider per call is
 // selected by task tier + availability:
 //
@@ -53,7 +53,7 @@ const TIER_ENV: Record<TaskTier, { providerVar: string; modelVar: string }> = {
 };
 
 const TIER_DEFAULT_PROVIDER: Record<TaskTier, string> = {
-  cheap: "ollama", // local-first per 07-AI-ROUTER; falls through when absent
+  cheap: "ollama", // local-first per AI-ROUTER; falls through when absent
   strong: "nvidia",
   embed: "openrouter",
 };

@@ -1,5 +1,5 @@
 // lib/opportunities/types.ts — Opportunity generation types and diversification constraints.
-// Normative specs: PRD §18, §28–§29; docs/05-PIPELINE-SCORING.md; docs/06-EVIDENCE-CONTRACT.md.
+// Normative specs: PRD §18, §28–§29; docs/PIPELINE-SCORING.md; docs/EVIDENCE-CONTRACT.md.
 
 import type { EvidenceInput } from "../evidence/types.ts";
 

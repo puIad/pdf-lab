@@ -1,6 +1,6 @@
 # PDFMinter scan exports (input for Part 3.11)
 
-Part 3.11 stays blocked until a scan file is here (DEC-010). Never put cookies, passwords or HAR
+Part 3.11 (issue #33) waits until a scan file is here (DEC-010). Never put cookies, passwords or HAR
 files in this folder; the snippet below keeps the session inside your browser.
 
 1. Sign in to https://pdfminter.com in your own browser.

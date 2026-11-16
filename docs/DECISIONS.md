@@ -1,7 +1,9 @@
 # DECISIONS — decision-request log (problems stop here)
 
-Append-only. Newest at the bottom. Every entry follows the template. Resolutions must also
-patch the affected guide/phase file (link the follow-up commit).
+Append-only. Newest at the bottom. Every entry follows the template. A resolution also fixes the
+spec it changes and is noted on the issue it unblocks. When to open one: `README.md`, "Decision
+requests". Entries before 2026-11-16 cite the old plan files (`STATE.md`, phase files, guides); those
+are in git history (`README.md`, "History").
 
 ## Template
 
@@ -31,7 +33,11 @@ patch the affected guide/phase file (link the follow-up commit).
   simplest, platform timeout limits.
 - Recommendation: none yet — measure Phase 1–3 run durations first; decide on data.
 - Question for user: (to be asked in Phase 4) "Runs take ~X min and need Y retries — pick (a)/(b)/(c)?"
-- Resolution: _unresolved_
+- Resolution: _resolved 2026-11-16_ — user: "Vercel Workflow + Cron (Recommended)". Vercel Workflow runs the
+  durable steps of a Deep run (Part 6.10, issue #24) and of scheduled re-research (Part 4.2, issue #26);
+  Vercel Cron starts the schedules. Basis: a batched run of about 100 signals needs about 10 model calls,
+  4 to 5 minutes, and the app already runs on Vercel, so no new vendor. Plan limits are re-verified
+  against the current Vercel docs before the package is installed; a mismatch reopens this entry.
 - Data point (2026-10-25, from DEC-013): a Deep run on "budgeting" took 17.7 minutes, almost all of
   it waiting on NVIDIA (about 7 signals a minute). Cloudflare Workflows on Workers Paid fits that
   shape (unlimited wall time per step, 30 s to 5 min of CPU per step, retried and persisted steps;
@@ -414,7 +420,10 @@ patch the affected guide/phase file (link the follow-up commit).
   prompt, the user pastes it into a chat model and pastes the JSON reply back (`/deep`). Live
   run "meal prep": 34 of 34 analysed, 8 markets, 25 opportunities. The router's model is still
   not chosen, so `POST /api/research` and `/api/runs` Deep runs still fail in extraction.
-- Resolution: _open_
+- Resolution: _resolved 2026-11-16_ — user: "model flexible options with testing whether they respond
+  beforehand, and also pasted replies option, switchable in settings". No single fixed model: the
+  extraction mode is a setting. It is one of several chat models, each tested for a response before it
+  can be chosen, or pasted replies (the `/deep` flow of Part 6.15). Built in Part 6.9's issue (#25).
 
 ## DEC-016 — Where the frontend megalibrary lives
 
