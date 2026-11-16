@@ -64,7 +64,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
-| 5.1 | Auth + tiers + quotas | done | (this commit) | Email-link sign-in, free and premium plans, quotas on every costly endpoint, runs private to their owner. Live check 31 of 31. [log](log/part-5.1.md) |
+| 5.1 | Auth + tiers + quotas | done | bfd75b7 | Email-link sign-in, free and premium plans, quotas on every costly endpoint, runs private to their owner. Live check 31 of 31. [log](log/part-5.1.md) |
 | 5.2 | BYOK vault + routing + metering | pending | — | BYOK key vault, per-request routing and usage metering. |
 | 5.3 | Hosted-premium + limits UX | pending | — | Hosted premium path and the limits UX. |
 | 5.4 | Send brief to Google Docs | pending | — | Send a brief to Google Docs with the project's own OAuth client. [log](log/part-5.4.md) |
