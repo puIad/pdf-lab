@@ -4,7 +4,6 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadarContainer } from "@/components/radar/radar-container";
 import { createServiceSupabaseClient } from "@/lib/db/client";
@@ -37,16 +36,9 @@ export default async function RadarPage() {
   const upcomingSeasonal = radar?.getUpcomingSeasonalSurges() ?? [];
 
   return (
-    <main className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6 lg:px-8">
+    <main className="flex-1 bg-background text-foreground py-8 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-7xl mx-auto space-y-6">
-        {/* Back navigation */}
-        <div className="flex items-center justify-between">
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="size-3.5" />
-              Back to Explorer
-            </Button>
-          </Link>
+        <div className="flex items-center justify-end">
           <div className="flex items-center gap-2">
             <Link href="/search">
               <Button variant="outline" size="sm" className="text-xs">

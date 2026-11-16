@@ -60,7 +60,7 @@ export default async function SearchPage(props: SearchPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="flex-1 bg-background text-foreground">
       <SearchView
         initialQuery={q}
         initialMode={mode}

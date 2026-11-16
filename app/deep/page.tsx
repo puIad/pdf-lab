@@ -36,7 +36,7 @@ export default async function DeepPage(props: { searchParams: Promise<{ seed?: s
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="flex-1 bg-background text-foreground">
       <DeepView key={initialRun?.runId ?? "new"} initialSeed={initialRun?.seed ?? seed?.trim() ?? ""} initialRun={initialRun} initialError={loadError} />
     </main>
   );

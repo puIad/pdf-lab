@@ -42,7 +42,7 @@ export default async function ResearchPage(props: ResearchPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="flex-1 bg-background text-foreground">
       <ResearchView initialPrompt={q?.trim() ?? ""} recentRuns={recentRuns} />
     </main>
   );

@@ -106,7 +106,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   const competitorTotal = platforms.reduce((n, p) => n + p.count, 0);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex-1 bg-background text-foreground">
       {/* Top Navigation */}
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/95 backdrop-blur-md">
         <div className="container mx-auto flex h-14 max-w-5xl items-center justify-between px-4">

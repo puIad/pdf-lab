@@ -17,7 +17,7 @@ export const metadata = {
 export default async function LoginPage(props: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const { next, error } = await props.searchParams;
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="flex-1 bg-background text-foreground">
       <div className="mx-auto w-full max-w-md space-y-6 px-4 py-10 sm:px-6">
         <Link href="/">
           <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">

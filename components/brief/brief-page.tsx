@@ -24,14 +24,14 @@ export async function BriefPage({ source, back }: { source: BriefSource; back: {
       <h1 className="text-lg font-semibold">No brief for this {source.kind === "idea" ? "idea" : "opportunity"}</h1>
       <p className="text-sm text-muted-foreground">{unavailable}</p>
       {source.kind === "idea" && (
-        <Link href={`/ideas?q=${encodeURIComponent(source.seed)}`} className="text-sm underline underline-offset-2">
+        <Link href={`/?q=${encodeURIComponent(source.seed)}`} className="text-sm underline underline-offset-2">
           Back to the ideas for “{source.seed}”: validate first
         </Link>
       )}
     </div>
   );
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex-1 bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/95 backdrop-blur-md">
         <div className="container mx-auto flex h-14 max-w-4xl items-center gap-3 px-4">
           <Link href={back.href} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
