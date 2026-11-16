@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { fetchMarketsData, parseMarketScope } from "@/lib/markets/fetcher";
+import { resolveCaller } from "@/lib/quotas/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
     const pdfFitFilter = searchParams.get("pdf_fit")?.toLowerCase().trim();
 
     const supabase = createServiceSupabaseClient();
-    const data = await fetchMarketsData(supabase, parseMarketScope(searchParams.get("run"), "latest"));
+    const data = await fetchMarketsData(supabase, parseMarketScope(searchParams.get("run"), "latest"), await resolveCaller(req.headers));
 
     let filtered = [...data.markets];
 

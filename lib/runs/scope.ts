@@ -10,6 +10,24 @@ export interface CompletedRun {
   completedAt: string | null;
   /** Newest completed run for its seed. */
   latest: boolean;
+  /** Who started it; null for a run made with the server key or on a dev server. */
+  userId: string | null;
+}
+
+/** Who is looking: the plan and user id of `resolveCaller` (lib/quotas/guard.ts). */
+export interface RunViewer {
+  plan: string;
+  userId: string | null;
+}
+
+/**
+ * The runs a viewer may see listed by seed. A seed is what someone searched for, so a person
+ * sees their own runs, the server key and a dev server see all, and a signed-out visitor none
+ * (Part 5.1, issue #39). The owner's id is left out of the result.
+ */
+export function listedRuns(runs: CompletedRun[], viewer: RunViewer | null): Omit<CompletedRun, "userId">[] {
+  if (!viewer || viewer.plan === "anon") return [];
+  return runs.filter((r) => !viewer.userId || r.userId === viewer.userId).map((r) => ({ id: r.id, query: r.query, completedAt: r.completedAt, latest: r.latest }));
 }
 
 export const seedKey = (query: string): string => query.trim().toLowerCase();
@@ -22,7 +40,7 @@ export const seedKey = (query: string): string => query.trim().toLowerCase();
 export async function listCompletedRuns(supabase: SupabaseClient): Promise<CompletedRun[]> {
   const { data, error } = await supabase
     .from("research_runs")
-    .select("id, query, completed_at, started_at, markets ( id )")
+    .select("id, query, completed_at, started_at, user_id, markets ( id )")
     .eq("mode", "deep")
     .eq("status", "completed")
     .order("started_at", { ascending: false });
@@ -33,7 +51,7 @@ export async function listCompletedRuns(supabase: SupabaseClient): Promise<Compl
     const key = seedKey(r.query as string);
     const latest = !seen.has(key);
     seen.add(key);
-    return { id: r.id as string, query: r.query as string, completedAt: (r.completed_at as string) ?? null, latest };
+    return { id: r.id as string, query: r.query as string, completedAt: (r.completed_at as string) ?? null, latest, userId: (r.user_id as string | null) ?? null };
   });
 }
 
