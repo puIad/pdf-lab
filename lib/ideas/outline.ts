@@ -19,6 +19,9 @@ const SECTIONS: Record<IdeaFormat, { n: number; defaults: string[] }> = {
 const QUESTION_BONUS = 12;
 const OVERLAP_WEIGHT = 45;
 const DUPLICATE_AT = 0.6;
+// Words that state one theme: "why X is important" and "why X matters" are the same section
+// (issue #46). Keys are in the form `tokens` gives ("matters" is "matter").
+const SAME_THEME: Record<string, string> = { importance: "important", matter: "important", significance: "important" };
 
 export function headingFrom(phrase: string): string {
   const p = phrase.trim().replace(/\s+/g, " ").replace(/\?+$/, "");
@@ -50,18 +53,24 @@ export function suggestOutline({ phrase, format, related, offset = 0 }: OutlineI
   // Dedupe on the words the target doesn't already have: every phrase shares the seed's words,
   // which would make all of them look like near-duplicates of each other.
   const mainSet = new Set(main);
+  const theme = (text: string) => tokens(text).filter((w) => !mainSet.has(w)).map((w) => SAME_THEME[w] ?? w);
   const picked: string[][] = [];
   const out: string[] = [];
+  const add = (text: string, heading: string) => {
+    const t = theme(text);
+    if (picked.some((p) => jaccard(p, t) >= DUPLICATE_AT)) return;
+    picked.push(t);
+    out.push(heading);
+  };
   for (const r of rotated) {
     if (out.length >= n) break;
-    const t = tokens(r.phrase).filter((w) => !mainSet.has(w));
-    if (picked.some((p) => jaccard(p, t) >= DUPLICATE_AT)) continue;
-    picked.push(t);
-    out.push(headingFrom(r.phrase));
+    add(r.phrase, headingFrom(r.phrase));
   }
+  // A default is checked too: "Why {T} matters" is not added under "Why is {T} important?".
   for (const d of defaults) {
     if (out.length >= n) break;
-    out.push(d.replace(/\{T\}/g, phrase));
+    const heading = d.replace(/\{T\}/g, phrase);
+    add(heading, heading);
   }
   return out;
 }

@@ -62,7 +62,8 @@ export interface IdeasResult {
   seed: string;
   ideas: QuickIdea[];
   topic: TopicTrendLine[];
-  stats: { ideas: number; questions: number; rising: number; avgDemand: number };
+  /** `offTopic`: Google Trends related queries left out for having no word in common with the seed. */
+  stats: { ideas: number; questions: number; rising: number; avgDemand: number; offTopic: number };
 }
 
 const QWORD = /^(how|what|why|when|where|who|which|can|is|are|does|do|should|will|would|could)\b/;
@@ -84,6 +85,16 @@ export function jaccard(a: string[], b: string[]): number {
   const B = new Set(b);
   const union = new Set([...A, ...B]).size;
   return union ? [...A].filter((t) => B.has(t)).length / union : 0;
+}
+
+/**
+ * True when the two texts have a content word in common, allowing for endings ("budgeting" and
+ * "budget planner"). shortcut: words of 4+ letters match on their first 5, so "internet" matches
+ * "interest"; move to a real stemmer if that lets unrelated phrases through.
+ */
+export function sharesWord(a: string, b: string): boolean {
+  const B = tokens(b);
+  return tokens(a).some((x) => B.some((y) => x === y || (Math.min(x.length, y.length) >= 4 && x.slice(0, 5) === y.slice(0, 5))));
 }
 
 export function isQuestion(phrase: string): boolean {
@@ -246,6 +257,7 @@ export function buildIdeas(seed: string, signals: MarketSignal[], now: Date = ne
   const seedKey = seed.trim().toLowerCase();
   const byPhrase = new Map<string, PhraseAcc>();
   const topic: TopicTrendLine[] = [];
+  let offTopic = 0;
   const get = (phrase: string) => {
     const key = phrase.trim().toLowerCase();
     let acc = byPhrase.get(key);
@@ -278,6 +290,13 @@ export function buildIdeas(seed: string, signals: MarketSignal[], now: Date = ne
       }
       acc.evidence.push(ev(s));
     } else if (related) {
+      // Google Trends related queries can be about anything that rose with the seed ("netflix new
+      // releases" under "meal prep"). One with no word in common with the seed is not an idea for
+      // it (issue #47); the count is reported so the scan says what it left out.
+      if (!sharesWord(related, seed)) {
+        offTopic += 1;
+        continue;
+      }
       const value = num(e.interest_value) ?? 0;
       const acc = get(related);
       acc.evidence.push(ev(s));
@@ -344,6 +363,7 @@ export function buildIdeas(seed: string, signals: MarketSignal[], now: Date = ne
       questions: ideas.filter((i) => i.isQuestion).length,
       rising: ideas.filter((i) => i.trend !== null).length,
       avgDemand: ideas.length ? Math.round(ideas.reduce((a, i) => a + i.demand, 0) / ideas.length) : 0,
+      offTopic,
     },
   };
 }
