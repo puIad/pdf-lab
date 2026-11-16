@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { safeNextPath } from "@/lib/auth/next-path";
 import { KIND_LABEL, LIMITS, USAGE_KINDS } from "@/lib/quotas/quotas";
 import { LoginForm } from "./login-form";
 
@@ -30,7 +31,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ next?: 
             <CardDescription>No password. We email you a link, you open it, you are in.</CardDescription>
           </CardHeader>
           <CardContent>
-            <LoginForm next={next && /^\/(?![/\\])/.test(next) ? next : "/account"} initialError={error ?? null} />
+            <LoginForm next={safeNextPath(next, "/account")} initialError={error ?? null} />
           </CardContent>
         </Card>
         <div className="space-y-2 px-1 text-xs text-muted-foreground">
