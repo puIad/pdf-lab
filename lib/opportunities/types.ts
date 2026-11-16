@@ -66,7 +66,8 @@ export interface GeneratedOpportunity {
   targetAudience: string;
   problem: string;
   solution: string;
-  format: OpportunityFormat;
+  /** The format the wording names, or null when it names none ("Not observed"). */
+  format: OpportunityFormat | null;
   /** Observed competitor price range, or null ("Not observed"). Never a format default. */
   priceRange: string | null;
   /** AI interpretation when a model supplied it, else null. */
@@ -96,7 +97,7 @@ export interface OpportunityRow {
   target_audience: string;
   problem: string;
   solution: string;
-  format: string;
+  format: string | null;
   price_range: string | null;
   opportunity_score: number;
   confidence: number;

@@ -2,6 +2,17 @@
 // Rule: Percentages ONLY from collected data, strictly summing to 100% (QC Rule 3 & 4).
 
 import type { CompetitorProduct, LandscapeAnalysis, LandscapeShare } from "./types.ts";
+import { matchFormat } from "../ideas/ideas.ts";
+
+export const FORMAT_NOT_STATED = "not stated";
+
+/**
+ * The format a listing's title names ("Budget Planner Printable" is a planner), or "not stated".
+ * Listings are stored without a format, and a default one would be an invented share.
+ */
+export function listingFormat(title: string | null | undefined): string {
+  return matchFormat(title ?? "")?.toLowerCase().replace(" ", "_") ?? FORMAT_NOT_STATED;
+}
 
 /**
  * Normalizes an array of counts into percentages that sum to exactly 100.0%.
@@ -72,7 +83,7 @@ export function calculateLandscape(competitors: CompetitorProduct[]): LandscapeA
   // 2. Format distribution
   const formatCounts = new Map<string, number>();
   for (const c of competitors) {
-    const f = c.format || "other";
+    const f = c.format || FORMAT_NOT_STATED;
     formatCounts.set(f, (formatCounts.get(f) || 0) + 1);
   }
   const formatItems = Array.from(formatCounts.entries()).map(([label, count]) => ({

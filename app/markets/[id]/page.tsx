@@ -30,7 +30,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EvidenceList, EvidenceDialog } from "@/components/evidence";
 import type { EvidenceRow } from "@/lib/evidence/types";
-import { calculateLandscape, mineReviewsAndGaps, type CompetitorProduct } from "@/lib/competition";
+import { calculateLandscape, listingFormat, mineReviewsAndGaps, type CompetitorProduct } from "@/lib/competition";
 import { parsePrice } from "@/lib/sources/marketplace-helper";
 import { QualityPanel } from "@/components/quality-panel";
 import { calculateCompleteness } from "@/lib/runs/completeness";
@@ -119,7 +119,7 @@ export default async function MarketPage(props: MarketPageProps) {
       url: comp.url,
       price: comp.price,
       priceNumeric,
-      format: ((comp as Record<string, unknown>).format as string) || "guide",
+      format: listingFormat(comp.title),
       rating: comp.rating,
       reviewCount: comp.review_count,
       positioning: null,
@@ -729,7 +729,7 @@ export default async function MarketPage(props: MarketPageProps) {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="capitalize text-[11px]">
-                          {opp.format.replace("_", " ")}
+                          {opp.format ? opp.format.replace("_", " ") : "Not observed"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs font-mono text-foreground">

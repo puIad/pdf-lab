@@ -12,6 +12,7 @@ import { fetchRunCompleteness, calculateCompleteness } from "../runs/completenes
 import { marketCompletenessCounts, NOT_OBSERVED, observeMarket, type ReportSignal } from "../report/observed.ts";
 import { parsePrice } from "../sources/marketplace-helper.ts";
 import {
+  listingFormat,
   mineReviewsAndGaps,
   type CompetitorProduct,
 } from "../competition/index.ts";
@@ -174,7 +175,7 @@ export async function fetchReportExportData(
       url: comp.url,
       price: comp.price,
       priceNumeric,
-      format: "guide",
+      format: listingFormat(comp.title),
       rating: comp.rating,
       reviewCount: comp.review_count,
       positioning: null,

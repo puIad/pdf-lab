@@ -14,7 +14,7 @@ import {
   enforceRule5_SeparationOfConcerns,
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
-import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
+import { listingFormat, mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 import { marketForCompetitor } from "../competition/map.ts";
 import { isDemandOnly, isListing } from "../sources/demand-only.ts";
 import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
@@ -111,8 +111,9 @@ export interface OrchestratorOpportunityItem {
   targetAudience: string;
   problem: string;
   solution: string;
-  format: string;
-  priceRange?: string | null;
+  /** Null when the wording names no format ("Not observed"). */
+  format: string | null;
+  priceRange?: string| null;
   opportunityScore: number;
   confidence: number;
   /** Signals of the market that match this problem, of `marketSignals` (QC Rule 4, Part 6.8). */
@@ -487,7 +488,7 @@ async function finishRun(
           title: c.title,
           url: c.url || null,
           price: c.price || null,
-          format: c.format || "guide",
+          format: c.format || listingFormat(c.title),
           rating: c.rating || null,
           reviewCount: c.reviewCount || null,
           positioning: c.positioning || null,

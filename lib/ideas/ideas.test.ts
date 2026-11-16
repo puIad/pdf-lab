@@ -8,6 +8,7 @@ import {
   buildIdeas,
   isTimely,
   classifyFormat,
+  matchFormat,
   classifyIntent,
   ideaTitle,
   opportunity,
@@ -57,6 +58,15 @@ describe("classification", () => {
     assert.equal(classifyFormat("budgeting template excel"), "Worksheet");
     assert.equal(classifyFormat("keto diet recipes"), "Ebook");
     assert.equal(classifyFormat("what is keto diet"), "Guide");
+  });
+
+  it("names a format only when the text does; in prose a plan is not a planner (issue #49)", () => {
+    assert.equal(matchFormat("what is keto diet"), null);
+    assert.equal(matchFormat("keto diet plan"), "Planner");
+    assert.equal(matchFormat("Grocery spending exceeds the monthly plan", true), null);
+    assert.equal(matchFormat("My plans fail, I need a weekly planner", true), "Planner");
+    assert.equal(matchFormat("a beginner's guide to budgeting"), "Guide");
+    assert.equal(matchFormat("budget tracker guide"), "Planner"); // a more specific format word wins
   });
 
   it("reads intent, fit and specificity", () => {

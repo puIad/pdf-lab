@@ -224,7 +224,8 @@ test("Opportunity generator: observed fields only, never padded (Part 6.4)", asy
     assert.equal(couples.priceRange, "$4.99–$19"); // the market's observed range
     assert.equal(freelancers.priceRange, null); // no stored competitor prices
     assert.equal(students.format, "checklist"); // the signal's wording names the format
-    assert.equal(freelancers.format, "guide");
+    assert.equal(freelancers.format, null); // no format word in the wording: not observed, no default (issue #49)
+    assert.match(freelancers.title, /^PDF for /);
   });
 
   await t.test("selection keeps (audience, problem, format) distinct and caps a format at 36%", async () => {

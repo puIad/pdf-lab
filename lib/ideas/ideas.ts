@@ -97,11 +97,22 @@ const FORMAT_RULES: Array<[IdeaFormat, RegExp]> = [
   ["Cheat sheet", /\b(cheat ?sheet|cheat|shortcuts|formulas|chart|symbols|glossary)\b/],
   ["Ebook", /\b(recipes|ideas|e?book|handbook|bible|complete|101)\b/],
   ["Report", /\b(statistics|stats|trends|market|salary|salaries|report|data|average cost)\b/],
+  // Last: only reached when no other format word appears, where classifyFormat says Guide anyway.
+  ["Guide", /\b(guides?|guidebook|manual|tutorial)\b/],
 ];
 
+/**
+ * The format a text names, or null when no format word appears. `prose` is for discussion text,
+ * where "plan" is an intention ("my plan is to save") far more often than a document (issue #49).
+ */
+export function matchFormat(text: string, prose = false): IdeaFormat | null {
+  const p = prose ? text.toLowerCase().replace(/\bplans?\b/g, " ") : text.toLowerCase();
+  return FORMAT_RULES.find(([, re]) => re.test(p))?.[0] ?? null;
+}
+
+/** A search phrase's format. A phrase that names none is suggested as a guide. */
 export function classifyFormat(phrase: string): IdeaFormat {
-  const p = phrase.toLowerCase();
-  return FORMAT_RULES.find(([, re]) => re.test(p))?.[0] ?? "Guide";
+  return matchFormat(phrase) ?? "Guide";
 }
 
 export function classifyIntent(phrase: string, engines: string[]): IdeaIntent {
