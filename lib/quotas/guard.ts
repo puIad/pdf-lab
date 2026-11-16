@@ -38,7 +38,16 @@ export function usageStore(): UsageStore {
       return count ?? 0;
     },
     async record(caller, kind) {
-      const { error } = await db.from("usage_events").insert({ user_id: caller.userId, anon_hash: caller.userId ? null : caller.anonHash, kind });
+      const { data, error } = await db
+        .from("usage_events")
+        .insert({ user_id: caller.userId, anon_hash: caller.userId ? null : caller.anonHash, kind })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      return data.id as string;
+    },
+    async remove(id) {
+      const { error } = await db.from("usage_events").delete().eq("id", id);
       if (error) throw new Error(error.message);
     },
   };
@@ -48,6 +57,8 @@ export interface Guarded {
   caller: Caller;
   /** The caller's quota after this action; null when the caller is not counted. */
   quota: QuotaState | null;
+  /** The usage row this action recorded; null when nothing was counted. */
+  usageId: string | null;
   /** Set when the action is refused: the reason, and the same reason as a JSON response. */
   error: string | null;
   denied: NextResponse | null;
@@ -64,12 +75,26 @@ export async function enforceQuota(headers: Headers, kind: UsageKind | "internal
   try {
     caller = await resolveCaller(headers);
     const d = await decide(caller, kind, usageStore());
-    if (d.ok) return { caller, quota: d.quota, error: null, denied: null };
-    return { caller, quota: d.quota, error: d.error, denied: NextResponse.json({ error: d.error, quota: d.quota }, { status: d.status }) };
+    if (d.ok) return { caller, quota: d.quota, usageId: d.usageId, error: null, denied: null };
+    return { caller, quota: d.quota, usageId: null, error: d.error, denied: NextResponse.json({ error: d.error, quota: d.quota }, { status: d.status }) };
   } catch (err) {
     // The quota could not be read: refuse, do not run uncounted.
     const error = `Could not check your usage limit: ${err instanceof Error ? err.message : String(err)}`;
-    return { caller, quota: null, error, denied: NextResponse.json({ error }, { status: 503 }) };
+    return { caller, quota: null, usageId: null, error, denied: NextResponse.json({ error }, { status: 503 }) };
+  }
+}
+
+/**
+ * Gives back an action counted by enforceQuota when the work then failed: the caller got nothing,
+ * so it should not use up their limit (a free plan has one Deep run a month). Call it on every
+ * error return after the guard. A failed refund is logged, never thrown over the real error.
+ */
+export async function refund(guard: Guarded): Promise<void> {
+  if (!guard.usageId) return;
+  try {
+    await usageStore().remove(guard.usageId);
+  } catch (err) {
+    console.error(`Could not refund usage row ${guard.usageId}:`, err);
   }
 }
 

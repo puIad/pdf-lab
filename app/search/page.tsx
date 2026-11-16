@@ -9,7 +9,7 @@ import { headers } from "next/headers";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { generateMarketOverview, getSearchHistory } from "@/lib/search";
 import type { MarketOverview, SearchHistoryItem } from "@/lib/search/types";
-import { enforceQuota, resolveCaller } from "@/lib/quotas/guard";
+import { enforceQuota, refund, resolveCaller } from "@/lib/quotas/guard";
 import { SearchView } from "./search-view";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +54,7 @@ export default async function SearchPage(props: SearchPageProps) {
         persistRun: true,
       });
     } catch (err) {
+      if (guard) await refund(guard); // the search failed: it does not count
       console.error(`Failed to generate market overview for "${q}":`, err);
     }
   }

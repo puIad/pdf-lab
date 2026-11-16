@@ -84,11 +84,14 @@ export interface Caller {
 
 export interface UsageStore {
   count(caller: Caller, kind: UsageKind, since: Date): Promise<number>;
-  record(caller: Caller, kind: UsageKind): Promise<void>;
+  /** Records one action and returns the row's id, so a failed action can be refunded. */
+  record(caller: Caller, kind: UsageKind): Promise<string>;
+  /** Deletes a recorded action: the work it paid for failed and gave the caller nothing. */
+  remove(id: string): Promise<void>;
 }
 
 export type QuotaDecision =
-  | { ok: true; quota: QuotaState | null }
+  | { ok: true; quota: QuotaState | null; usageId: string | null }
   | { ok: false; status: 401 | 429; error: string; quota: QuotaState | null };
 
 const resetDate = (iso: string): string =>
@@ -104,9 +107,9 @@ export async function decide(
   store: UsageStore,
   now: Date = new Date(),
 ): Promise<QuotaDecision> {
-  if (caller.plan === "internal") return { ok: true, quota: null };
+  if (caller.plan === "internal") return { ok: true, quota: null, usageId: null };
   if (kind === "internal") return { ok: false, status: 401, error: "This endpoint needs the internal API key.", quota: null };
-  if (caller.plan === "local") return { ok: true, quota: null };
+  if (caller.plan === "local") return { ok: true, quota: null, usageId: null };
 
   const { max, window } = LIMITS[caller.plan][kind];
   if (max === 0) {
@@ -128,6 +131,6 @@ export async function decide(
       quota,
     };
   }
-  await store.record(caller, kind);
-  return { ok: true, quota: quotaState(caller.plan, kind, used + 1, now) };
+  const usageId = await store.record(caller, kind);
+  return { ok: true, quota: quotaState(caller.plan, kind, used + 1, now), usageId };
 }

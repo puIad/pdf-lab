@@ -14,7 +14,7 @@ import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { OPPORTUNITY_PROMPT_VERSION } from "@/lib/opportunities";
 import { isDemandOnly } from "@/lib/sources/demand-only";
-import { enforceQuota } from "@/lib/quotas/guard";
+import { enforceQuota, refund } from "@/lib/quotas/guard";
 import {
   RESEARCH_MODES,
   buildValidationReport,
@@ -147,6 +147,7 @@ export async function POST(req: Request) {
       }
       case "monitor": {
         if (!text) {
+          await refund(guard);
           return NextResponse.json({ error: "Monitor needs a niche, e.g. `monitor: pc troubleshooting`", plan }, { status: 400 });
         }
         const { data, error } = await supabase
@@ -203,6 +204,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ runId: run.id, plan, result, quota: guard.quota });
   } catch (err) {
+    await refund(guard); // the run failed: it does not count
     return NextResponse.json(
       { error: `Research failed: ${err instanceof Error ? err.message : String(err)}`, plan },
       { status: 500 },

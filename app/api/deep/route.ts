@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { startPastedRun } from "@/lib/runs/orchestrator";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
 import { buildPastePrompt, PASTE_PROMPT_VERSION, promptSignals } from "@/lib/runs/pasted";
-import { enforceQuota } from "@/lib/quotas/guard";
+import { enforceQuota, refund } from "@/lib/quotas/guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // ingest: about 15 s of throttled adapter calls
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
     const topic = seed.trim();
     const run = await startPastedRun({ query: topic, seed: topic, mode: "deep", limit: (limit as number | undefined) ?? 25, userId: guard.caller.userId }, createServerOrchestratorDeps());
     if (run.status !== "awaiting_reply") {
+      await refund(guard); // nothing collected: the month's Deep run is not used up
       return NextResponse.json({ error: run.error ?? "The run failed while collecting signals.", runId: run.runId, trace: run.trace }, { status: 502 });
     }
     const signals = promptSignals(run.signals);
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
       quota: guard.quota,
     });
   } catch (err) {
+    await refund(guard);
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

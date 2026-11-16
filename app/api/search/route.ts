@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { generateMarketOverview, getSearchHistory } from "@/lib/search";
-import { enforceQuota, resolveCaller } from "@/lib/quotas/guard";
+import { enforceQuota, refund, resolveCaller } from "@/lib/quotas/guard";
 import type { Caller } from "@/lib/quotas/quotas";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +61,7 @@ export async function GET(req: Request) {
       quota: guard.quota,
     });
   } catch (err) {
+    await refund(guard); // the search failed: it does not count
     return NextResponse.json(
       { error: `Market search failed: ${err instanceof Error ? err.message : String(err)}` },
       { status: 500 }
@@ -103,6 +104,7 @@ export async function POST(req: Request) {
       quota: guard.quota,
     });
   } catch (err) {
+    await refund(guard); // the search failed: it does not count
     return NextResponse.json(
       { error: `Market search failed: ${err instanceof Error ? err.message : String(err)}` },
       { status: 500 }

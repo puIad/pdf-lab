@@ -3,7 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/db/client";
 import { getRouter } from "@/lib/ai/index";
 import { BriefUnavailable, DESCRIPTION_KEY, loadBrief, parseBriefSource } from "@/lib/brief";
 import { writeBriefNote } from "@/lib/brief/notes";
-import { enforceQuota } from "@/lib/quotas/guard";
+import { enforceQuota, refund } from "@/lib/quotas/guard";
 
 // POST /api/briefs/notes { source, key } — Phase 3 Part 3.10: one click = one cheap-tier AI note for an
 // outline heading, or `key: "description"` for the listing description. The brief is rebuilt from
@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     const note = await writeBriefNote(getRouter(), brief, body.key);
     return NextResponse.json({ key: body.key, note });
   } catch (err) {
+    await refund(guard); // no note written: it does not count
     if (err instanceof BriefUnavailable) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 502 });
   }
