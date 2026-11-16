@@ -1,41 +1,53 @@
-// app/page.tsx — Market Explorer homepage (DB-backed) per PRD §7, §40.
-// Renders the dashboard shell, evidence-derived explorer table, and filter tabs.
+// app/page.tsx — Home (Part 6.12): the quick-ideas scan, which leads to Validate, the competition
+// check and the brief, and below it the visitor's recent Deep runs. The market explorer that was
+// here is at /markets; old `/?run=` links redirect there.
 
 import React from "react";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { IdeasView } from "@/app/ideas/ideas-view";
+import { RecentDeepRuns, type RecentDeepRun } from "@/components/home/recent-deep-runs";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { fetchMarketsData, parseMarketScope } from "@/lib/markets/fetcher";
-import { DashboardShell } from "@/components/markets-table";
+import { resolveCaller } from "@/lib/quotas/guard";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage(props: { searchParams: Promise<{ run?: string }> }) {
-  // Latest completed run of each seed by default; `?run=<id>` or `?run=legacy` reaches the rest (Part 6.7).
-  const scope = parseMarketScope((await props.searchParams).run, "latest");
-  const supabase = createServiceSupabaseClient();
-  let markets: Awaited<ReturnType<typeof fetchMarketsData>>["markets"] = [];
-  let stats: Awaited<ReturnType<typeof fetchMarketsData>>["stats"] = {
-    totalMarkets: 0,
-    totalEvidence: 0,
-    totalOpportunities: 0,
-    totalSignals: 0,
-  };
-
-  let runs: Awaited<ReturnType<typeof fetchMarketsData>>["runs"] = [];
-  let legacyCount = 0;
-
+async function loadRecentDeepRuns(): Promise<{ runs: RecentDeepRun[]; signedOut: boolean; error: string | null }> {
   try {
-    const res = await fetchMarketsData(supabase, scope);
-    markets = res.markets;
-    stats = res.stats;
-    runs = res.runs;
-    legacyCount = res.legacyCount;
+    const caller = await resolveCaller(await headers());
+    if (caller.plan === "anon") return { runs: [], signedOut: true, error: null };
+    const query = createServiceSupabaseClient()
+      .from("research_runs")
+      .select("id, query, status, started_at, markets ( id )")
+      .eq("mode", "deep")
+      .order("started_at", { ascending: false })
+      .limit(6);
+    // A person sees their own runs; the server key and a local dev server see all (Part 5.1).
+    const { data, error } = await (caller.userId ? query.eq("user_id", caller.userId) : query);
+    if (error) throw new Error(error.message);
+    const runs = (data ?? []).map((r) => ({
+      id: r.id as string,
+      query: r.query as string,
+      status: r.status as string,
+      startedAt: r.started_at as string,
+      markets: Array.isArray(r.markets) ? r.markets.length : 0,
+    }));
+    return { runs, signedOut: false, error: null };
   } catch (err) {
-    console.error("Failed to load initial markets from DB:", err);
+    return { runs: [], signedOut: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
 
+export default async function HomePage(props: { searchParams: Promise<{ q?: string; region?: string; run?: string }> }) {
+  const { q, region, run } = await props.searchParams;
+  if (run) redirect(`/markets?run=${encodeURIComponent(run)}`);
+  const recent = await loadRecentDeepRuns();
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <DashboardShell key={scope} initialMarkets={markets} initialStats={stats} runs={runs} scope={scope} legacyCount={legacyCount} />
+    <main className="flex-1 bg-background text-foreground">
+      <IdeasView initialSeed={q?.trim() ?? ""} initialRegion={region ?? ""} />
+      <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+        <RecentDeepRuns {...recent} />
+      </div>
     </main>
   );
 }

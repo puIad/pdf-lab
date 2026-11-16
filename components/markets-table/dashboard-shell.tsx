@@ -7,8 +7,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search,
-  Terminal,
-  Compass,
   Flame,
   TrendingUp,
   DollarSign,
@@ -24,11 +22,9 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { ExplorerTable } from "./explorer-table";
-import { DeepResearchDialog } from "./deep-research-dialog";
 import type { MarketRowData, MarketRun, MarketStats, MarketTab } from "./types";
 
 interface DashboardShellProps {
@@ -232,47 +228,25 @@ export function DashboardShell({
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-8">
-      {/* 1. Header & Branding */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center size-9 rounded-xl bg-primary text-primary-foreground font-bold shadow-xs">
-              P
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              PDF LAB
-            </h1>
-            <Badge variant="outline" className="text-xs font-mono py-0 px-2 text-muted-foreground">
-              Market Explorer
-            </Badge>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Evidence-backed digital product intelligence. Continuously evaluate niches, demand velocity, competition density, and PDF suitability with zero hallucination.
+      {/* 1. Header. The site header carries the logo and the other sections (Part 6.12). */}
+      <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Markets</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Markets found by Deep runs, each score with the evidence behind it. The latest run of each seed is shown;
+            pick another run in the filters. To start a run, scan a topic on{" "}
+            <Link href="/" className="font-medium text-foreground underline underline-offset-4">
+              Ideas
+            </Link>{" "}
+            and choose Go deeper on this seed.
           </p>
         </div>
-
-        {/* Top CTAs: Market Search, Market Radar & Run Deep Research */}
-        <div className="flex items-center gap-2.5">
-          <Link href="/radar">
-            <Button variant="outline" size="sm" className="gap-1.5 cursor-pointer border-primary/40 hover:border-primary">
-              <Compass className="size-4 text-primary" />
-              <span>Market Radar</span>
-            </Button>
-          </Link>
-          <Link href="/search">
-            <Button variant="outline" size="sm" className="gap-1.5 cursor-pointer">
-              <Search className="size-4" />
-              <span>Market Search</span>
-            </Button>
-          </Link>
-          <Link href="/research">
-            <Button variant="outline" size="sm" className="gap-1.5 cursor-pointer">
-              <Terminal className="size-4" />
-              <span>Ask PDF Lab</span>
-            </Button>
-          </Link>
-          <DeepResearchDialog />
-        </div>
+        <Link href="/search" className="shrink-0">
+          <Button variant="outline" size="sm" className="cursor-pointer gap-1.5">
+            <Search className="size-4" />
+            <span>Search markets</span>
+          </Button>
+        </Link>
       </div>
 
       {/* 2. Stat Summary Overview */}

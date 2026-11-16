@@ -37,7 +37,7 @@ export default async function AccountPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="flex-1 bg-background text-foreground">
       <div className="mx-auto w-full max-w-2xl space-y-6 px-4 py-8 sm:px-6">
         <div className="flex items-center gap-3 border-b border-border pb-5">
           <Link href="/">

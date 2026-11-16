@@ -4,7 +4,15 @@ Scores shown are EVIDENCE-DERIVED (PRD §7 note). Any number without backing row
 Frontend rule: ALWAYS and ONLY use components, UI primitives, and directing prompts from
 `C:\Users\pulad\Desktop\frontend-ai-megalibrary`.
 
-## Dashboard (PRD §40)
+## Navigation and home (Part 6.12)
+
+- One header on every page: Ideas (`/`), Markets (`/markets`), Research (`/research`), Radar
+  (`/radar`), and Sign in or Account.
+- `/` is the quick-ideas scan with the four steps to a brief, then the visitor's recent Deep
+  runs. Deep research starts from a scanned seed ("Go deeper on this seed").
+- The dashboard below is `/markets`. `/ideas` and `/?run=` redirect to `/` and `/markets?run=`.
+
+## Dashboard (PRD §40, at `/markets` since Part 6.12)
 
 ```text
 PDF LAB
@@ -52,7 +60,7 @@ positioning, search keywords, customer language, evidence sources.
 
 ## Quick ideas, verdict, brief (Parts 3.6 to 3.10, DEC-010)
 
-- `/ideas`: seed + region → idea cards (format, title, demand, PDF fit, trend, effort, interest,
+- `/` (was `/ideas`): seed + region → idea cards (format, title, demand, PDF fit, trend, effort, interest,
   Timely / not-advice tags). Five ticks per card (demand, trend, PDF fit, effort, competition),
   each showing its threshold and count; competition stays blank until "Check competition" ran.
   Card actions: Validate, Deep research, Check competition, save, outline. Scan → CSV.

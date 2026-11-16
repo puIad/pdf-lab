@@ -101,10 +101,10 @@ export function SearchView({
       {/* 1. Header Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div className="flex items-center gap-3">
-          <Link href="/">
+          <Link href="/markets">
             <Button variant="ghost" size="sm" className="gap-1.5 cursor-pointer">
               <ArrowLeft className="size-4" />
-              <span>Back to Explorer</span>
+              <span>Markets</span>
             </Button>
           </Link>
           <div className="h-4 w-px bg-border hidden sm:block" />

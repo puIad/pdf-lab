@@ -157,17 +157,17 @@ export default async function MarketPage(props: MarketPageProps) {
   const completeness = calculateCompleteness(counts);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex-1 bg-background text-foreground">
       {/* Top Navigation */}
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/95 backdrop-blur-md">
         <div className="container mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <Link
-              href="/"
+              href="/markets"
               className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="size-3.5" />
-              <span>Back to Explorer</span>
+              <span>Back to markets</span>
             </Link>
             <span className="hidden text-border sm:inline">/</span>
             <span className="hidden text-xs font-medium text-foreground truncate max-w-md sm:inline">

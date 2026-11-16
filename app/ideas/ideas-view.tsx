@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, Copy, Download, ExternalLink, FileText, Flame, History, ListOrdered, Loader2, Microscope, RefreshCw, Search, Store, ShieldAlert, ShieldCheck, TrendingUp } from "lucide-react";
+import { CalendarClock, Copy, Download, ExternalLink, FileText, Flame, History, ListOrdered, Loader2, Microscope, RefreshCw, Search, Store, ShieldAlert, ShieldCheck, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -437,6 +437,14 @@ function IdeaCard({ seed, idea, related, initialCheck }: { seed: string; idea: Q
   );
 }
 
+// The path from a topic to a brief, shown on the home page (Part 6.12).
+const PATH = [
+  { title: "Scan a topic", detail: "Ideas from search phrases, Trends and Wikipedia." },
+  { title: "Validate an idea", detail: "GO, WAIT or KILL from the stored counts." },
+  { title: "Check competition", detail: "Etsy, Gumroad and KDP listings for the phrase." },
+  { title: "Get the brief", detail: "Outline and evidence as Markdown or DOCX." },
+];
+
 export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string; initialRegion: string }) {
   const [seed, setSeed] = useState(initialSeed);
   const [region, setRegion] = useState<RegionCode>(isRegion(initialRegion) ? initialRegion : DEFAULT_REGION);
@@ -471,7 +479,7 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
         setData(body);
         setTab("all");
         setShown(24);
-        window.history.replaceState(null, "", `/ideas?q=${encodeURIComponent(s)}&region=${where}`);
+        window.history.replaceState(null, "", `${window.location.pathname}?q=${encodeURIComponent(s)}&region=${where}`);
         pushRecent({ seed: s.toLowerCase(), region: where });
       }
     } catch (err) {
@@ -494,24 +502,27 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="cursor-pointer gap-1.5">
-              <ArrowLeft className="size-4" />
-              <span>Explorer</span>
-            </Button>
-          </Link>
-          <div className="hidden h-4 w-px bg-border sm:block" />
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Quick ideas</h1>
-          <Badge variant="outline" className="font-mono text-xs">
-            Part 3.9
-          </Badge>
+      <div className="space-y-5 border-b border-border pb-6">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Find PDF ideas people already search for</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            One topic in, ranked PDF ideas out, from what people type into search boxes. Every score shows the counts behind
+            it. Scores are not calibrated yet.
+          </p>
         </div>
-        <p className="max-w-md text-xs text-muted-foreground">
-          One topic in, ranked PDF ideas out, from what people type into search boxes. Every score shows the counts behind it.
-          Scores are not calibrated yet.
-        </p>
+        <ol className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4" aria-label="From a topic to a brief">
+          {PATH.map((step, i) => (
+            <li key={step.title} className="flex gap-2.5">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border font-mono text-[10px] text-muted-foreground">
+                {i + 1}
+              </span>
+              <span className="space-y-0.5">
+                <span className="block text-xs font-medium">{step.title}</span>
+                <span className="block text-[11px] leading-snug text-muted-foreground">{step.detail}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
       </div>
 
       <form
@@ -634,7 +645,7 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
                 <Link href={`/deep?seed=${encodeURIComponent(data.seed)}`}>
                   <Button size="xs" variant="outline" className="cursor-pointer" title="Collect this seed's signals and have a chat model analyse them; its top quick ideas join the opportunity candidates.">
                     <Microscope />
-                    Deep research
+                    Go deeper on this seed
                   </Button>
                 </Link>
               </div>
@@ -726,6 +737,23 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
                   </Button>
                 </div>
               )}
+              <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    Go deeper on <span className="capitalize">{data.seed}</span>
+                  </p>
+                  <p className="max-w-2xl text-xs text-muted-foreground">
+                    Deep research collects this seed&apos;s signals from every connected source, you paste them into a chat model
+                    that sorts them into markets, and the top quick ideas above join the opportunity candidates. It uses one Deep run of your plan.
+                  </p>
+                </div>
+                <Link href={`/deep?seed=${encodeURIComponent(data.seed)}`} className="shrink-0">
+                  <Button size="sm" className="cursor-pointer gap-1.5">
+                    <Microscope />
+                    Go deeper on this seed
+                  </Button>
+                </Link>
+              </div>
               <p className="text-[11px] text-muted-foreground">
                 Phrase specificity is not a competition measure (QC Rule 3). Use Competition on a card to count observed Etsy, Gumroad
                 and Amazon KDP listings for that phrase; until then the competition tick stays blank.

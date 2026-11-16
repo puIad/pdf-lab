@@ -8,7 +8,6 @@ import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
-  ArrowLeft,
   ArrowRight,
   Crosshair,
   CornerDownLeft,
@@ -432,8 +431,8 @@ function DeepResult({ run }: { run: RunSummary }) {
           </div>
         ))}
       </dl>
-      <Link href="/" className="inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline">
-        Open the explorer <ArrowRight className="size-3" />
+      <Link href="/markets" className="inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline">
+        Open the markets <ArrowRight className="size-3" />
       </Link>
     </div>
   );
@@ -495,13 +494,6 @@ export function ResearchView({ initialPrompt, recentRuns }: { initialPrompt: str
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="cursor-pointer gap-1.5">
-              <ArrowLeft className="size-4" />
-              <span>Explorer</span>
-            </Button>
-          </Link>
-          <div className="hidden h-4 w-px bg-border sm:block" />
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Ask PDF Lab</h1>
           <Badge variant="outline" className="font-mono text-xs">
             PRD §26–§28

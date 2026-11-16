@@ -203,10 +203,10 @@ export function DeepView({
     <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
       <div className="flex flex-col gap-3 border-b border-border pb-5">
         <div className="flex items-center gap-3">
-          <Link href="/">
+          <Link href={seed.trim() ? `/?q=${encodeURIComponent(seed.trim())}` : "/"}>
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">
               <ArrowLeft className="size-3.5" />
-              Explorer
+              Ideas
             </Button>
           </Link>
           <div className="hidden h-4 w-px bg-border sm:block" />
@@ -363,7 +363,7 @@ export function DeepView({
                   </p>
                 )}
                 {completed ? (
-                  <Link href={`/?run=${finished.run.runId}`}>
+                  <Link href={`/markets?run=${finished.run.runId}`}>
                     <Button className="gap-1.5">
                       Open this run&apos;s markets
                       <ArrowUpRight />
@@ -379,7 +379,7 @@ export function DeepView({
               <p className="text-sm text-muted-foreground">
                 This run is {paused?.status}.{" "}
                 {paused?.status === "completed" && (
-                  <Link href={`/?run=${paused.runId}`} className="font-medium text-foreground underline underline-offset-4">
+                  <Link href={`/markets?run=${paused.runId}`} className="font-medium text-foreground underline underline-offset-4">
                     Open its markets
                   </Link>
                 )}

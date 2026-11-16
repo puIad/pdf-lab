@@ -84,7 +84,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 | 6.9 | Batched extraction; a run that analysed nothing fails | blocked | 88fe435 | Batched extraction, 10 signals per call; a run that analysed under half fails. Live extraction run waits on DEC-015; a pasted run calls no model. [log](log/part-6.9.md) |
 | 6.10 | Deep runs as a background job | blocked | — | Waits on DEC-001 (job provider) and a measured post-6.9 run duration. [log](log/part-6.10.md) |
 | 6.11 | Score honesty + calibration from stored competition checks | done | 2ff8833 | Demand no longer grows with the fetch limit, intent averages analysed signals, competition tick recut from 30 stored checks. [log](log/part-6.11.md) |
-| 6.12 | Ideas-first home + shared navigation | pending | — | Ideas-first home and one shared header. [log](log/part-6.12.md) |
+| 6.12 | Ideas-first home + shared navigation | done | (this commit) | `/` is the ideas scan with recent Deep runs; explorer at `/markets`; one shared header; brief reached by clicks only. [log](log/part-6.12.md) |
 | 6.13 | Lighter process docs | done | 12e791c | STATE notes moved to docs/log, open-defects table added. Frontend rule now points at components/ui (DEC-016). [log](log/part-6.13.md) |
 | 6.14 | Report pages: remove hard-coded PC copy and invented values | done | 878caea | Report pages show stored values or "Not observed"; panel counts equal the stored rows. [log](log/part-6.14.md) |
 | 6.15 | Deep runs analysed by a pasted model reply | done | bddcb53 | Collect, copy one prompt into a chat model, paste the reply back; markets come from the reply's names. No model call. [log](log/part-6.15.md) |
@@ -111,8 +111,6 @@ Known defects and their owner. A fixed defect leaves this table (its story stays
 | A quick idea whose words are in no market is filed under the run's strongest market | 6.16 | unowned |
 | PDF fit threshold and verdict thresholds are not supported by the calibration data; idea opportunity score adds nothing over demand | 6.11 | unowned (needs 3.11's file or more checks) |
 | Most stored budgeting "discussions" are Trends related-query rows; stored markets keep scores from the old formula | 6.8, 6.11 | unowned (a new run rewrites them) |
-| Home page is the explorer over old markets; no shared navigation | DEC-014 | 6.12 |
-| Explorer header buttons overflow by 223 px at 375 px | 6.7 | 6.12 |
 | Production Reddit needs its own app id | 1.1 | DEC-005 (external approval) |
 | Vercel project not connected to the repo for auto-deploys | 0.3 | unowned (user, dashboard) |
 | Outline headings can repeat a theme ("why X is important" / "why X matters") | 3.6, 3.10 | unowned |
