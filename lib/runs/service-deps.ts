@@ -415,7 +415,9 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         }
       }
 
-      return observed.slice(0, 10);
+      // Every listing of the run: a cut to the first 10 made the landscape shares a slice of what
+      // was collected (issue #50). The adapters cap a run at 10 results per marketplace.
+      return observed;
     },
 
     saveCompetitors: async (competitors) => {
