@@ -56,7 +56,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
-| 4.1 | Watchlist | done | (this commit) | Markets, tracked seeds and saved ideas per signed-in user at `/watchlist`, owner-only RLS, plan cap; signed out asks for sign-in. Live check 38 of 38. [log](log/part-4.1.md) |
+| 4.1 | Watchlist | done | 6c43963 | Markets, tracked seeds and saved ideas per signed-in user at `/watchlist`, owner-only RLS, plan cap; signed out asks for sign-in. Live check 38 of 38. [log](log/part-4.1.md) |
 | 4.2 | Scheduled re-research + change detection | pending | — | Scheduled re-research with change detection and daily seed re-scans. DEC-001 is decided here. [log](log/part-4.2.md) |
 | 4.3 | Alerts (in-app first) | pending | — | In-app alerts and a weekly digest. [log](log/part-4.3.md) |
 
