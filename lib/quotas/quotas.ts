@@ -88,8 +88,12 @@ export interface Caller {
 
 export interface UsageStore {
   count(caller: Caller, kind: UsageKind, since: Date): Promise<number>;
-  /** Records one action and returns the row's id, so a failed action can be refunded. */
-  record(caller: Caller, kind: UsageKind): Promise<string>;
+  /**
+   * Counts the caller's actions since `since` and, when there are fewer than `max`, records one
+   * more, as one step: two requests at the limit cannot both pass. `usageId` is the new row (a
+   * failed action is refunded by it) or null when the limit is reached; `used` is the count after.
+   */
+  take(caller: Caller, kind: UsageKind, since: Date, max: number): Promise<{ usageId: string | null; used: number }>;
   /** Deletes a recorded action: the work it paid for failed and gave the caller nothing. */
   remove(id: string): Promise<void>;
 }
@@ -125,8 +129,8 @@ export async function decide(
       quota: quotaState(caller.plan, kind, 0, now),
     };
   }
-  const used = await store.count(caller, kind, windowStart(window, now));
-  if (used >= max) {
+  const { usageId, used } = await store.take(caller, kind, windowStart(window, now), max);
+  if (!usageId) {
     const quota = quotaState(caller.plan, kind, used, now);
     return {
       ok: false,
@@ -135,6 +139,5 @@ export async function decide(
       quota,
     };
   }
-  const usageId = await store.record(caller, kind);
-  return { ok: true, quota: quotaState(caller.plan, kind, used + 1, now), usageId };
+  return { ok: true, quota: quotaState(caller.plan, kind, used, now), usageId };
 }

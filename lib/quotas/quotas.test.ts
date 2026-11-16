@@ -13,10 +13,12 @@ function memoryStore(clock: { now: Date }): UsageStore & { rows: Array<{ id: str
   return {
     rows,
     count: async (c, kind, since) => rows.filter((r) => r.who === who(c) && r.kind === kind && r.at >= since).length,
-    record: async (c, kind) => {
+    take: async (c, kind, since, max) => {
+      const used = rows.filter((r) => r.who === who(c) && r.kind === kind && r.at >= since).length;
+      if (used >= max) return { usageId: null, used };
       const id = `row-${++next}`;
       rows.push({ id, who: who(c), kind, at: clock.now });
-      return id;
+      return { usageId: id, used: used + 1 };
     },
     remove: async (id) => {
       const i = rows.findIndex((r) => r.id === id);

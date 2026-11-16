@@ -37,14 +37,13 @@ export function usageStore(): UsageStore {
       if (error) throw new Error(error.message);
       return count ?? 0;
     },
-    async record(caller, kind) {
+    async take(caller, kind, since, max) {
+      // One SQL function counts and inserts under a lock (migration 11).
       const { data, error } = await db
-        .from("usage_events")
-        .insert({ user_id: caller.userId, anon_hash: caller.userId ? null : caller.anonHash, kind })
-        .select("id")
-        .single();
+        .rpc("take_usage", { p_user_id: caller.userId, p_anon_hash: caller.userId ? null : caller.anonHash, p_kind: kind, p_since: since.toISOString(), p_max: max })
+        .single<{ usage_id: string | null; used: number }>();
       if (error) throw new Error(error.message);
-      return data.id as string;
+      return { usageId: data.usage_id, used: data.used };
     },
     async remove(id) {
       const { error } = await db.from("usage_events").delete().eq("id", id);
@@ -67,8 +66,6 @@ export interface Guarded {
 /**
  * Run at the top of every endpoint that spends something. `kind` names what is counted;
  * `internal` marks a pipeline endpoint only the server key may call.
- * shortcut: check then insert, so two requests in the same instant can both pass at the limit;
- * move the count into one SQL statement if that is ever abused.
  */
 export async function enforceQuota(headers: Headers, kind: UsageKind | "internal"): Promise<Guarded> {
   let caller: Caller = { plan: "anon", userId: null, anonHash: null, email: null };
