@@ -66,7 +66,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ runId: string 
     const { items, problems, missing } = parsed;
     // Signals the model found unrelated to the topic: analysed, but in no market.
     const noMarket = [...items.values()].filter((i) => marketKey(i.market) === NO_MARKET).length;
-    const counts = { analysed: items.size, total: signals.length, noMarket, problems, missing };
+    // A signal an earlier run analysed keeps that analysis and its embedding, as it does in a model
+    // run; the reply still names its market (issue #40).
+    const kept = [...items.keys()].filter((n) => signals[n - 1].analysis).length;
+    const counts = { analysed: items.size, total: signals.length, noMarket, kept, problems, missing };
 
     // Too little to report on: nothing is stored and the run keeps waiting, so the user can paste again.
     if (items.size / signals.length < MIN_ANALYZED_SHARE) {
@@ -89,7 +92,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ runId: string 
       embedding: null,
       prompt_version: PASTE_PROMPT_VERSION,
     }));
-    const { error: upsertErr } = await supabase.from("signal_analysis").upsert(rows, { onConflict: "signal_id" });
+    const { error: upsertErr } = await supabase.from("signal_analysis").upsert(rows, { onConflict: "signal_id", ignoreDuplicates: true });
     if (upsertErr) throw new Error(`Failed to save the analyses: ${upsertErr.message}`);
 
     const marketLabels = new Map([...items.entries()].map(([n, item]) => [signals[n - 1].id, item.market]));

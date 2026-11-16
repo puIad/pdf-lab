@@ -19,7 +19,9 @@ QUEUED → COLLECTING → NORMALIZING → CLASSIFYING → CLUSTERING → TREND_A
   CLASSIFYING and returns one prompt of stored signal text; `POST /api/deep/<runId>` takes the
   pasted reply, validates each item, stores the analyses (`prompt_version = extract-v3-paste`)
   and runs CLUSTERING to COMPLETED. Markets are the reply's market names, not embedding
-  clusters; a signal the reply marks `none` is in no market. PDF Lab calls no model.
+  clusters; a signal the reply marks `none` is in no market. PDF Lab calls no model. A signal an
+  earlier run analysed keeps that analysis and its embedding, as in a model run; the reply only
+  names its market (issue #40).
 
 ## Deep-research pipeline (PRD §39) — the 9 phases every `pdf-lab <niche>` run executes
 
