@@ -10,7 +10,11 @@ import { CircleUserRound, LogIn } from "lucide-react";
 import { NavLinks } from "./nav-links";
 
 export async function SiteHeader() {
-  const signedIn = (await cookies()).getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
+  // `sb-<ref>-auth-token-code-verifier` is the PKCE secret saved when a sign-in link is requested,
+  // before anyone has signed in, so it does not count.
+  const signedIn = (await cookies())
+    .getAll()
+    .some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token") && !c.name.endsWith("-code-verifier"));
   return (
     <header className="border-b border-border/80 bg-background">
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-2 px-4 sm:gap-6 sm:px-6 lg:px-8">

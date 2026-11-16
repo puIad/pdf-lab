@@ -57,3 +57,11 @@ Part 6.12.
   market and opportunity pages). They are correct but partly redundant with the header.
 - The signed-in label trusts the cookie's presence; an expired session shows Account until the
   proxy refreshes or clears it. `/account` itself checks the session.
+
+## Review fixes (PR #22 review, 2026-11-16)
+
+- The header read "Account" as soon as a sign-in link was requested: the PKCE secret is stored in
+  `sb-<ref>-auth-token-code-verifier`, which matched the signed-in test. That cookie no longer
+  counts.
+- The 5.1 fixes from the same review (`/research` run privacy, refund of failed counted actions)
+  were made on `phase-5-part-5.1` and merged into this branch; see `docs/log/part-5.1.md`.
