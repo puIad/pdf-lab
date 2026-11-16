@@ -171,11 +171,14 @@ export interface OrchestratorDeps {
   saveMarkets: (markets: OrchestratorMarketItem[], runId: string) => Promise<Array<{ id: string; name: string }>>;
   saveEvidence: (items: EvidenceInput[]) => Promise<EvidenceRow[]>;
   /** `seed`: the stored quick ideas of this seed join the candidate pool (Part 3.8). */
-  /** The array may carry `droppedUnsourced`: candidates the generator removed for lacking sourced evidence. */
+  /**
+   * The array may carry `droppedUnsourced` (candidates the generator removed for lacking sourced
+   * evidence) and `ideasInNoMarket` (quick ideas left out because their words are in no market).
+   */
   generateOpportunities: (markets: OrchestratorMarketItem[], seed: string) => Promise<Array<{
     opportunity: OrchestratorOpportunityItem;
     evidence: EvidenceInput[];
-  }> & { droppedUnsourced?: number }>;
+  }> & { droppedUnsourced?: number; ideasInNoMarket?: number }>;
   saveOpportunities: (items: OrchestratorOpportunityItem[], runId: string) => Promise<Array<{ id: string; title: string }>>;
   observeCompetition: (signals: StoredSignalForRun[]) => Promise<OrchestratorCompetitorItem[]>;
   saveCompetitors?: (competitors: Array<{
@@ -585,11 +588,13 @@ async function finishRun(
         opportunities: savedOppsCount,
         opportunitiesFromIdeas: fromIdeas,
         opportunitiesDroppedUnsourced: droppedUnsourced,
+        ideasInNoMarket: generatedPairs.ideasInNoMarket ?? 0,
         evidenceCreated: totalEvidenceCreated,
       },
       message:
         `Saved ${savedOppsCount} of ${OPPORTUNITY_TARGET} target opportunities` +
         (savedOppsCount < OPPORTUNITY_TARGET ? ", limited by evidence" : "") +
+        (generatedPairs.ideasInNoMarket ? `; ${generatedPairs.ideasInNoMarket} quick ideas fit no market and were left out` : "") +
         `; assembling research completeness panel and reconciling database counts`,
     });
     await deps.updateRunStatus(runId, "report_generation");
