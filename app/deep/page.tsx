@@ -2,7 +2,9 @@
 // PDF Lab collects the signals, the user runs the analysis in a chat model and pastes the reply back.
 
 import React from "react";
+import { headers } from "next/headers";
 import { createServiceSupabaseClient } from "@/lib/db/client";
+import { ownsRun, resolveCaller } from "@/lib/quotas/guard";
 import { loadPastedRun, pastedRunState, type PastedRunState } from "@/lib/runs/pasted-run";
 import { DeepView } from "./deep-view";
 
@@ -24,8 +26,10 @@ export default async function DeepPage(props: { searchParams: Promise<{ seed?: s
   if (run && UUID.test(run)) {
     try {
       const loaded = await loadPastedRun(createServiceSupabaseClient(), run);
-      if (loaded) initialRun = pastedRunState(loaded.run, loaded.signals);
-      else loadError = `No run ${run}.`;
+      if (!loaded) loadError = `No run ${run}.`;
+      // A run's prompt holds its collected signals: only the person who started it reopens it (Part 5.1).
+      else if (!ownsRun(await resolveCaller(await headers()), loaded.run.user_id)) loadError = "This run belongs to another account. Sign in as the person who started it.";
+      else initialRun = pastedRunState(loaded.run, loaded.signals);
     } catch (err) {
       loadError = err instanceof Error ? err.message : String(err);
     }

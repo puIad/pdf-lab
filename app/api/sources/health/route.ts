@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listAdapters } from "@/lib/sources/index";
 import type { HealthStatus } from "@/lib/sources/index";
+import { resolveCaller } from "@/lib/quotas/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,13 @@ function withTimeout(
   ]);
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Each probe is a real adapter call (Serper spends a credit), so outside a dev server only the
+  // server key may run it (Part 5.1).
+  const caller = await resolveCaller(req.headers);
+  if (caller.plan !== "internal" && caller.plan !== "local") {
+    return NextResponse.json({ error: "This endpoint needs the internal API key." }, { status: 401 });
+  }
   const adapters = listAdapters();
   const results = await Promise.all(
     adapters.map(async (adapter) => {

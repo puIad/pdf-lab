@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceQuota } from "@/lib/quotas/guard";
 import { runIngest } from "@/lib/ingest/pipeline";
 import { getServiceDeps } from "@/lib/ingest/service-deps";
 
@@ -17,11 +18,9 @@ interface IngestBody {
 }
 
 export async function POST(req: Request) {
-  // Auth guard (pre-Phase 5 lightweight secret key)
-  const authHeader = req.headers.get("x-api-key");
-  if (authHeader !== process.env.INTERNAL_API_KEY) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Pipeline endpoint: the server key only (Part 5.1).
+  const guard = await enforceQuota(req.headers, "internal");
+  if (guard.denied) return guard.denied;
 
   let body: IngestBody;
   try {

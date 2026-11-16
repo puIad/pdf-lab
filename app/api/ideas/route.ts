@@ -7,24 +7,18 @@ import { loadCompetitionChecks, normalizePhrase } from "@/lib/competition/check"
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { autocompleteEnabled } from "@/lib/sources";
 import type { MarketSignal } from "@/lib/sources/types";
+import { enforceQuota, refund } from "@/lib/quotas/guard";
 
 // POST /api/ideas { seed, region? } — Phase 3 Parts 3.6 + 3.7 quick ideas.
 // Phrases come from autocomplete while its local-only guard is open (DEC-008), otherwise (always in
 // production) from Serper People-also-ask + related searches (DEC-010). Google Trends and Wikipedia
 // run either way. Only the signals that were stored are scored: no stored evidence, no idea
-// (06-EVIDENCE-CONTRACT). Open in local dev; in production it needs the internal key until Phase 5 auth.
+// (06-EVIDENCE-CONTRACT). Counted as one idea scan against the caller's plan (Part 5.1).
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // ~15 s suggestions + 2 throttled Trends calls
 
 export async function POST(req: Request) {
-  if (process.env.NODE_ENV === "production") {
-    const key = process.env.INTERNAL_API_KEY;
-    if (!key || req.headers.get("x-api-key") !== key) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
-
   let seed: unknown;
   let region: unknown;
   try {
@@ -40,6 +34,8 @@ export async function POST(req: Request) {
   if (!isRegion(region)) {
     return NextResponse.json({ error: "region must be one of the listed country codes" }, { status: 400 });
   }
+  const guard = await enforceQuota(req.headers, "exploration");
+  if (guard.denied) return guard.denied;
   const phraseSource = autocompleteEnabled() ? "autocomplete" : "web";
 
   try {
@@ -66,8 +62,10 @@ export async function POST(req: Request) {
         error,
       })),
       scannedAt: summary.ingestedAt,
+      quota: guard.quota,
     });
   } catch (err) {
+    await refund(guard); // the scan failed: it does not count
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

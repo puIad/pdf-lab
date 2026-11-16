@@ -2,22 +2,16 @@ import { NextResponse } from "next/server";
 import { getServiceDeps } from "@/lib/ingest/service-deps";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { loadCompetitionChecks, normalizePhrase, runCompetitionCheck } from "@/lib/competition/check";
+import { enforceQuota, refund } from "@/lib/quotas/guard";
 
 // POST /api/ideas/competition { phrase } — Phase 3 Part 3.9: one click = one check (3 Serper calls,
 // Etsy / Gumroad / KDP). Listings are stored as `competition` evidence and the response is read back
-// from those rows. Open in local dev; in production it needs the internal key until Phase 5 auth.
+// from those rows. Counted as one check against the caller's plan (Part 5.1).
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  if (process.env.NODE_ENV === "production") {
-    const key = process.env.INTERNAL_API_KEY;
-    if (!key || req.headers.get("x-api-key") !== key) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
-
   let phrase: unknown;
   try {
     phrase = ((await req.json()) as { phrase?: unknown } | null)?.phrase;
@@ -27,6 +21,8 @@ export async function POST(req: Request) {
   if (typeof phrase !== "string" || normalizePhrase(phrase).length < 2 || phrase.length > 160) {
     return NextResponse.json({ error: "phrase must be a 2 to 160 character string" }, { status: 400 });
   }
+  const guard = await enforceQuota(req.headers, "check");
+  if (guard.denied) return guard.denied;
 
   try {
     const supabase = createServiceSupabaseClient();
@@ -53,11 +49,13 @@ export async function POST(req: Request) {
     });
     if (!run.sources.some((s) => s.status === "ok")) {
       const reason = run.sources.map((s) => `${s.key}: ${s.status}${s.error ? ` (${s.error})` : ""}`).join("; ");
+      await refund(guard); // nothing stored: the check does not count
       return NextResponse.json({ error: `No marketplace answered, nothing stored. ${reason}`, sources: run.sources }, { status: 502 });
     }
     const check = (await loadCompetitionChecks(supabase, [phrase]))[normalizePhrase(phrase)] ?? null;
     return NextResponse.json({ check, sources: run.sources });
   } catch (err) {
+    await refund(guard);
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

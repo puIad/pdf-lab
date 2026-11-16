@@ -3,6 +3,7 @@
 // Persists opportunities to `opportunities` table and evidence to `evidence` table (QC Rule 1).
 
 import { NextResponse } from "next/server";
+import { enforceQuota } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { getRouter } from "@/lib/ai/index";
 import { generate25Opportunities, observedPriceRange } from "@/lib/opportunities/index";
@@ -19,11 +20,9 @@ interface GenerateBody {
 }
 
 export async function POST(req: Request) {
-  // Auth guard (pre-Phase 5 lightweight secret key)
-  const authHeader = req.headers.get("x-api-key");
-  if (authHeader !== process.env.INTERNAL_API_KEY) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Pipeline endpoint: the server key only (Part 5.1).
+  const guard = await enforceQuota(req.headers, "internal");
+  if (guard.denied) return guard.denied;
 
   let body: GenerateBody = {};
   try {

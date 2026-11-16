@@ -1,30 +1,32 @@
 // app/api/search/route.ts — Phase 3 Part 3.2 Market Search & Overview API.
 // Implements free-text niche/audience search returning PRD §8 overview with evidence citations
 // and persists searches into research_runs (mode explore/validate) for history.
+// Part 5.1: a search is counted against the caller's plan, and history is the caller's own.
 
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { generateMarketOverview, getSearchHistory } from "@/lib/search";
+import { enforceQuota, refund, resolveCaller } from "@/lib/quotas/guard";
+import type { Caller } from "@/lib/quotas/quotas";
 
 export const dynamic = "force-dynamic";
+
+/** A person sees their own searches; the server key and a dev server see all; signed out sees none. */
+function historyFor(caller: Caller, limit: number) {
+  if (caller.plan === "anon") return Promise.resolve([]);
+  return getSearchHistory(createServiceSupabaseClient(), { userId: caller.userId ?? undefined, limit });
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q");
   const modeParam = searchParams.get("mode");
-  const userId = searchParams.get("user_id");
   const isHistoryRequest = searchParams.get("history") === "true";
-
-  const supabase = createServiceSupabaseClient();
 
   // If client only requested history
   if (isHistoryRequest && !q) {
     try {
-      const history = await getSearchHistory(supabase, {
-        userId: userId || undefined,
-        limit: 20,
-      });
-      return NextResponse.json({ history });
+      return NextResponse.json({ history: await historyFor(await resolveCaller(req.headers), 20) });
     } catch (err) {
       return NextResponse.json(
         { error: `Failed to fetch search history: ${err instanceof Error ? err.message : String(err)}` },
@@ -42,25 +44,24 @@ export async function GET(req: Request) {
   }
 
   const mode = modeParam === "validate" ? "validate" : "explore";
+  const guard = await enforceQuota(req.headers, "search");
+  if (guard.denied) return guard.denied;
 
   try {
-    const overview = await generateMarketOverview(q.trim(), supabase, {
-      userId: userId || undefined,
+    const overview = await generateMarketOverview(q.trim(), createServiceSupabaseClient(), {
+      userId: guard.caller.userId ?? undefined,
       mode,
       persistRun: true,
-    });
-
-    const history = await getSearchHistory(supabase, {
-      userId: userId || undefined,
-      limit: 10,
     });
 
     return NextResponse.json({
       overview,
       runId: overview.runId,
-      history,
+      history: await historyFor(guard.caller, 10),
+      quota: guard.quota,
     });
   } catch (err) {
+    await refund(guard); // the search failed: it does not count
     return NextResponse.json(
       { error: `Market search failed: ${err instanceof Error ? err.message : String(err)}` },
       { status: 500 }
@@ -69,7 +70,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  let body: { query?: unknown; mode?: unknown; userId?: unknown };
+  let body: { query?: unknown; mode?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -87,12 +88,12 @@ export async function POST(req: Request) {
   }
 
   const mode = body.mode === "validate" ? "validate" : "explore";
-  const userId = typeof body.userId === "string" ? body.userId : undefined;
-  const supabase = createServiceSupabaseClient();
+  const guard = await enforceQuota(req.headers, "search");
+  if (guard.denied) return guard.denied;
 
   try {
-    const overview = await generateMarketOverview(body.query.trim(), supabase, {
-      userId,
+    const overview = await generateMarketOverview(body.query.trim(), createServiceSupabaseClient(), {
+      userId: guard.caller.userId ?? undefined,
       mode,
       persistRun: true,
     });
@@ -100,8 +101,10 @@ export async function POST(req: Request) {
     return NextResponse.json({
       overview,
       runId: overview.runId,
+      quota: guard.quota,
     });
   } catch (err) {
+    await refund(guard); // the search failed: it does not count
     return NextResponse.json(
       { error: `Market search failed: ${err instanceof Error ? err.message : String(err)}` },
       { status: 500 }

@@ -2,6 +2,7 @@
 // POST { prompt, mode?, user_id? } → planner turns the prompt into a structured query, the mode
 // picks the pipeline depth, and the run is persisted with its mode, rule-set version and plan.
 // `pdf-lab <niche>` (or mode "deep") runs the full 10-state pipeline and needs the internal key.
+// The other modes are counted as one search against the caller's plan (Part 5.1).
 
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
@@ -13,6 +14,7 @@ import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { OPPORTUNITY_PROMPT_VERSION } from "@/lib/opportunities";
 import { isDemandOnly } from "@/lib/sources/demand-only";
+import { enforceQuota, refund } from "@/lib/quotas/guard";
 import {
   RESEARCH_MODES,
   buildValidationReport,
@@ -74,20 +76,23 @@ export async function POST(req: Request) {
   if (body.user_id !== undefined && (typeof body.user_id !== "string" || !UUID_RE.test(body.user_id))) {
     return NextResponse.json({ error: "user_id must be a UUID" }, { status: 400 });
   }
-  const userId = (body.user_id as string | undefined) ?? null;
 
   const plan = planResearch(body.prompt, body.mode as ResearchMode | undefined);
   const text = searchTextOf(plan.query);
 
-  // ── Deep: the pdf-lab <niche> pipeline (costly → internal key until Phase 5 auth) ──
+  // Part 5.1. A Deep run in one request calls the model for minutes and does not fit a function
+  // (DEC-001), so it stays on the server key; signed-in users run Deep through /deep. Every other
+  // mode reads stored rows and is counted as one search.
+  const guard = await enforceQuota(req.headers, plan.mode === "deep" ? "internal" : "search");
+  if (guard.denied) {
+    return plan.mode === "deep"
+      ? NextResponse.json({ error: "A one-request Deep run needs the internal API key. Use the Deep research page instead.", plan }, { status: 401 })
+      : guard.denied;
+  }
+  // The run belongs to the signed-in caller. Only the server key may name another owner.
+  const userId = guard.caller.userId ?? (guard.caller.plan === "internal" ? ((body.user_id as string | undefined) ?? null) : null);
+
   if (plan.mode === "deep") {
-    const key = process.env.INTERNAL_API_KEY;
-    if (!key || req.headers.get("x-api-key") !== key) {
-      return NextResponse.json(
-        { error: "Deep research runs require the internal API key until Phase 5 auth lands", plan },
-        { status: 401 },
-      );
-    }
     if (!text) {
       return NextResponse.json({ error: "Deep research needs a niche, e.g. `pdf-lab pc troubleshooting`", plan }, { status: 400 });
     }
@@ -142,6 +147,7 @@ export async function POST(req: Request) {
       }
       case "monitor": {
         if (!text) {
+          await refund(guard);
           return NextResponse.json({ error: "Monitor needs a niche, e.g. `monitor: pc troubleshooting`", plan }, { status: 400 });
         }
         const { data, error } = await supabase
@@ -196,8 +202,9 @@ export async function POST(req: Request) {
       .single();
     if (runErr) throw new Error(`failed to persist research run: ${runErr.message}`);
 
-    return NextResponse.json({ runId: run.id, plan, result });
+    return NextResponse.json({ runId: run.id, plan, result, quota: guard.quota });
   } catch (err) {
+    await refund(guard); // the run failed: it does not count
     return NextResponse.json(
       { error: `Research failed: ${err instanceof Error ? err.message : String(err)}`, plan },
       { status: 500 },

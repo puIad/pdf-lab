@@ -157,6 +157,27 @@ create index on competitors (run_id);
   Its `evidence` row then uses the run id as `entity_id`.
 - Migration: `supabase/migrations/20261113000006_run_scope.sql`.
 
+## Sign-in and usage (Part 5.1)
+
+```sql
+alter table users add constraint users_plan_check check (plan in ('free', 'premium'));
+-- trigger on auth.users insert: public.users row with the same id and email, plan 'free'
+create table usage_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade,
+  anon_hash text,          -- HMAC of a signed-out caller's IP; the address is never stored
+  kind text not null check (kind in ('search', 'exploration', 'check', 'deep')),
+  created_at timestamptz not null default now(),
+  check ((user_id is null) <> (anon_hash is null))
+);
+```
+
+- One row per counted action. A quota is the count of rows in the current UTC day or month
+  (`lib/quotas/quotas.ts`); a refused action writes no row. Service-role only, RLS on, no policy.
+- `public.users.id` equals `auth.users.id`, but there is no foreign key between them: deleting an
+  auth user leaves its `public.users` row (see Open defects in `STATE.md`).
+- Migration: `supabase/migrations/20261116000009_auth_quotas.sql`.
+
 ## RLS (Supabase)
 
 - Public read: `markets`, `opportunities`, `competitors`, `evidence`, `sources` (anon can

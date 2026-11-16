@@ -3,6 +3,7 @@
 // GET: Lists recent research runs.
 
 import { NextResponse } from "next/server";
+import { enforceQuota, resolveCaller } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { executeResearchRun } from "@/lib/runs/orchestrator";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
@@ -19,11 +20,9 @@ interface CreateRunBody {
 const VALID_MODES = ["explore", "validate", "hunt", "deep", "monitor"] as const;
 
 export async function POST(req: Request) {
-  // Auth guard (pre-Phase 5 lightweight secret key)
-  const authHeader = req.headers.get("x-api-key");
-  if (authHeader !== process.env.INTERNAL_API_KEY) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Pipeline endpoint: the server key only (Part 5.1).
+  const guard = await enforceQuota(req.headers, "internal");
+  if (guard.denied) return guard.denied;
 
   let body: CreateRunBody;
   try {
@@ -87,13 +86,17 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // A run's query is private to whoever started it; the server key and a dev server see all (Part 5.1).
+  const caller = await resolveCaller(req.headers);
+  if (caller.plan === "anon") return NextResponse.json({ runs: [] });
   const supabase = createServiceSupabaseClient();
-  const { data, error } = await supabase
+  const list = supabase
     .from("research_runs")
     .select("id, query, mode, status, started_at, completed_at")
     .order("started_at", { ascending: false })
     .limit(20);
+  const { data, error } = await (caller.userId ? list.eq("user_id", caller.userId) : list);
 
   if (error) {
     return NextResponse.json({ error: `Failed to list runs: ${error.message}` }, { status: 500 });
