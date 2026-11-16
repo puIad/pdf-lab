@@ -43,10 +43,27 @@ const signalText = (s: OpportunitySignalInput): string => `${s.analysis?.problem
  * Share of the problem's own content words that appear in the signal (its stored problem + title).
  * Containment, not jaccard: a long post title must not push a word-for-word problem under the bar.
  */
-export function problemOverlap(problem: string, signal: OpportunitySignalInput): number {
-  const words = [...new Set(tokens(problem))];
+export function problemOverlap(problem: string, signal: OpportunitySignalInput, ignore?: Set<string>): number {
+  const words = [...new Set(tokens(problem))].filter((t) => !ignore?.has(t));
   const hay = new Set(tokens(signalText(signal)));
   return words.length ? words.filter((t) => hay.has(t)).length / words.length : 0;
+}
+
+// shortcut: "more than half" and the 3-signal limit were checked on two runs only (2026-11-15),
+// tune them once more completed runs have hand-checked matches.
+/** Markets this small may share one evidence set (Part 6.8), so their words are all kept. */
+const SMALL_MARKET = 3;
+
+/**
+ * Words found in more than half of a market's signals: the seed's words, the market's theme, and
+ * the way the analyses are phrased ("they look for"). They cannot tell one problem of the market
+ * from another, so the word match leaves them out (Part 6.16).
+ */
+export function commonWords(market: OpportunitySignalInput[]): Set<string> {
+  const seen = new Map<string, number>();
+  if (market.length <= SMALL_MARKET) return new Set();
+  for (const s of market) for (const t of new Set(tokens(signalText(s)))) seen.set(t, (seen.get(t) ?? 0) + 1);
+  return new Set([...seen].filter(([, n]) => n > market.length / 2).map(([t]) => t));
 }
 
 /**
@@ -64,13 +81,14 @@ export function matchSignals(
   const query = vectors.length > 0 && vectors.every((v) => v.length === vectors[0].length) ? centroid(vectors) : null;
 
   const matches: Array<{ signal: OpportunitySignalInput; rank: number }> = own.map((signal) => ({ signal, rank: 2 }));
+  const common = commonWords(market);
   for (const signal of market) {
     if (ownIds.has(signal.id)) continue;
     if (query && signal.embedding?.length === query.length) {
       const score = cosine(query, signal.embedding);
       if (score >= MIN_EMBEDDING_MATCH) matches.push({ signal, rank: score });
     } else {
-      const score = problemOverlap(problem, signal);
+      const score = problemOverlap(problem, signal, common);
       if (score >= MIN_TOKEN_MATCH) matches.push({ signal, rank: score });
     }
   }

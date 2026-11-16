@@ -17,6 +17,7 @@ import {
 import type { AIRouter } from "../ai/router.ts";
 import { enforceRule1_OpportunityEvidence, QCViolationError } from "../evidence/qc.ts";
 import { buildIdeas } from "../ideas/ideas.ts";
+import { marketFor } from "./from-ideas.ts";
 
 function createMockMarkets(): OpportunityMarketInput[] {
   return [
@@ -438,6 +439,32 @@ test("AI path: model wording, stored grounding, no defaults, no padding (Part 6.
     assert.doesNotMatch(JSON.stringify(res), PC_TEXT);
   });
 
+  await t.test("a model problem does not match a whole market through the words its signals share (Part 6.16)", async () => {
+    const things = ["chicken", "recipes", "soups", "lunches", "breakfasts", "snacks"];
+    const mealPrep: OpportunityMarketInput = {
+      id: "bbbbbbbb-0000-0000-0000-000000000001",
+      name: "Meal Prep",
+      demandScore: 60,
+      confidence: 0.5,
+      signals: things.map((thing, i) => ({
+        id: `m${i}`,
+        source_id: `src-m${i}`,
+        source_type: "web",
+        title: `meal prep ${thing}`,
+        content: "",
+        url: `https://example.com/m${i}`,
+        published_at: "2026-11-01T12:00:00Z",
+        analysis: { audience: "home cooks", problem: `They look for ${thing} to meal prep.`, intent: "strong", urgency: "low", pdf_relevance: 0.8 },
+      })),
+    };
+    const res = await generate25Opportunities([mealPrep], {
+      router: routerReturning([{ ...ok, marketId: mealPrep.id, title: "Chicken Prep Plan", targetAudience: "home cooks", problem: "Meal prep chicken ideas" }]),
+    });
+    const model = res.opportunities.find((o) => o.title === "Chicken Prep Plan");
+    assert.ok(model);
+    assert.deepEqual(model.evidence.map((e) => e.sourceId), ["src-m0"]); // the chicken signal, not all six
+  });
+
   await t.test("no usable model candidate, or a provider error, leaves the observed pool", async () => {
     const none = await generate25Opportunities(markets, { router: routerReturning([{ title: "only a title" }]) });
     assert.equal(none.opportunities.length, 3);
@@ -504,4 +531,37 @@ test("Part 3.8: quick ideas join the Deep-run candidate pool", async (t) => {
     assert.ok(res.opportunities.some((o) => o.evidence.some((e) => e.claim.startsWith(IDEA_CLAIM_PREFIX))));
     assert.ok(extra.every((c) => c.urgency === null && c.sophistication === null && c.priceRange === null));
   });
+});
+
+// Part 6.16, from the 2026-11-15 live run on "meal prep": ten general ideas were filed under a
+// one-signal market, because jaccard divides by all of a market's text.
+test("a quick idea goes to the market holding its own words, not to the one with the least text", () => {
+  const market = (id: string, name: string, demandScore: number, problems: string[]): OpportunityMarketInput => ({
+    id,
+    name,
+    demandScore,
+    confidence: 0.5,
+    signals: problems.map((problem, i) => ({
+      id: `${id}-${i}`,
+      source_id: "src",
+      source_type: "gtrends",
+      title: problem,
+      content: problem,
+      url: null,
+      analysis: { audience: "people searching", problem },
+    })),
+  });
+  const markets = [
+    market("small", "Vegetarian meal prep", 38, ["They look for vegetarian meal prep ideas."]),
+    market("big", "Meal prep recipes", 69, ["They look for recipes to meal prep.", "They want freezable soups and big-batch family meals.", "They look for ways to meal prep chicken."]),
+    market("healthy", "Healthy meal prep plans", 26, ["They look for meal prep that is good for them."]),
+    market("budget", "Budget meal prep", 33, ["They want 10 healthy meals in one hour on a budget."]),
+  ];
+  // Only seed words: the strongest market, not the smallest.
+  assert.equal(marketFor("how to meal prep", markets, "meal prep").id, "big");
+  // Its own word is in one market's text.
+  assert.equal(marketFor("meal prep chicken recipes", markets, "meal prep").id, "big");
+  assert.equal(marketFor("vegetarian meal prep", markets, "meal prep").id, "small");
+  // A word in a market's name beats the same word in another market's snippet.
+  assert.equal(marketFor("is meal prep healthy", markets, "meal prep").id, "healthy");
 });

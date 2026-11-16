@@ -42,18 +42,25 @@ export function marketForCompetitor(
   const seedStems = tokens(seed).map(stem);
   const distinctive = (text: string): Set<string> =>
     new Set(tokens(text).filter((t) => !PRODUCT_WORDS.has(t) && !seedStems.some((s) => stem(t) === s)));
-  const titleWords = [...distinctive(listing.title)];
+  const titleWords = distinctive(listing.title);
   let best: string | null = null;
+  let bestNamed = 0;
   let bestShared = 0;
   for (const m of markets) {
+    // A title holding every distinctive word of a market's name belongs there, and the longest such
+    // name wins ("no equipment" over "equipment"). A market made of short search queries has too
+    // few words for the shared-word count, so a market with one long snippet used to win (Part 6.16).
+    const nameWords = [...distinctive(m.name)];
+    const named = nameWords.length > 0 && nameWords.every((t) => titleWords.has(t)) ? nameWords.length : 0;
     const hay = distinctive([m.name, ...m.texts].join(" "));
-    const shared = titleWords.filter((t) => hay.has(t)).length;
-    if (shared > bestShared) {
+    const shared = [...titleWords].filter((t) => hay.has(t)).length;
+    if (named > bestNamed || (named === bestNamed && shared > bestShared)) {
       best = m.id;
+      bestNamed = named;
       bestShared = shared;
     }
   }
-  return bestShared >= MIN_SHARED_WORDS ? best : null;
+  return bestNamed > 0 || bestShared >= MIN_SHARED_WORDS ? best : null;
 }
 
 // Stores whose pages are products. A `web` result from any other host is a discussion, not a competitor.

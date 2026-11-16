@@ -397,3 +397,26 @@ Recommended order: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.11, 5.1 (auth, pulled ahead o
   counts equal a recount of the stored rows; an unrelated signal becomes no market; a truncated
   reply stores nothing; the one-request model run still passes its tests; 0 px overflow at
   375 px.
+
+## Part 6.16 — Three matchers corrected after the live checks
+
+- Deps: 6.7, 6.8, 6.15 (done). Touches: `lib/competition/map.ts`, `lib/opportunities/match.ts`,
+  `lib/opportunities/from-ideas.ts`, their tests. Added 2026-11-15 from the live checks of 6.7
+  and 6.8.
+- Findings:
+  1. Quick-idea opportunities are filed under the market with the least text: 10 general ideas
+     sat under a one-signal market.
+  2. Without embeddings, the opportunity word match counts the seed's words and the analyses'
+     shared phrasing, so a short problem matches every signal of its market ("6 of 6").
+  3. The competitor mapper counts words shared with a market's signal text, so a market made of
+     short search queries loses its listings to a market with one long snippet.
+- Tasks:
+  1. Idea filing by the share of the phrase's own words found in the market, seed words left
+     out, a name word counted twice, ties to the stronger market.
+  2. Leave words shared by more than half of a market's signals out of the word match; markets
+     of 3 signals or fewer keep every word.
+  3. A title holding a market's whole name goes to that market, the longest name first.
+- Acceptance: replayed on the stored rows of two completed runs, no general idea sits under a
+  one-signal market, no opportunity in a market of more than 3 signals matches all of its
+  signals through shared words alone, and a listing whose title holds a market's name maps to
+  that market; a test for each rule.

@@ -42,13 +42,24 @@ export function pickDistinctIdeas(ideas: QuickIdea[], max = IDEA_CANDIDATES): Qu
   return kept.map((k) => k.idea);
 }
 
-function marketFor(idea: QuickIdea, markets: OpportunityMarketInput[]): OpportunityMarketInput {
-  const toks = tokens(idea.phrase);
+/**
+ * The market that holds the most of the phrase's own words. The seed's words are left out: every
+ * market of the run has them. Containment, not jaccard: jaccard divides by all of a market's text,
+ * so the market with the fewest signals won every general idea (Part 6.16). A phrase that shares
+ * nothing with any market goes to the run's strongest one.
+ */
+export function marketFor(phrase: string, markets: OpportunityMarketInput[], seed: string): OpportunityMarketInput {
+  const seedToks = new Set(tokens(seed));
+  const toks = [...new Set(tokens(phrase))].filter((t) => !seedToks.has(t));
   let best = markets[0];
   let bestScore = -1;
   for (const m of markets) {
-    const hay = tokens([m.name, ...m.signals.map((s) => s.analysis?.problem ?? s.title ?? "")].join(" "));
-    const score = jaccard(toks, hay) + m.demandScore / 1000; // ties go to the stronger market
+    const name = new Set(tokens(m.name));
+    const hay = new Set([...name, ...tokens(m.signals.map((s) => s.analysis?.problem ?? s.title ?? "").join(" "))]);
+    const share = (set: Set<string>) => (toks.length ? toks.filter((t) => set.has(t)).length / toks.length : 0);
+    // A word in the market's name counts twice: "is meal prep healthy" belongs to "Healthy meal prep
+    // plans", not to a market where one snippet says "healthy". Ties go to the stronger market.
+    const score = share(hay) + share(name) + m.demandScore / 1000;
     if (score > bestScore) {
       best = m;
       bestScore = score;
@@ -66,7 +77,7 @@ export function ideaCandidates(
   if (markets.length === 0) return [];
   return pickDistinctIdeas(ideas).map((idea) => {
     const id = crypto.randomUUID();
-    const market = marketFor(idea, markets);
+    const market = marketFor(idea.phrase, markets, seed);
     const format = IDEA_FORMAT_MAP[idea.format];
     const evidence: EvidenceInput[] = idea.evidence.map((e) => ({
       entityType: "opportunity",

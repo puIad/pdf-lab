@@ -2,7 +2,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { matchSignals, MAX_EVIDENCE_SIGNALS, MIN_TOKEN_MATCH, problemOverlap } from "./match.ts";
+import { commonWords, matchSignals, MAX_EVIDENCE_SIGNALS, MIN_TOKEN_MATCH, problemOverlap } from "./match.ts";
 import type { OpportunitySignalInput } from "./types.ts";
 
 const sig = (id: string, problem: string, embedding?: number[]): OpportunitySignalInput => ({
@@ -55,3 +55,33 @@ test("a long post title does not hide a problem stated word for word (PR #13 rev
   assert.equal(problemOverlap("", longTitle), 0);
 });
 
+
+// Part 6.16, from the 2026-11-15 live runs: with no embeddings, four opportunities of one market
+// each matched 6 of 6 signals, because the seed's words and "they look for" were half of each problem.
+test("words most of the market shares do not make a match", () => {
+  const market = [
+    sig("chicken", "They look for ways to meal prep chicken."),
+    sig("ideas", "They look for ideas of what to meal prep."),
+    sig("recipes", "They look for recipes to meal prep."),
+    sig("batch", "They want meal prep recipes to cook in advance for the week."),
+    sig("meals", "They look for meals suited to meal prep."),
+  ];
+  assert.deepEqual([...commonWords(market)].sort(), ["look", "meal", "prep", "they"]);
+  const chicken = matchSignals(market[0].analysis!.problem!, [market[0]], market);
+  assert.deepEqual(chicken.signals.map((s) => s.id), ["chicken"]);
+  assert.equal(chicken.matchCount, 1);
+  // A word that does tell problems apart still matches: two signals are about recipes.
+  const recipes = matchSignals(market[2].analysis!.problem!, [market[2]], market);
+  assert.deepEqual(recipes.signals.map((s) => s.id).sort(), ["batch", "recipes"]);
+  assert.equal(recipes.marketTotal, 5);
+});
+
+test("a market of three signals or fewer keeps every word", () => {
+  const market = [
+    sig("a", "They look for a workout bench to use at home."),
+    sig("b", "They look for a workout bench for their home."),
+    sig("c", "They look for a workout bench."),
+  ];
+  assert.equal(commonWords(market).size, 0);
+  assert.equal(matchSignals(market[2].analysis!.problem!, [market[2]], market).matchCount, 3);
+});
