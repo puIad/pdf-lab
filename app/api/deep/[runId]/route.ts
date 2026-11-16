@@ -9,6 +9,7 @@ import { finishPastedRun, MIN_ANALYZED_SHARE } from "@/lib/runs/orchestrator";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
 import { marketKey, NO_MARKET, parsePastedReply, PASTE_PROMPT_VERSION } from "@/lib/runs/pasted";
 import { loadPastedRun, pastedRunState } from "@/lib/runs/pasted-run";
+import { ownsRun, resolveCaller } from "@/lib/quotas/guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // database writes only
@@ -16,20 +17,16 @@ export const maxDuration = 60; // database writes only
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_REPLY_CHARS = 400_000;
 
-function unauthorized(req: Request): NextResponse | null {
-  if (process.env.NODE_ENV !== "production") return null;
-  const key = process.env.INTERNAL_API_KEY;
-  return !key || req.headers.get("x-api-key") !== key ? NextResponse.json({ error: "Unauthorized" }, { status: 401 }) : null;
-}
+// Not counted: the Deep run was counted when it started. Only its owner may read or finish it (Part 5.1).
+const NOT_YOURS = { error: "This run belongs to another account. Sign in as the person who started it." };
 
 export async function GET(req: Request, ctx: { params: Promise<{ runId: string }> }) {
-  const denied = unauthorized(req);
-  if (denied) return denied;
   const { runId } = await ctx.params;
   if (!UUID.test(runId)) return NextResponse.json({ error: "run id must be a uuid" }, { status: 400 });
   try {
     const loaded = await loadPastedRun(createServiceSupabaseClient(), runId);
     if (!loaded) return NextResponse.json({ error: `No run ${runId}` }, { status: 404 });
+    if (!ownsRun(await resolveCaller(req.headers), loaded.run.user_id)) return NextResponse.json(NOT_YOURS, { status: 403 });
     return NextResponse.json({ ...pastedRunState(loaded.run, loaded.signals), promptVersion: PASTE_PROMPT_VERSION });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
@@ -37,8 +34,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ runId: string }
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ runId: string }> }) {
-  const denied = unauthorized(req);
-  if (denied) return denied;
   const { runId } = await ctx.params;
   if (!UUID.test(runId)) return NextResponse.json({ error: "run id must be a uuid" }, { status: 400 });
 
@@ -57,6 +52,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ runId: string 
     const loaded = await loadPastedRun(supabase, runId);
     if (!loaded) return NextResponse.json({ error: `No run ${runId}` }, { status: 404 });
     const { run, signals } = loaded;
+    if (!ownsRun(await resolveCaller(req.headers), run.user_id)) return NextResponse.json(NOT_YOURS, { status: 403 });
     if (run.status !== "classifying") {
       return NextResponse.json({ error: `This run is ${run.status}. Only a run waiting for a reply can take one.` }, { status: 409 });
     }

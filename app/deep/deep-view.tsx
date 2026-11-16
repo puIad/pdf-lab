@@ -50,10 +50,8 @@ interface FinishedRun extends ReplyCounts {
 
 type Phase = "idle" | "collecting" | "waiting" | "finishing" | "done";
 
-const explain = (status: number, body: { error?: string }): string =>
-  status === 401
-    ? "Deep research needs the internal API key on the deployed site until sign-in exists (Phase 5). It is open on a local dev server."
-    : (body.error ?? `Request failed (${status})`);
+// A refusal (signed out, limit used up, someone else's run) arrives with its reason in `error`.
+const explain = (status: number, body: { error?: string }): string => body.error ?? `Request failed (${status})`;
 
 function StepHeader({ n, title, state }: { n: number; title: string; state: "todo" | "active" | "done" }) {
   return (

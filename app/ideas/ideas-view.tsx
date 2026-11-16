@@ -206,8 +206,7 @@ function IdeaCard({ seed, idea, related, initialCheck }: { seed: string; idea: Q
       });
       const body = (await res.json()) as { check?: CompetitionCheck | null; sources?: CheckSource[]; error?: string };
       const failed = (body.sources ?? []).filter((s) => s.status !== "ok");
-      if (res.status === 401) setComp((c) => ({ ...c, loading: false, error: "Competition checks need the internal API key until Phase 5 auth lands." }));
-      else if (!res.ok || !body.check) setComp((c) => ({ ...c, loading: false, error: body.error ?? `Request failed (${res.status})` }));
+      if (!res.ok || !body.check) setComp((c) => ({ ...c, loading: false, error: body.error ?? `Request failed (${res.status})` }));
       else setComp({ loading: false, check: body.check, failed, error: null });
     } catch (err) {
       setComp((c) => ({ ...c, loading: false, error: err instanceof Error ? err.message : "Request failed" }));
@@ -467,11 +466,7 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
         body: JSON.stringify({ seed: s, region: where }),
       });
       const body = (await res.json()) as IdeasResponse;
-      if (res.status === 401) {
-        setError(
-          "Quick ideas need the internal API key until Phase 5 auth lands (POST /api/ideas with x-api-key). The route is open when you run PDF Lab locally.",
-        );
-      } else if (!res.ok) setError(body.error ?? `Request failed (${res.status})`);
+      if (!res.ok) setError(body.error ?? `Request failed (${res.status})`);
       else {
         setData(body);
         setTab("all");

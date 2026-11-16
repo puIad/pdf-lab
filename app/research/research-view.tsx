@@ -615,11 +615,15 @@ export function ResearchView({ initialPrompt, recentRuns }: { initialPrompt: str
             <div className="flex gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <KeyRound className="mt-0.5 size-4 shrink-0" />
               <div className="space-y-1">
-                <p className="font-medium">Deep runs are locked until accounts ship (Phase 5).</p>
+                <p className="font-medium">Deep runs start on the Deep research page.</p>
                 <p className="text-xs text-muted-foreground">
-                  The full pipeline spends source and model quota, so for now it runs only through the API with the
-                  internal key: <code className="font-mono">POST /api/research</code> with an{" "}
-                  <code className="font-mono">x-api-key</code> header. Explore, Validate, Hunt and Monitor work here.
+                  A Deep run from this box calls the model for minutes inside one request, so it only runs through the
+                  API with the internal key. On the{" "}
+                  <Link href="/deep" className="font-medium text-foreground underline underline-offset-2">
+                    Deep research page
+                  </Link>{" "}
+                  you collect the signals, a chat model analyses them and you paste its reply back. Explore, Validate,
+                  Hunt and Monitor work here.
                 </p>
               </div>
             </div>

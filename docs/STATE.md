@@ -64,7 +64,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
-| 5.1 | Auth + tiers + quotas | pending | — | Auth, tiers and quotas. |
+| 5.1 | Auth + tiers + quotas | done | (this commit) | Email-link sign-in, free and premium plans, quotas on every costly endpoint, runs private to their owner. Live check 31 of 31. [log](log/part-5.1.md) |
 | 5.2 | BYOK vault + routing + metering | pending | — | BYOK key vault, per-request routing and usage metering. |
 | 5.3 | Hosted-premium + limits UX | pending | — | Hosted premium path and the limits UX. |
 | 5.4 | Send brief to Google Docs | pending | — | Send a brief to Google Docs with the project's own OAuth client. [log](log/part-5.4.md) |
@@ -101,7 +101,10 @@ Known defects and their owner. A fixed defect leaves this table (its story stays
 |---|---|---|
 | No chat model answers: extraction fails and no Deep run completes | 6.7 | DEC-015 (user) |
 | Deep run does not fit a Vercel function; a timed-out step keeps writing | 3.8 | 6.10 |
-| `/deep` and `/api/deep` need the internal key when deployed, so pasted Deep runs work on a local dev server only | 6.15 | 5.1 |
+| Deleting an auth user leaves its `public.users` row; signing up again with that email gets no row, so every counted action answers 503 | 5.1 | unowned (no flow deletes accounts yet) |
+| Quota is counted then recorded: two requests in the same instant can both pass at the limit | 5.1 | unowned |
+| Search and check caps and all premium limits are placeholders | 5.1 | 5.3 (from the usage ledger) |
+| Supabase Auth site URL and redirect allow list not checked for the production domain | 5.1 | user (Supabase dashboard) |
 | A pasted run re-analyses signals an earlier run analysed: the stored analysis is replaced and its embedding cleared | 6.15 | unowned |
 | A pasted run's second request took 41 s of its 60 s limit on 34 signals | 6.15 | 6.10 |
 | Stored runs `c638c48d` and `7963555f` keep the pre-6.16 competitor markets, idea filing and match counts | 6.16 | unowned (a new run rewrites them) |

@@ -7,7 +7,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Search,
   ArrowLeft,
@@ -42,6 +41,8 @@ interface SearchViewProps {
   initialMode: "explore" | "validate";
   initialOverview: MarketOverview | null;
   initialHistory: SearchHistoryItem[];
+  /** Set when the search in the URL was refused, e.g. the daily limit is used up. */
+  initialError?: string | null;
 }
 
 export function SearchView({
@@ -49,14 +50,14 @@ export function SearchView({
   initialMode,
   initialOverview,
   initialHistory,
+  initialError = null,
 }: SearchViewProps) {
-  const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const [mode, setMode] = useState<"explore" | "validate">(initialMode);
   const [overview, setOverview] = useState<MarketOverview | null>(initialOverview);
   const [history, setHistory] = useState<SearchHistoryItem[]>(initialHistory);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
 
   async function handleSearch(searchQ = query, searchMode = mode) {
     const trimmed = searchQ.trim();
@@ -79,10 +80,8 @@ export function SearchView({
       if (data.history) {
         setHistory(data.history);
       }
-      // Update URL query params without full reload
-      router.push(`/search?q=${encodeURIComponent(trimmed)}&mode=${searchMode}`, {
-        scroll: false,
-      });
+      // Update the URL without asking the server again: the page would run, and count, the search twice.
+      window.history.pushState(null, "", `/search?q=${encodeURIComponent(trimmed)}&mode=${searchMode}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
     } finally {

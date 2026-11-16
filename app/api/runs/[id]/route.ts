@@ -5,12 +5,13 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { fetchRunCompleteness } from "@/lib/runs/completeness";
 import { LIFECYCLE_STATES } from "@/lib/runs/types";
+import { ownsRun, resolveCaller } from "@/lib/quotas/guard";
 import type { LifecycleState, LifecycleTraceStep } from "@/lib/runs/types";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   props: { params: Promise<{ id: string }> },
 ) {
   const { id } = await props.params;
@@ -28,6 +29,10 @@ export async function GET(
 
   if (runErr || !run) {
     return NextResponse.json({ error: `Research run not found: ${id}` }, { status: 404 });
+  }
+  // A run's query is private to whoever started it, as in GET /api/runs (Part 5.1).
+  if (!ownsRun(await resolveCaller(req.headers), run.user_id)) {
+    return NextResponse.json({ error: "This run belongs to another account." }, { status: 403 });
   }
 
   const currentStatus = run.status as LifecycleState;

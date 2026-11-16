@@ -12,6 +12,8 @@ export interface PastedRunRow {
   mode: string;
   status: string;
   started_at: string;
+  /** Who started the run; null for runs from the server key or a signed-out dev server. */
+  user_id: string | null;
 }
 
 export interface PastedRunState {
@@ -29,7 +31,7 @@ export async function loadPastedRun(
 ): Promise<{ run: PastedRunRow; signals: StoredSignalForRun[] } | null> {
   const { data: run, error } = await supabase
     .from("research_runs")
-    .select("id, query, mode, status, started_at")
+    .select("id, query, mode, status, started_at, user_id")
     .eq("id", runId)
     .maybeSingle();
   if (error) throw new Error(`Failed to load the run: ${error.message}`);

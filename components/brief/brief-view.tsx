@@ -139,7 +139,7 @@ export function BriefView({ brief }: { brief: Brief }) {
       });
       const body = (await res.json()) as { note?: BriefAiNote; error?: string };
       if (!res.ok || !body.note) {
-        setErrors((e) => ({ ...e, [key]: res.status === 401 ? "AI notes need the internal key in production (until Phase 5 sign-in)." : (body.error ?? `Request failed (${res.status})`) }));
+        setErrors((e) => ({ ...e, [key]: body.error ?? `Request failed (${res.status})` }));
       } else {
         setNotes((n) => ({ ...n, [key]: body.note! }));
       }
