@@ -4,6 +4,7 @@
 // Facts (demand basis, trend basis, sources) are shown next to every score; the specificity
 // badge describes the phrase and is labeled as not a competition claim (QC Rules 3–5) until a
 // Part 3.9 competition check stores observed listings; then the label and tick show those counts.
+// Part 4.1: a scan's seed can be tracked and a card's idea saved to the signed-in person's watchlist.
 
 import React, { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
@@ -21,6 +22,8 @@ import { ideaTicks, type TickStatus } from "@/lib/ideas/ticks";
 import type { ValidationVerdict } from "@/lib/planner/verdict";
 import { VerdictPanel } from "@/components/research/verdict-panel";
 import type { CompetitionCheck, MarketplaceCount } from "@/lib/competition/check";
+import { WatchToggle } from "@/components/watchlist/watch-toggle";
+import { watchKey } from "@/lib/watchlist/watchlist";
 
 interface SourceStatus {
   key: string;
@@ -191,7 +194,17 @@ function CompetitionPanel({ state }: { state: CheckState }) {
   );
 }
 
-function IdeaCard({ seed, idea, related, initialCheck }: { seed: string; idea: QuickIdea; related: QuickIdea[]; initialCheck: CompetitionCheck | null }) {
+interface IdeaCardProps {
+  seed: string;
+  region: RegionCode;
+  idea: QuickIdea;
+  related: QuickIdea[];
+  initialCheck: CompetitionCheck | null;
+  saved: boolean;
+  onSaved: (key: string, watched: boolean) => void;
+}
+
+function IdeaCard({ seed, region, idea, related, initialCheck, saved, onSaved }: IdeaCardProps) {
   const [open, setOpen] = useState(false);
   const [comp, setComp] = useState<CheckState>({ loading: false, check: initialCheck, failed: [], error: null });
 
@@ -379,6 +392,13 @@ function IdeaCard({ seed, idea, related, initialCheck }: { seed: string; idea: Q
               <ListOrdered />
               Outline
             </Button>
+            <WatchToggle
+              watch={{ kind: "idea", ref: idea.phrase, region, seed }}
+              initialWatched={saved}
+              on="Saved"
+              off="Save"
+              onChange={(watched) => onSaved(watchKey("idea", idea.phrase, region), watched)}
+            />
           </div>
         </div>
 
@@ -445,7 +465,17 @@ const PATH = [
   { title: "Get the brief", detail: "Outline and evidence as Markdown or DOCX." },
 ];
 
-export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string; initialRegion: string }) {
+export function IdeasView({ initialSeed, initialRegion, watchKeys }: { initialSeed: string; initialRegion: string; watchKeys: string[] }) {
+  // What the person has saved: from the server at load, then kept current as toggles succeed, so
+  // a card that mounts later (Show more, a second scan) starts in the right state.
+  const [saved, setSaved] = useState(() => new Set(watchKeys));
+  const onSaved = (key: string, watched: boolean) =>
+    setSaved((prev) => {
+      const next = new Set(prev);
+      if (watched) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   const [seed, setSeed] = useState(initialSeed);
   const [region, setRegion] = useState<RegionCode>(isRegion(initialRegion) ? initialRegion : DEFAULT_REGION);
   const recentJson = useSyncExternalStore(subscribeRecent, recentRaw, () => "[]");
@@ -641,6 +671,15 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
                     CSV
                   </Button>
                 )}
+                <WatchToggle
+                  key={`${data.seed}|${data.region}`}
+                  watch={{ kind: "seed", ref: data.seed, region: data.region }}
+                  initialWatched={saved.has(watchKey("seed", data.seed, data.region))}
+                  on="Tracking this seed"
+                  off="Track this seed"
+                  size="xs"
+                  onChange={(watched) => onSaved(watchKey("seed", data.seed, data.region), watched)}
+                />
                 {/* Deep research runs on its own page: the analysis is a pasted model reply (Part 6.15). */}
                 <Link href={`/deep?seed=${encodeURIComponent(data.seed)}`}>
                   <Button size="xs" variant="outline" className="cursor-pointer" title="Collect this seed's signals and have a chat model analyse them; its top quick ideas join the opportunity candidates.">
@@ -727,7 +766,16 @@ export function IdeasView({ initialSeed, initialRegion }: { initialSeed: string;
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {visible.slice(0, shown).map((idea) => (
-                  <IdeaCard key={idea.id} seed={data.seed} idea={idea} related={related} initialCheck={data.competition?.[idea.id] ?? null} />
+                  <IdeaCard
+                    key={idea.id}
+                    seed={data.seed}
+                    region={data.region}
+                    idea={idea}
+                    related={related}
+                    initialCheck={data.competition?.[idea.id] ?? null}
+                    saved={saved.has(watchKey("idea", idea.phrase, data.region))}
+                    onSaved={onSaved}
+                  />
                 ))}
               </div>
               {visible.length > shown && (

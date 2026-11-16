@@ -6,6 +6,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Section {
@@ -27,6 +28,25 @@ function isActive(section: Section, pathname: string): boolean {
   return section.match.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
+/** The header's link to the visitor's watchlist (Part 4.1): an icon on small screens, labelled from `md` up. */
+export function WatchlistLink() {
+  const active = isActive({ href: "/watchlist", label: "Watchlist", match: ["/watchlist"] }, usePathname() ?? "/");
+  return (
+    <Link
+      href="/watchlist"
+      aria-label="Watchlist"
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm transition-colors hover:bg-muted hover:text-foreground sm:px-2",
+        active ? "font-medium text-foreground" : "text-muted-foreground",
+      )}
+    >
+      <Bookmark className="size-4" />
+      <span className="hidden md:inline">Watchlist</span>
+    </Link>
+  );
+}
+
 export function NavLinks() {
   const pathname = usePathname() ?? "/";
   return (
@@ -39,12 +59,12 @@ export function NavLinks() {
             href={s.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "relative rounded-md px-2 py-1.5 text-sm transition-colors sm:px-3",
+              "relative rounded-md px-1.5 py-1.5 text-sm transition-colors sm:px-3",
               active ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
             {s.label}
-            {active && <span aria-hidden className="absolute inset-x-2 -bottom-[11px] h-0.5 rounded-full bg-foreground sm:inset-x-3" />}
+            {active && <span aria-hidden className="absolute inset-x-1.5 -bottom-[11px] h-0.5 rounded-full bg-foreground sm:inset-x-3" />}
           </Link>
         );
       })}

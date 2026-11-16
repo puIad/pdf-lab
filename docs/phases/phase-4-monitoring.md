@@ -18,6 +18,8 @@ ideas, the way PDFMinter's tracked topics and saved ideas work.
   2. Quota note: watchlist size capped per tier (limits enforced in Phase 5; constant in one place).
 - Acceptance: bookmark/unbookmark persists per user for all three kinds; anonymous prompted to
   sign in (or local-only list explicitly labeled — DECIDE in part, log it).
+- Decided 2026-11-16: anonymous is asked to sign in, no local-only list (reasons in
+  `docs/log/part-4.1.md`). The table also has a `seed` column for ideas (`04-SCHEMA.md`).
 
 ## Part 4.2 — Scheduled re-research + change detection (DEC-001 lives here)
 
