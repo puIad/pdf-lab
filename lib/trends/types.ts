@@ -73,6 +73,8 @@ export interface RadarSnapshot {
     seasonalCount: number;
     solvableCount: number;
     avgMomentum: number;
+    /** Markets that match the filters but have too few dated signals for a trend; not plotted. */
+    notPlotted?: number;
   };
 }
 

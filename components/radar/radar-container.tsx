@@ -78,7 +78,7 @@ export function RadarContainer({
     }
   };
 
-  const currentSummary = snapshots["7d"]?.summary || {
+  const currentSummary: RadarSnapshot["summary"] = snapshots["7d"]?.summary || {
     totalTopics: 0,
     emergingCount: 0,
     acceleratingCount: 0,
@@ -129,6 +129,20 @@ export function RadarContainer({
         totalTopics={currentSummary.totalTopics}
         solvableTopicsCount={currentSummary.solvableCount}
       />
+
+      {/* What the filters left: nothing to plot is said, an empty radar is not shown as a finding. */}
+      {currentSummary.totalTopics === 0 ? (
+        <p role="status" className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+          No market matches these filters with enough dated signals for a trend.
+          {(currentSummary.notPlotted ?? 0) > 0 ? ` ${currentSummary.notPlotted} matching ${currentSummary.notPlotted === 1 ? "market has" : "markets have"} too few dated signals and ${currentSummary.notPlotted === 1 ? "is" : "are"} not plotted.` : ""}
+        </p>
+      ) : (
+        (currentSummary.notPlotted ?? 0) > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {currentSummary.notPlotted} more {currentSummary.notPlotted === 1 ? "market matches" : "markets match"} but {currentSummary.notPlotted === 1 ? "has" : "have"} too few dated signals for a trend, so {currentSummary.notPlotted === 1 ? "it is" : "they are"} not plotted.
+          </p>
+        )
+      )}
 
       {/* Synchronized 4-Window Radar Grid */}
       <div className={`relative grid grid-cols-1 lg:grid-cols-2 gap-4 transition-opacity duration-200 ${loading ? "opacity-60" : "opacity-100"}`}>

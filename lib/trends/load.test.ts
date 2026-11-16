@@ -54,6 +54,19 @@ test("radar topics are stored market ids, and a market with one dated signal has
   assert.deepEqual(topics.map((t) => t.marketId).sort(), ["m1", "m2"]);
   assert.equal(topics.find((t) => t.marketId === "m1")?.classification, "unknown");
   assert.notEqual(topics.find((t) => t.marketId === "m2")?.classification, "unknown");
+
+  // The unknown one is counted, not plotted (issue #51), in every window and in a single one.
+  const snapshots = radar.getFourWindowSnapshots();
+  for (const s of Object.values(snapshots)) {
+    assert.ok(s.nodes.every((n) => n.classification !== "unknown"));
+    assert.equal(s.summary.totalTopics, 1);
+    assert.equal(s.summary.notPlotted, 1);
+  }
+  assert.equal(radar.getSnapshot("30d").summary.notPlotted, 1);
+  // A filter that leaves only the unknown market plots nothing and says one was left out.
+  const filtered = radar.getSnapshot("7d", { search: "A" });
+  assert.equal(filtered.summary.totalTopics, 0);
+  assert.equal(filtered.summary.notPlotted, 1);
 });
 
 test("thin data: no trend to plot, and the empty state states the stored counts", async () => {
