@@ -11,7 +11,7 @@ import {
   enforceRule5_SeparationOfConcerns,
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
-import { matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
+import { commonWords, matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
 import { classifyFormat } from "../ideas/ideas.ts";
 import { IDEA_FORMAT_MAP } from "./from-ideas.ts";
 import {
@@ -520,7 +520,9 @@ ${JSON.stringify(marketSummaries, null, 2)}`;
     // Its evidence is the signals that speak about the model's problem wording (Part 6.8).
     // No stored embedding exists for new wording, so its own signals are found by shared words;
     // a problem none of that audience's signals mentions has no evidence and is skipped.
-    const signals = audienceSignals.filter((s) => problemOverlap(raw.problem, s) >= MIN_TOKEN_MATCH);
+    // Words most of the market shares are left out, as in matchSignals (Part 6.16).
+    const common = commonWords(market.signals);
+    const signals = audienceSignals.filter((s) => problemOverlap(raw.problem, s, common) >= MIN_TOKEN_MATCH);
     if (signals.length === 0) continue;
 
     const format = raw.format.toLowerCase().trim() as OpportunityFormat;

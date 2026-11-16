@@ -52,3 +52,11 @@ found in the live checks of 6.7 and 6.8 (`docs/log/part-6.7.md`, `docs/log/part-
   not a fitting one ("can meal prep last 5 days" → "Meal prep recipe ideas").
 - "More than half of the signals" and the 3-signal limit are first guesses, marked in the code
   comments. They were checked on these two runs only.
+
+## 2026-11-16: review fix (PR #20)
+
+The model path (`generateWithAIRouter`) picked a candidate's own signals with `problemOverlap`
+and no common-word set, so a model-worded problem could still take a whole market as its own
+("6 of 6"). It now passes `commonWords(market.signals)`, the same set `matchSignals` uses. One
+test added: a six-signal meal prep market, model problem "Meal prep chicken ideas", evidence is
+the chicken signal only. 342/342 tests, lint, typecheck green.

@@ -439,6 +439,32 @@ test("AI path: model wording, stored grounding, no defaults, no padding (Part 6.
     assert.doesNotMatch(JSON.stringify(res), PC_TEXT);
   });
 
+  await t.test("a model problem does not match a whole market through the words its signals share (Part 6.16)", async () => {
+    const things = ["chicken", "recipes", "soups", "lunches", "breakfasts", "snacks"];
+    const mealPrep: OpportunityMarketInput = {
+      id: "bbbbbbbb-0000-0000-0000-000000000001",
+      name: "Meal Prep",
+      demandScore: 60,
+      confidence: 0.5,
+      signals: things.map((thing, i) => ({
+        id: `m${i}`,
+        source_id: `src-m${i}`,
+        source_type: "web",
+        title: `meal prep ${thing}`,
+        content: "",
+        url: `https://example.com/m${i}`,
+        published_at: "2026-11-01T12:00:00Z",
+        analysis: { audience: "home cooks", problem: `They look for ${thing} to meal prep.`, intent: "strong", urgency: "low", pdf_relevance: 0.8 },
+      })),
+    };
+    const res = await generate25Opportunities([mealPrep], {
+      router: routerReturning([{ ...ok, marketId: mealPrep.id, title: "Chicken Prep Plan", targetAudience: "home cooks", problem: "Meal prep chicken ideas" }]),
+    });
+    const model = res.opportunities.find((o) => o.title === "Chicken Prep Plan");
+    assert.ok(model);
+    assert.deepEqual(model.evidence.map((e) => e.sourceId), ["src-m0"]); // the chicken signal, not all six
+  });
+
   await t.test("no usable model candidate, or a provider error, leaves the observed pool", async () => {
     const none = await generate25Opportunities(markets, { router: routerReturning([{ title: "only a title" }]) });
     assert.equal(none.opportunities.length, 3);
