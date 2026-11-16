@@ -56,6 +56,10 @@ positioning, search keywords, customer language, evidence sources.
 
 - Watchlist (Phase 4.1) → scheduled re-research + change reports (4.2) → in-app alerts
   first, email/browser optional (4.3).
+- Built in 4.1: `/watchlist` ("My watchlist") groups Markets, Tracked seeds and Saved ideas, each
+  row with Remove, and shows the plan's cap. Rows are added with Watch market on a market report,
+  Track this seed on a scan, and Save on an idea card. The header links to it on the right. A
+  signed-out visitor is asked to sign in; nothing is kept in the browser.
 - Export MVP: Markdown + CSV + JSON; PDF later; Notion/GDocs post-MVP (PRD §46).
 
 ## Quick ideas, verdict, brief (Parts 3.6 to 3.10, DEC-010)

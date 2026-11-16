@@ -178,11 +178,36 @@ create table usage_events (
   auth user leaves its `public.users` row (see Open defects in `STATE.md`).
 - Migration: `supabase/migrations/20261116000009_auth_quotas.sql`.
 
+## Watchlist (Part 4.1)
+
+```sql
+create table watchlists (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade not null,
+  kind text not null check (kind in ('market', 'seed', 'idea')),
+  ref text not null check (char_length(ref) between 1 and 200),  -- market id, seed, or idea phrase
+  region text not null default '',  -- scan region for a seed or idea; '' for a market
+  seed text check (char_length(seed) <= 80),  -- idea only: the scan it was saved from
+  created_at timestamptz not null default now(),
+  unique (user_id, kind, ref, region)
+);
+```
+
+- One row per thing a signed-in person follows. Seeds and phrases are stored lowercased with
+  single spaces (`lib/watchlist/watchlist.ts`), so the unique key is case-insensitive in practice.
+- `region` is not nullable: two nulls would not collide in the unique key.
+- Owner only, enforced twice: grants (`authenticated` may select, insert and delete; `anon`
+  nothing) and three policies on `(select auth.uid()) = user_id`. No update: a row is saved or
+  removed. The app reads and writes it as the signed-in person, not with the service role.
+- How many rows a plan holds is `WATCHLIST_LIMIT` in `lib/quotas/quotas.ts`, checked by
+  `POST /api/watchlist`.
+- Migration: `supabase/migrations/20261116000010_watchlists.sql`.
+
 ## RLS (Supabase)
 
 - Public read: `markets`, `opportunities`, `competitors`, `evidence`, `sources` (anon can
   browse explorer within free-tier limits enforced app-side).
-- Private: `users` (owner only), `research_runs` + `signals`/`signal_analysis`/
+- Private: `users` (owner only), `watchlists` (owner only, Part 4.1), `research_runs` + `signals`/`signal_analysis`/
   `market_signals`/`run_signals` (owner's runs + linked rows, or service-role only in MVP; tighten in Phase 5).
 - Enforce with policies + tests in Phase 0 Part 0.2; service-role key NEVER ships to client.
 

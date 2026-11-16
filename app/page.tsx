@@ -9,12 +9,13 @@ import { IdeasView } from "@/app/ideas/ideas-view";
 import { RecentDeepRuns, type RecentDeepRun } from "@/components/home/recent-deep-runs";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { resolveCaller } from "@/lib/quotas/guard";
+import type { Caller } from "@/lib/quotas/quotas";
+import { watchKeys } from "@/lib/watchlist/store";
 
 export const dynamic = "force-dynamic";
 
-async function loadRecentDeepRuns(): Promise<{ runs: RecentDeepRun[]; signedOut: boolean; error: string | null }> {
+async function loadRecentDeepRuns(caller: Caller): Promise<{ runs: RecentDeepRun[]; signedOut: boolean; error: string | null }> {
   try {
-    const caller = await resolveCaller(await headers());
     if (caller.plan === "anon") return { runs: [], signedOut: true, error: null };
     const query = createServiceSupabaseClient()
       .from("research_runs")
@@ -41,10 +42,21 @@ async function loadRecentDeepRuns(): Promise<{ runs: RecentDeepRun[]; signedOut:
 export default async function HomePage(props: { searchParams: Promise<{ q?: string; region?: string; run?: string }> }) {
   const { q, region, run } = await props.searchParams;
   if (run) redirect(`/markets?run=${encodeURIComponent(run)}`);
-  const recent = await loadRecentDeepRuns();
+  // Who is calling is resolved once, for the runs and for the saved marks on the idea cards (Part 4.1).
+  let caller: Caller | null = null;
+  let callerError: string | null = null;
+  try {
+    caller = await resolveCaller(await headers());
+  } catch (err) {
+    callerError = err instanceof Error ? err.message : String(err);
+  }
+  const [recent, saved] = await Promise.all([
+    caller ? loadRecentDeepRuns(caller) : { runs: [], signedOut: false, error: callerError },
+    watchKeys(caller?.userId ?? null),
+  ]);
   return (
     <main className="flex-1 bg-background text-foreground">
-      <IdeasView initialSeed={q?.trim() ?? ""} initialRegion={region ?? ""} />
+      <IdeasView initialSeed={q?.trim() ?? ""} initialRegion={region ?? ""} watchKeys={saved} />
       <div className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
         <RecentDeepRuns {...recent} />
       </div>

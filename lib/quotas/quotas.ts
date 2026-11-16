@@ -35,6 +35,10 @@ export const LIMITS: Record<Plan, Record<UsageKind, Limit>> = {
   },
 };
 
+// How many markets, seeds and ideas a watchlist holds in all (Part 4.1). Not a usage window: it
+// is the number of rows kept. shortcut: placeholders like the caps above, set in Part 5.3.
+export const WATCHLIST_LIMIT: Record<Plan, number> = { anon: 0, free: 25, premium: 250 };
+
 export const KIND_LABEL: Record<UsageKind, string> = {
   search: "searches",
   exploration: "idea scans",

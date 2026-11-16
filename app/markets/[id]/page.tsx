@@ -3,8 +3,13 @@
 
 import React from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { createServiceSupabaseClient } from "@/lib/db/client";
+import { resolveCaller } from "@/lib/quotas/guard";
+import { watchKeys } from "@/lib/watchlist/store";
+import { watchKey } from "@/lib/watchlist/watchlist";
+import { WatchToggle } from "@/components/watchlist/watch-toggle";
 import {
   ArrowLeft,
   TrendingUp,
@@ -156,6 +161,12 @@ export default async function MarketPage(props: MarketPageProps) {
   const counts = marketCompletenessCounts({ observations: observed, opportunityIds: oppIds, evidence: allEvidence });
   const completeness = calculateCompleteness(counts);
 
+  // 7. Is this market on the visitor's watchlist (Part 4.1)? Signed out, or unknown: shown as not saved.
+  const saved = await resolveCaller(await headers())
+    .then((caller) => watchKeys(caller.userId))
+    .catch((): string[] => []);
+  const watched = saved.includes(watchKey("market", market.id));
+
   return (
     <div className="flex-1 bg-background text-foreground">
       {/* Top Navigation */}
@@ -209,6 +220,7 @@ export default async function MarketPage(props: MarketPageProps) {
               <ShieldCheck className="mr-1 size-3" />
               {confidencePct === null ? "Confidence not stored" : `${confidencePct}% Evidence Confidence`}
             </Badge>
+            <WatchToggle watch={{ kind: "market", ref: market.id }} initialWatched={watched} on="Watching" off="Watch market" size="xs" />
           </div>
 
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">

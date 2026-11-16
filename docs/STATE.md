@@ -56,7 +56,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 
 | Part | Title | Status | Commit | Notes |
 |---|---|---|---|---|
-| 4.1 | Watchlist | pending | — | Watchlist of markets, idea seeds and saved ideas. [log](log/part-4.1.md) |
+| 4.1 | Watchlist | done | (this commit) | Markets, tracked seeds and saved ideas per signed-in user at `/watchlist`, owner-only RLS, plan cap; signed out asks for sign-in. Live check 38 of 38. [log](log/part-4.1.md) |
 | 4.2 | Scheduled re-research + change detection | pending | — | Scheduled re-research with change detection and daily seed re-scans. DEC-001 is decided here. [log](log/part-4.2.md) |
 | 4.3 | Alerts (in-app first) | pending | — | In-app alerts and a weekly digest. [log](log/part-4.3.md) |
 
@@ -103,7 +103,10 @@ Known defects and their owner. A fixed defect leaves this table (its story stays
 | Deep run does not fit a Vercel function; a timed-out step keeps writing | 3.8 | 6.10 |
 | Deleting an auth user leaves its `public.users` row; signing up again with that email gets no row, so every counted action answers 503 | 5.1 | unowned (no flow deletes accounts yet) |
 | Quota is counted then recorded: two requests in the same instant can both pass at the limit | 5.1 | unowned |
-| Search and check caps and all premium limits are placeholders | 5.1 | 5.3 (from the usage ledger) |
+| Search and check caps and all premium limits are placeholders; so are the watchlist caps (25 and 250 rows) | 5.1, 4.1 | 5.3 (from the usage ledger) |
+| Watchlist cap is read then inserted: two requests in the same instant can pass it by one | 4.1 | unowned |
+| A watched market points at one run's market row; a newer run of the same seed stores new rows | 4.1 | 4.2 |
+| One watchlist removal did not happen in the first live run and never again in 100 more writes; the response was not recorded | 4.1 | unowned (see the part log) |
 | Supabase Auth site URL and redirect allow list not checked for the production domain | 5.1 | user (Supabase dashboard) |
 | `/markets` run picker shows every completed Deep run's seed, while 5.1 keeps run queries private | 5.1 review | user (are Deep-run markets shared?) |
 | A pasted run re-analyses signals an earlier run analysed: the stored analysis is replaced and its embedding cleared | 6.15 | unowned |
