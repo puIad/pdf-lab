@@ -4,6 +4,7 @@
 
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNextPath } from "@/lib/auth/next-path";
 import { createServerSupabaseClient } from "@/lib/db/client";
 
 export async function GET(request: NextRequest) {
@@ -11,10 +12,8 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/";
-  // Only a path on this site: "//host" and "/\host" would leave it.
   const to = (path: string) => NextResponse.redirect(new URL(path, request.nextUrl.origin));
-  const target = /^\/(?![/\\])/.test(next) ? next : "/";
+  const target = safeNextPath(searchParams.get("next"), "/");
 
   let message = "The sign-in link is incomplete. Ask for a new one.";
   if (code || (tokenHash && type)) {

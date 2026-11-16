@@ -121,3 +121,14 @@ signed-in user now runs pasted Deep runs in production, within the plan's limit.
   the nonsense seed "qzxv wkjp" still collected signals, so it was a success and stayed counted.
 - Open question, not changed: the `/markets` run picker lists every completed Deep run's seed.
   Markets are public by design (`04-SCHEMA.md` RLS), but a seed is also the run's query.
+
+## Review fix (PR #21 review, 2026-11-16)
+
+- Open redirect after sign-in closed. The `next` path was checked by a regex on its first two
+  characters, but the URL parser drops tab, CR and LF, so `/\t/evil.com` passed and redirected to
+  another site. `safeNextPath` (`lib/auth/next-path.ts`) now parses `next` the way the redirect
+  does and keeps it only when it stays on this origin. `/auth/confirm` and `/login` both use it.
+- The reviewer's origin comparison alone still let `/.//evil.com` through: it parses on this
+  origin, but its path normalises to `//evil.com`, which leaves on the next parse. The helper
+  also refuses a normalised path that starts with `//`.
+- Verified: `pnpm test` 352 of 352 (3 new, 13 hostile values), typecheck, eslint.
