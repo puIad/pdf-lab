@@ -6,13 +6,22 @@ import test from "node:test";
 import { decide, LIMITS, windowEnd, windowStart, type Caller, type UsageKind, type UsageStore } from "./quotas.ts";
 
 /** In-memory stand-in for the usage_events table. `now` is the clock the rows are stamped with. */
-function memoryStore(clock: { now: Date }): UsageStore & { rows: Array<{ who: string; kind: UsageKind; at: Date }> } {
+function memoryStore(clock: { now: Date }): UsageStore & { rows: Array<{ id: string; who: string; kind: UsageKind; at: Date }> } {
   const who = (c: Caller) => c.userId ?? c.anonHash ?? "";
-  const rows: Array<{ who: string; kind: UsageKind; at: Date }> = [];
+  const rows: Array<{ id: string; who: string; kind: UsageKind; at: Date }> = [];
+  let next = 0;
   return {
     rows,
     count: async (c, kind, since) => rows.filter((r) => r.who === who(c) && r.kind === kind && r.at >= since).length,
-    record: async (c, kind) => void rows.push({ who: who(c), kind, at: clock.now }),
+    record: async (c, kind) => {
+      const id = `row-${++next}`;
+      rows.push({ id, who: who(c), kind, at: clock.now });
+      return id;
+    },
+    remove: async (id) => {
+      const i = rows.findIndex((r) => r.id === id);
+      if (i >= 0) rows.splice(i, 1);
+    },
   };
 }
 
@@ -97,13 +106,27 @@ test("the server key is never counted; a pipeline endpoint refuses everyone else
   const store = memoryStore(clock);
   const internal: Caller = { plan: "internal", userId: null, anonHash: null, email: null };
   const local: Caller = { plan: "local", userId: null, anonHash: null, email: null };
-  assert.deepEqual(await decide(internal, "internal", store, clock.now), { ok: true, quota: null });
-  assert.deepEqual(await decide(internal, "deep", store, clock.now), { ok: true, quota: null });
-  assert.deepEqual(await decide(local, "deep", store, clock.now), { ok: true, quota: null });
+  assert.deepEqual(await decide(internal, "internal", store, clock.now), { ok: true, quota: null, usageId: null });
+  assert.deepEqual(await decide(internal, "deep", store, clock.now), { ok: true, quota: null, usageId: null });
+  assert.deepEqual(await decide(local, "deep", store, clock.now), { ok: true, quota: null, usageId: null });
   for (const caller of [anon, free, local]) {
     const d = await decide(caller, "internal", store, clock.now);
     assert.ok(!d.ok);
     assert.equal(d.status, 401);
   }
   assert.equal(store.rows.length, 0);
+});
+
+test("a refunded Deep run gives the month's run back", async () => {
+  const clock = { now: at("2026-11-16T10:00:00Z") };
+  const store = memoryStore(clock);
+  const first = await decide(free, "deep", store, clock.now);
+  assert.ok(first.ok && first.usageId);
+  assert.equal((await decide(free, "deep", store, clock.now)).ok, false);
+  // The run failed while collecting: the route removes the row it was counted under.
+  await store.remove(first.usageId);
+  const again = await decide(free, "deep", store, clock.now);
+  assert.ok(again.ok);
+  assert.equal(again.quota?.remaining, 0);
+  assert.equal(store.rows.length, 1);
 });

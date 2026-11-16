@@ -7,7 +7,7 @@ import { loadCompetitionChecks, normalizePhrase } from "@/lib/competition/check"
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { autocompleteEnabled } from "@/lib/sources";
 import type { MarketSignal } from "@/lib/sources/types";
-import { enforceQuota } from "@/lib/quotas/guard";
+import { enforceQuota, refund } from "@/lib/quotas/guard";
 
 // POST /api/ideas { seed, region? } — Phase 3 Parts 3.6 + 3.7 quick ideas.
 // Phrases come from autocomplete while its local-only guard is open (DEC-008), otherwise (always in
@@ -65,6 +65,7 @@ export async function POST(req: Request) {
       quota: guard.quota,
     });
   } catch (err) {
+    await refund(guard); // the scan failed: it does not count
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

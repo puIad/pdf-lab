@@ -104,3 +104,20 @@ signed-in user now runs pasted Deep runs in production, within the plan's limit.
   origin is not allowed, Supabase falls back to the site URL.
 - `INTERNAL_API_KEY` is not in `.env.local`, so on a local production build no caller is
   "internal"; scripts that call the pipeline endpoints need it set.
+
+## Review fixes (PR #22 review, 2026-11-16)
+
+- `/research` listed the 8 newest runs of everyone. It now lists the caller's own (all on a dev
+  server or with the server key, none signed out), like the other run lists.
+- A counted action whose work then fails is refunded: `decide` returns the id of the
+  `usage_events` row it wrote, and `refund(guard)` (`lib/quotas/guard.ts`) deletes it. Every
+  error return after the quota check calls it: `/api/deep` (collection failed, 502, 500),
+  `/api/ideas`, `/api/ideas/competition`, `/api/briefs/notes`, `/api/search`, `/api/research`
+  and `/search?q=`. A failed refund is logged and does not replace the real error.
+- Verified: `pnpm test` 349 of 349 (new test: a refunded Deep run gives the month's run back),
+  typecheck, eslint, `next build`. Live on a production build with one test account (deleted):
+  signed-out `/research` shows no stored run query; a search refused after the quota check
+  ("Monitor needs a niche", 400) leaves 0 usage rows; a working search leaves 1. A Deep run on
+  the nonsense seed "qzxv wkjp" still collected signals, so it was a success and stayed counted.
+- Open question, not changed: the `/markets` run picker lists every completed Deep run's seed.
+  Markets are public by design (`04-SCHEMA.md` RLS), but a seed is also the run's query.

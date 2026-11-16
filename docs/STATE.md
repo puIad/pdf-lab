@@ -105,6 +105,7 @@ Known defects and their owner. A fixed defect leaves this table (its story stays
 | Quota is counted then recorded: two requests in the same instant can both pass at the limit | 5.1 | unowned |
 | Search and check caps and all premium limits are placeholders | 5.1 | 5.3 (from the usage ledger) |
 | Supabase Auth site URL and redirect allow list not checked for the production domain | 5.1 | user (Supabase dashboard) |
+| `/markets` run picker shows every completed Deep run's seed, while 5.1 keeps run queries private | 5.1 review | user (are Deep-run markets shared?) |
 | A pasted run re-analyses signals an earlier run analysed: the stored analysis is replaced and its embedding cleared | 6.15 | unowned |
 | A pasted run's second request took 41 s of its 60 s limit on 34 signals | 6.15 | 6.10 |
 | Stored runs `c638c48d` and `7963555f` keep the pre-6.16 competitor markets, idea filing and match counts | 6.16 | unowned (a new run rewrites them) |

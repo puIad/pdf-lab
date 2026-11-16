@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServiceDeps } from "@/lib/ingest/service-deps";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { loadCompetitionChecks, normalizePhrase, runCompetitionCheck } from "@/lib/competition/check";
-import { enforceQuota } from "@/lib/quotas/guard";
+import { enforceQuota, refund } from "@/lib/quotas/guard";
 
 // POST /api/ideas/competition { phrase } — Phase 3 Part 3.9: one click = one check (3 Serper calls,
 // Etsy / Gumroad / KDP). Listings are stored as `competition` evidence and the response is read back
@@ -49,11 +49,13 @@ export async function POST(req: Request) {
     });
     if (!run.sources.some((s) => s.status === "ok")) {
       const reason = run.sources.map((s) => `${s.key}: ${s.status}${s.error ? ` (${s.error})` : ""}`).join("; ");
+      await refund(guard); // nothing stored: the check does not count
       return NextResponse.json({ error: `No marketplace answered, nothing stored. ${reason}`, sources: run.sources }, { status: 502 });
     }
     const check = (await loadCompetitionChecks(supabase, [phrase]))[normalizePhrase(phrase)] ?? null;
     return NextResponse.json({ check, sources: run.sources });
   } catch (err) {
+    await refund(guard);
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }
