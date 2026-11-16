@@ -84,7 +84,7 @@ The 3.3 radar fix of 2026-11-06 is in [log/part-3.3.md](log/part-3.3.md).
 | 6.9 | Batched extraction; a run that analysed nothing fails | blocked | 88fe435 | Batched extraction, 10 signals per call; a run that analysed under half fails. Live extraction run waits on DEC-015; a pasted run calls no model. [log](log/part-6.9.md) |
 | 6.10 | Deep runs as a background job | blocked | — | Waits on DEC-001 (job provider) and a measured post-6.9 run duration. [log](log/part-6.10.md) |
 | 6.11 | Score honesty + calibration from stored competition checks | done | 2ff8833 | Demand no longer grows with the fetch limit, intent averages analysed signals, competition tick recut from 30 stored checks. [log](log/part-6.11.md) |
-| 6.12 | Ideas-first home + shared navigation | done | (this commit) | `/` is the ideas scan with recent Deep runs; explorer at `/markets`; one shared header; brief reached by clicks only. [log](log/part-6.12.md) |
+| 6.12 | Ideas-first home + shared navigation | done | cc319ef | `/` is the ideas scan with recent Deep runs; explorer at `/markets`; one shared header; brief reached by clicks only. [log](log/part-6.12.md) |
 | 6.13 | Lighter process docs | done | 12e791c | STATE notes moved to docs/log, open-defects table added. Frontend rule now points at components/ui (DEC-016). [log](log/part-6.13.md) |
 | 6.14 | Report pages: remove hard-coded PC copy and invented values | done | 878caea | Report pages show stored values or "Not observed"; panel counts equal the stored rows. [log](log/part-6.14.md) |
 | 6.15 | Deep runs analysed by a pasted model reply | done | bddcb53 | Collect, copy one prompt into a chat model, paste the reply back; markets come from the reply's names. No model call. [log](log/part-6.15.md) |
