@@ -134,6 +134,15 @@ Files outside the phase file's "touches" list, all required by its task 1 or 2:
   `20260920000004_seed_tier2_sources.sql`. Whether its rows were applied another way was not
   checked.
 
+## Review fix (PR #23 review, 2026-11-16)
+
+- `GET /api/watchlist` removed. Nothing called it: the toggle sends POST and DELETE, and the
+  pages read the list on the server with `listWatches`. Item 4 above and the "GET" lines of the
+  live check describe the handler as it was when checked. A client or Part 4.2 that needs the
+  list over HTTP adds it back.
+- Verified: `pnpm test` 357 of 357, typecheck, eslint, `next build`. On the rebuilt production
+  build, signed out: POST and DELETE still answer 401 and GET answers 405.
+
 ## Review checklist
 
 - A. Acceptance: bookmark and unbookmark persist per user for all three kinds (live check and

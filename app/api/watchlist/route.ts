@@ -1,7 +1,8 @@
 // app/api/watchlist/route.ts — a signed-in person's watchlist (Phase 4 Part 4.1, PRD §43).
-// GET lists it, POST saves a market, seed or idea, DELETE removes one. Signed out: 401, the UI
-// then asks the visitor to sign in (no local-only list). Rows are read and written as the
-// caller, so the table's owner-only policies apply; nothing here uses the service-role key.
+// POST saves a market, seed or idea, DELETE removes one; pages read the list on the server
+// (lib/watchlist/store.ts). Signed out: 401, the UI then asks the visitor to sign in (no
+// local-only list). Rows are read and written as the caller, so the table's owner-only policies
+// apply; nothing here uses the service-role key.
 
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/db/client";
@@ -28,16 +29,6 @@ async function readWatch(req: Request) {
     return parseWatch((await req.json()) as Record<string, unknown> | null);
   } catch {
     return { error: "body must be valid JSON" };
-  }
-}
-
-export async function GET(req: Request) {
-  try {
-    const me = await owner(req.headers);
-    if (!me) return signIn();
-    return NextResponse.json({ items: await listWatches(me.userId), limit: me.limit });
-  } catch (err) {
-    return failed(err);
   }
 }
 
