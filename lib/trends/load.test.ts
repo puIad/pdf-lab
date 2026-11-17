@@ -58,7 +58,7 @@ test("radar topics are stored market ids, and a market with one dated signal has
   // The unknown one is counted, not plotted (issue #51), in every window and in a single one.
   const snapshots = radar.getFourWindowSnapshots();
   for (const s of Object.values(snapshots)) {
-    assert.ok(s.nodes.every((n) => n.classification !== "unknown"));
+    assert.ok(s.nodes.every((n) => n.analysis.classification !== "unknown"));
     assert.equal(s.summary.totalTopics, 1);
     assert.equal(s.summary.notPlotted, 1);
   }
