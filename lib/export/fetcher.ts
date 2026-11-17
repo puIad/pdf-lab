@@ -9,7 +9,13 @@ import type {
   ExportEvidenceItem,
 } from "./types.ts";
 import { fetchRunCompleteness, calculateCompleteness } from "../runs/completeness.ts";
-import { marketCompletenessCounts, NOT_OBSERVED, observeMarket, type ReportSignal } from "../report/observed.ts";
+import {
+  marketCompletenessCounts,
+  marketQcRules,
+  NOT_OBSERVED,
+  observeMarket,
+  type ReportSignal,
+} from "../report/observed.ts";
 import { parsePrice } from "../sources/marketplace-helper.ts";
 import {
   listingFormat,
@@ -221,10 +227,29 @@ export async function fetchReportExportData(
 
   // 8. Completeness: the run's own counts when the market belongs to a run, else this market's
   // stored rows. No floors: a thin market reads as thin (Part 6.14).
+  const evidenceForQc = (evRows ?? []).map((e) => ({
+    entity_type: e.entity_type as string,
+    entity_id: e.entity_id as string,
+    source_id: e.source_id as string | null,
+    url: e.url as string | null,
+    excerpt: e.excerpt as string | null,
+  }));
+  const qcRules = marketQcRules({
+    market: {
+      trend: marketData.trend ?? null,
+      demand_score: marketData.demand_score ?? null,
+      competition_score: marketData.competition_score ?? null,
+    },
+    signals: rawSignals as ReportSignal[],
+    competitorCount: (compRows ?? []).length,
+    opportunityIds: oppIds,
+    evidence: evidenceForQc,
+  });
   const marketCounts = marketCompletenessCounts({
     observations: observeMarket(rawSignals as ReportSignal[]),
     opportunityIds: oppIds,
-    evidence: (evRows ?? []).map((e) => ({ entity_type: e.entity_type as string, entity_id: e.entity_id as string })),
+    evidence: evidenceForQc,
+    rules: qcRules,
   });
   const runComp = scopedRunId ? await fetchRunCompleteness(supabase, scopedRunId).catch(() => null) : null;
   const completeness = runComp ?? calculateCompleteness(marketCounts);
@@ -246,6 +271,7 @@ export async function fetchReportExportData(
       createdAt: marketData.created_at,
     },
     completeness,
+    qcRules,
     competitors: exportCompetitors,
     productGaps: exportProductGaps,
     customerQuotes,

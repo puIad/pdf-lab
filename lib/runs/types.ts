@@ -34,6 +34,9 @@ export interface ResearchCompleteness {
   completenessPercentage: number;
   /** Analysed signals that are in none of the run's markets (no embedding, or unrelated to the topic). */
   signalsNotClustered?: number;
+  /** One market only: QC rules that had rows to check, and how many of them held. */
+  qcRulesChecked?: number;
+  qcRulesHeld?: number;
 }
 
 export interface ResearchRunRecord {

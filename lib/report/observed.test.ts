@@ -3,7 +3,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { marketCompletenessCounts, observeMarket, platformCounts } from "./observed.ts";
+import { marketCompletenessCounts, marketQcRules, observeMarket, platformCounts } from "./observed.ts";
+import { calculateCompleteness } from "../runs/completeness.ts";
 
 const signal = (type: string, analysis?: { audience?: string; problem?: string; urgency?: string; pdf_relevance?: number }) => ({
   sources: { type },
@@ -82,4 +83,77 @@ test("report sources carry no fixed niche copy, default scores or count floors",
     assert.doesNotMatch(src, /\bPC\b|BIOS|hardware|repair shop|troubleshoot|Powercfg|\$\d+ Value/i, `${file} has niche copy`);
     assert.doesNotMatch(src, /Math\.max\([^)]*\b25\b|marketsIdentified: 14|\|\| 7[05]\b|\?\? 0\.75|\|\| 0\.5\b/, `${file} has a floor or default`);
   }
+});
+
+test("QC rules are results on the market's stored rows (#52)", () => {
+  const dated = { published_at: "2026-10-01", sources: { type: "reddit" } };
+  const ev = (entity_type: string, entity_id: string, sourced = true) => ({
+    entity_type,
+    entity_id,
+    source_id: sourced ? "s1" : null,
+    url: "https://example.com/p",
+    excerpt: null,
+  });
+  const rules = marketQcRules({
+    market: { trend: "accelerating", demand_score: 40, competition_score: 55 },
+    signals: [dated, { sources: { type: "web" }, signal_analysis: [{ problem: "x" }] }],
+    competitorCount: 0,
+    opportunityIds: ["o1", "o2"],
+    evidence: [ev("opportunity", "o1"), ev("opportunity", "o2", false), ev("market", "m1")],
+  });
+  assert.deepEqual(
+    rules.map((r) => [r.rule, r.held, r.text]),
+    [
+      [1, false, "1 of 2 opportunities have a sourced evidence row"],
+      [2, false, 'Trend "accelerating" from 1 dated observation, 2 needed'],
+      [3, false, "Competition score 55 with no stored listing"],
+      [4, true, "Demand 40 from 2 linked signals"],
+      [5, true, "3 citations, 1 analysed signal, 2 suggestions stored apart"],
+    ],
+  );
+
+  // An empty market claims nothing: the rules hold or have nothing to check.
+  const empty = marketQcRules({
+    market: { trend: null, demand_score: null, competition_score: null },
+    signals: [],
+    competitorCount: 0,
+    opportunityIds: [],
+    evidence: [],
+  });
+  assert.deepEqual(
+    empty.map((r) => r.held),
+    [null, true, true, null, null],
+  );
+  // A Google Trends row is a dated observation.
+  const trends = marketQcRules({
+    market: { trend: "stable", demand_score: 10, competition_score: null },
+    signals: [{ sources: { type: "gtrends" } }, dated],
+    competitorCount: 3,
+    opportunityIds: [],
+    evidence: [],
+  });
+  assert.deepEqual([trends[1].held, trends[2].text], [true, "Competition from 3 stored listings"]);
+  // Interpretations with no citation under them break the separation.
+  assert.deepEqual(
+    [trends[4].held, marketQcRules({
+      market: { trend: null, demand_score: null, competition_score: null },
+      signals: [{ signal_analysis: [{ problem: "x" }] }],
+      competitorCount: 0,
+      opportunityIds: [],
+      evidence: [],
+    })[4]],
+    [null, { rule: 5, held: false, text: "0 citations, 1 analysed signal, 0 suggestions stored apart, with no facts layer" }],
+  );
+});
+
+test("a market page's 15% completeness slot is the share of checked rules that hold", () => {
+  const base = { observations: observeMarket([]), opportunityIds: [], evidence: [] };
+  const rule = (held: boolean | null) => ({ rule: 2 as const, held, text: "" });
+  const counts = marketCompletenessCounts({ ...base, rules: [rule(true), rule(false), rule(null), rule(true)] });
+  assert.equal(counts.qcRulesChecked, 3);
+  assert.equal(counts.qcRulesHeld, 2);
+  assert.equal(calculateCompleteness(counts).completenessPercentage, 10); // 2/3 of 15
+  // Before #52 any market page got the 15 points.
+  assert.equal(calculateCompleteness(marketCompletenessCounts(base)).completenessPercentage, 15);
+  assert.equal(calculateCompleteness(marketCompletenessCounts({ ...base, rules: [rule(false)] })).completenessPercentage, 0);
 });

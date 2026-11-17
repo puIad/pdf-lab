@@ -34,7 +34,13 @@ import { calculateLandscape, listingFormat, mineReviewsAndGaps, type CompetitorP
 import { parsePrice } from "@/lib/sources/marketplace-helper";
 import { QualityPanel } from "@/components/quality-panel";
 import { calculateCompleteness } from "@/lib/runs/completeness";
-import { marketCompletenessCounts, observeMarket, type ReportSignal } from "@/lib/report/observed";
+import {
+  marketCompletenessCounts,
+  marketQcRules,
+  observeMarket,
+  type QcEvidenceRow,
+  type ReportSignal,
+} from "@/lib/report/observed";
 
 export const dynamic = "force-dynamic";
 
@@ -154,11 +160,19 @@ export default async function MarketPage(props: MarketPageProps) {
   const oppIds = oppList.map((o) => o.id);
   const { data: oppEvidenceData } = await supabase
     .from("evidence")
-    .select("id, entity_type, entity_id")
+    .select("id, entity_type, entity_id, source_id, url, excerpt")
     .in("entity_id", [id, ...oppIds]);
 
-  const allEvidence = (oppEvidenceData ?? []) as Array<{ id: string; entity_type: string; entity_id: string }>;
-  const counts = marketCompletenessCounts({ observations: observed, opportunityIds: oppIds, evidence: allEvidence });
+  const allEvidence = (oppEvidenceData ?? []) as QcEvidenceRow[];
+  // QC lines R1 to R5 are results on these rows, and they score the panel's 15% rules slot (#52).
+  const qcRules = marketQcRules({
+    market,
+    signals: signalsList as ReportSignal[],
+    competitorCount: compList.length,
+    opportunityIds: oppIds,
+    evidence: allEvidence,
+  });
+  const counts = marketCompletenessCounts({ observations: observed, opportunityIds: oppIds, evidence: allEvidence, rules: qcRules });
   const completeness = calculateCompleteness(counts);
 
   // 7. Is this market on the visitor's watchlist (Part 4.1)? Signed out, or unknown: shown as not saved.
@@ -236,6 +250,7 @@ export default async function MarketPage(props: MarketPageProps) {
         <QualityPanel
           marketId={market.id}
           completeness={completeness}
+          rules={qcRules}
           marketName={market.name}
           sourceTypes={observed.sources}
         />

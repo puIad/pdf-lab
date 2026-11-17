@@ -74,6 +74,13 @@ function createMockReportData(oppCount = 25): ReportExportData {
       evidenceBackedOpportunitiesCount: oppCount,
       completenessPercentage: 100,
     },
+    qcRules: [
+      { rule: 1, held: true, text: `${oppCount} of ${oppCount} opportunities have a sourced evidence row` },
+      { rule: 2, held: true, text: 'Trend "accelerating" from 6 dated observations' },
+      { rule: 3, held: true, text: "Competition from 2 stored listings" },
+      { rule: 4, held: true, text: "Demand 88 from 25 linked signals" },
+      { rule: 5, held: false, text: "Competition score 42 with no stored listing" },
+    ],
     competitors: [
       {
         platform: "etsy",
@@ -163,6 +170,10 @@ test("generateReportMarkdown produces structured, cited document per PRD §46 & 
   assert.ok(md.includes("QC Rule 3"));
   assert.ok(md.includes("QC Rule 4"));
   assert.ok(md.includes("QC Rule 5"));
+  // The QC lines are the rule results, held or broken, never fixed statements (#52).
+  assert.ok(md.includes('Trend "accelerating" from 6 dated observations. Holds.'));
+  assert.ok(md.includes("Competition score 42 with no stored listing. Broken."));
+  assert.ok(!md.includes("Scores are rule-based indexes"));
 
   // 3. Section 2: Market Overview
   assert.ok(md.includes("## 2. Market Overview & Intelligence"));
