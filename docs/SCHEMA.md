@@ -180,9 +180,10 @@ create table usage_events (
 - `public.users.id` equals `auth.users.id`. There is no foreign key between them, so a trigger on
   `auth.users` delete removes the `public.users` row. That cascades to the person's usage rows,
   watchlist and research runs (`research_runs.user_id` is `on delete cascade`; a run's markets,
-  opportunities and competitors go with the run).
+  opportunities and competitors go with the run). Rows left by auth users deleted before the
+  trigger existed are removed once by migration 12.
 - Migrations: `supabase/migrations/20261116000009_auth_quotas.sql`,
-  `20261116000011_atomic_limits.sql`.
+  `20261116000011_atomic_limits.sql`, `20261117000012_orphan_users_cleanup.sql`.
 
 ## Watchlist (Part 4.1)
 
