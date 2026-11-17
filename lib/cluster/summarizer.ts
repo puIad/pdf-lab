@@ -76,7 +76,7 @@ function extractLanguagePhrases(signals: ClusterSignal[]): string[] {
 }
 
 /** An extraction placeholder, not a problem: "none explicitly stated in the text", "N/A". */
-const PLACEHOLDER_PROBLEM = /^(n\/?a|none|unknown|nothing)\.?$|\b(none|not)\b.*\b(stated|specified|mentioned|given|provided)\b/i;
+const PLACEHOLDER_PROBLEM = /^(n\/?a|none|unknown|nothing)\.?$|^(no|none|not)\b.*\b(stated|specified|mentioned|given|provided)\b/i;
 // Words a name must not end on after it is cut short.
 const TRAILING_FILLER = new Set(
   "a an the and or of to for in on with without over at by from how what which that their they".split(" "),
@@ -91,9 +91,9 @@ export function problemPhraseName(problem: string | null | undefined): string | 
   const text = problem?.trim();
   if (!text || PLACEHOLDER_PROBLEM.test(text)) return null;
   const clause = text
-    .split(/[.;:(]|,\s|\s[—–-]\s/)[0]
+    .split(/[.;:](?:\s|$)|\s\(|,\s|\s[—–-]\s/)[0]
     .replace(/^(they|people|users|someone)\s+(need|needs|want|wants)\s+(to\s+)?/i, "")
-    .replace(/^(they|people|users|someone)\s+((are|is)\s+)?/i, "")
+    .replace(/^(they|people|users|someone)\s+((are|is|were|was)\s+)?/i, "")
     .replace(/^(a|an|the)\s+/i, "")
     .trim();
   let words = clause.split(/\s+/).filter(Boolean);
@@ -113,8 +113,8 @@ export function problemPhraseName(problem: string | null | undefined): string | 
  */
 function generateDefaultClusterName(signals: ClusterSignal[], centroid: number[]): string {
   const ranked = signals
-    .map((s, i) => ({ s, i, sim: s.embedding?.length && centroid.length ? cosineSimilarity(s.embedding, centroid) : 0 }))
-    .sort((a, b) => b.sim - a.sim || a.i - b.i);
+    .map((s) => ({ s, sim: cosineSimilarity(s.embedding, centroid) }))
+    .sort((a, b) => b.sim - a.sim); // stable: equally central signals keep their order
   for (const { s } of ranked) {
     const name = problemPhraseName(s.analysis?.problem);
     if (name) return name;
