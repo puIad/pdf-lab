@@ -5,6 +5,7 @@
 import type { AIRouter } from "../ai/router.ts";
 import type { ClusterSignal, ProblemCluster } from "./types.ts";
 import { scoreMarket } from "../scoring/scoring.ts";
+import { cosineSimilarity } from "./similarity.ts";
 import type { TrendDirection } from "../scoring/types.ts";
 
 export interface SummarizeClusterOptions {
@@ -74,24 +75,55 @@ function extractLanguagePhrases(signals: ClusterSignal[]): string[] {
   return [...phrases].slice(0, 6);
 }
 
-const NAME_STOP = new Set(
-  "a an the and or of to for in on with how what why when is are was can do does did my your you i me we they it its be as at by from this that not no have has had get got but if so than then there their them too very just about into out up will would could should".split(" "),
+/** An extraction placeholder, not a problem: "none explicitly stated in the text", "N/A". */
+const PLACEHOLDER_PROBLEM = /^(n\/?a|none|unknown|nothing)\.?$|^(no|none|not)\b.*\b(stated|specified|mentioned|given|provided)\b/i;
+// Words a name must not end on after it is cut short.
+const TRAILING_FILLER = new Set(
+  "a an the and or of to for in on with without over at by from how what which that their they".split(" "),
 );
+const MAX_NAME_WORDS = 12;
 
-/** Model-free name: the cluster's most frequent problem terms (titles when no problem was extracted). */
-function generateDefaultClusterName(signals: ClusterSignal[]): string {
-  const problems = signals.map((s) => s.analysis?.problem || "").filter(Boolean);
-  const texts = problems.length > 0 ? problems : signals.map((s) => s.title || "");
-  const counts = new Map<string, number>();
-  for (const text of texts) {
-    // Count each term once per signal so one long text cannot name the cluster.
-    for (const term of new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2 && !NAME_STOP.has(t)))) {
-      counts.set(term, (counts.get(term) || 0) + 1);
-    }
+/**
+ * A problem sentence as a market name: its first clause, without the "They need to" lead-in or a
+ * leading article, at most 12 words. Null for a placeholder or an empty problem.
+ */
+export function problemPhraseName(problem: string | null | undefined): string | null {
+  const text = problem?.trim();
+  if (!text || PLACEHOLDER_PROBLEM.test(text)) return null;
+  const clause = text
+    .split(/[.;:](?:\s|$)|\s\(|,\s|\s[—–-]\s/)[0]
+    .replace(/^(they|people|users|someone)\s+(need|needs|want|wants)\s+(to\s+)?/i, "")
+    .replace(/^(they|people|users|someone)\s+((are|is|were|was)\s+)?/i, "")
+    .replace(/^(a|an|the)\s+/i, "")
+    .trim();
+  let words = clause.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return null;
+  const cut = words.length > MAX_NAME_WORDS;
+  if (cut) {
+    words = words.slice(0, MAX_NAME_WORDS);
+    while (words.length > 1 && TRAILING_FILLER.has(words[words.length - 1].toLowerCase())) words.pop();
   }
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 3).map(([t]) => t);
-  return top.length > 0 ? top.map((t) => t[0].toUpperCase() + t.slice(1)).join(" ") : "Unnamed cluster";
+  const name = words.join(" ");
+  return name[0].toUpperCase() + name.slice(1) + (cut ? "…" : "");
 }
+
+/**
+ * Model-free name (#59): the problem phrase of the signal closest to the cluster's centroid, the
+ * cluster's most typical member. "Unnamed cluster" when no signal has a usable problem.
+ */
+function generateDefaultClusterName(signals: ClusterSignal[], centroid: number[]): string {
+  const ranked = signals
+    .map((s) => ({ s, sim: cosineSimilarity(s.embedding, centroid) }))
+    .sort((a, b) => b.sim - a.sim); // stable: equally central signals keep their order
+  for (const { s } of ranked) {
+    const name = problemPhraseName(s.analysis?.problem);
+    if (name) return name;
+  }
+  return "Unnamed cluster";
+}
+
+/** The example name in the naming prompt: a model that copies it has not named anything. */
+const PROMPT_EXAMPLE_NAME = "Specific Problem Family Name";
 
 export async function summarizeCluster(
   id: string,
@@ -102,7 +134,7 @@ export async function summarizeCluster(
   const audience = determineAudience(signals);
   const urgency = determineUrgency(signals);
   const language = extractLanguagePhrases(signals);
-  const defaultName = generateDefaultClusterName(signals);
+  const defaultName = generateDefaultClusterName(signals, centroid);
   let name = defaultName;
   // Product titles come from the model only; without one there are none to show.
   let relatedProducts: string[] = [];
@@ -120,7 +152,7 @@ ${signalSnippets}
 
 Respond with JSON:
 {
-  "name": "Specific Problem Family Name",
+  "name": "${PROMPT_EXAMPLE_NAME}",
   "products": ["Title 1 Checklist", "Title 2 Guide", "Title 3 Reference Sheet"]
 }`;
 
@@ -132,6 +164,7 @@ Respond with JSON:
           if (typeof raw !== "object" || raw === null) throw new Error("not an object");
           const r = raw as Record<string, unknown>;
           if (typeof r.name !== "string" || !r.name.trim()) throw new Error("invalid name");
+          if (r.name.trim().toLowerCase() === PROMPT_EXAMPLE_NAME.toLowerCase()) throw new Error("copied the example name");
           if (!Array.isArray(r.products) || r.products.length === 0) throw new Error("invalid products");
           return {
             name: r.name.trim(),

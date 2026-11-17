@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { cosineSimilarity, computeCentroid } from "./similarity.ts";
 import { clusterSignals } from "./clusterer.ts";
-import { summarizeCluster } from "./summarizer.ts";
+import { problemPhraseName, summarizeCluster } from "./summarizer.ts";
 import type { ClusterSignal } from "./types.ts";
 import type { AIRouter } from "../ai/router.ts";
 
@@ -144,13 +144,13 @@ describe("summarizeCluster without a model (Part 6.4)", () => {
     embedding: [1, 0, 0],
   });
 
-  it("names a cluster from its most frequent problem terms, with no PC defaults", async () => {
+  it("names a cluster from its most typical problem phrase, with no PC defaults", async () => {
     const c = await summarizeCluster("cluster-1", [
       sig("a", "Groceries wreck our plan", "young couples", "Grocery spending exceeds the monthly budget"),
       sig("b", "Overspending again", "young couples", "Monthly grocery budget runs out early"),
       sig("c", "Budget help", "students", "Cannot keep a grocery budget"),
     ], [1, 0, 0]);
-    assert.equal(c.name, "Budget Grocery Monthly");
+    assert.equal(c.name, "Grocery spending exceeds the monthly budget"); // all equally central: the first
     assert.equal(c.audience, "young couples");
     assert.deepEqual(c.relatedProducts, []);
     assert.doesNotMatch(JSON.stringify({ ...c, signals: [] }), /\b(pc|bios|gamers?|repair shop|hardware|boot|troubleshooting)\b/i);
@@ -259,5 +259,63 @@ describe("a naming call that outlives the budget is abandoned (#58 review)", () 
     assert.ok(Date.now() - t0 < 1000);
     assert.equal(clusters.length, 2);
     assert.ok(clusters.every((c) => c.name && c.name !== "Unnamed cluster"));
+  });
+});
+
+describe("fallback names read as names (#59)", () => {
+  // Problem texts stored by budgeting run 03b27c65 (2026-11-17), whose names were word lists.
+  const cases: Array<[string, string | null]> = [
+    ["They need the steps to make a budget: work out after-tax income, choose a system, track progress and automate savings.", "Steps to make a budget"],
+    ["They avoid budgeting because of myths, and miss out on preventing debt and building emergency savings.", "Avoid budgeting because of myths"],
+    ["They need a plan to pay essential bills, manage spending and save for future needs.", "Plan to pay essential bills"],
+    ["They need to learn how to create a first budget, set goals, know net income, track spending, and set realistic spending limits.", "Learn how to create a first budget"],
+    ["They do not understand how and where they are spending their money.", "Do not understand how and where they are spending their money"],
+    ["They risk spending more than they earn and taking on debt without a budget.", "Risk spending more than they earn and taking on debt…"],
+    ["They do not know which type of budget fits them or how to use each one.", "Do not know which type of budget fits them…"],
+    ["They are searching for software to manage a budget.", "Searching for software to manage a budget"],
+    ["They were not given a clear plan to pay off credit card debt", "Not given a clear plan to pay off credit card debt"],
+    ["Their employer has not provided a guide to the 401k match", "Their employer has not provided a guide to the 401k match"],
+    ["They need to max out a 401(k) before year end", "Max out a 401(k) before year end"],
+    ["They overspend by $1.5k every month on takeout", "Overspend by $1.5k every month on takeout"],
+    ["Not specified", null],
+    ["none explicitly stated in the text", null],
+    ["N/A", null],
+    ["", null],
+  ];
+  for (const [problem, name] of cases) {
+    it(`${JSON.stringify(problem.slice(0, 40))} -> ${name}`, () => assert.equal(problemPhraseName(problem), name));
+  }
+
+  it("a problem that only mentions what was given is not a placeholder", () => {
+    assert.equal(problemPhraseName("They cannot track the notes they were given"), "Cannot track the notes they were given");
+  });
+
+  it("the most central signal names the cluster; a placeholder problem is passed over", async () => {
+    const sig = (id: string, embedding: number[], problem: string): ClusterSignal => ({
+      id, sourceType: "reddit", title: "Budget thread", content: null, url: null,
+      analysis: { audience: null, problem, intent: "strong", urgency: null, pdf_relevance: 0.6 }, embedding,
+    });
+    const c = await summarizeCluster("c", [
+      sig("a", [0.6, 0.8], "They forget irregular bills"),
+      sig("b", [1, 0], "none explicitly stated in the text"),
+      sig("c", [0.9, 0.1], "They overspend on groceries every month"),
+    ], [1, 0]);
+    assert.equal(c.name, "Overspend on groceries every month");
+    const lone = await summarizeCluster("d", [sig("e", [1, 0], "none explicitly stated in the text")], [1, 0]);
+    assert.equal(lone.name, "Unnamed cluster");
+  });
+
+  it("a model that copies the prompt's example name is not used", async () => {
+    const router = {
+      generateObject: async (input: { validate: (raw: unknown) => unknown }) => ({
+        object: input.validate({ name: "Specific Problem Family Name", products: ["Checklist"] }),
+      }),
+    } as unknown as AIRouter;
+    const c = await summarizeCluster("c", [{
+      id: "a", sourceType: "reddit", title: "t", content: null, url: null,
+      analysis: { audience: null, problem: "They overspend on groceries", intent: "strong", urgency: null, pdf_relevance: 0.6 },
+      embedding: [1, 0],
+    }], [1, 0], { router });
+    assert.equal(c.name, "Overspend on groceries");
   });
 });
