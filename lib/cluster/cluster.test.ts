@@ -6,6 +6,7 @@ import { cosineSimilarity, computeCentroid } from "./similarity.ts";
 import { clusterSignals } from "./clusterer.ts";
 import { summarizeCluster } from "./summarizer.ts";
 import type { ClusterSignal } from "./types.ts";
+import type { AIRouter } from "../ai/router.ts";
 
 describe("similarity & vector math", () => {
   it("computes cosine similarity accurately", () => {
@@ -189,5 +190,74 @@ describe("cluster trend comes from observed Trends rows (Part 6.11)", () => {
     assert.equal(await trendOf([row("g", "gtrends", { interest_value: 300, rising: true })]), "accelerating");
     assert.equal(await trendOf([row("g", "gtrends", { avg_interest: 50, direction: "rising" })]), "accelerating");
     assert.equal(await trendOf([row("g", "gtrends", { avg_interest: 50, direction: "falling" })]), "declining");
+  });
+});
+
+describe("cluster naming has a budget (#58)", () => {
+  // SAMPLE DATA (fixture rule): three unrelated budgeting signals, so three singleton clusters.
+  const sig = (id: string, embedding: number[], problem: string): ClusterSignal => ({
+    id,
+    sourceType: "reddit",
+    title: problem,
+    content: problem,
+    url: null,
+    analysis: { audience: "households", problem, intent: "strong", urgency: null, pdf_relevance: 0.7 },
+    embedding,
+  });
+  const signals = [
+    sig("a", [1, 0, 0], "Rent takes the whole budget"),
+    sig("b", [0, 1, 0], "Groceries overrun every month"),
+    sig("c", [0, 0, 1], "Debt payments crowd out savings"),
+  ];
+  const fakeRouter = (answer: () => Promise<unknown>) => {
+    let calls = 0;
+    const router = {
+      generateObject: async (input: { validate: (raw: unknown) => unknown }) => {
+        calls++;
+        return { object: input.validate(await answer()) };
+      },
+    } as unknown as AIRouter;
+    return { router, calls: () => calls };
+  };
+
+  it("one failed naming call stops naming; the rest keep names from observed terms", async () => {
+    const f = fakeRouter(async () => {
+      throw new Error("all AI providers failed for tier 'cheap'");
+    });
+    const clusters = await clusterSignals(signals, { router: f.router });
+    assert.equal(clusters.length, 3);
+    assert.equal(f.calls(), 1);
+    assert.ok(clusters.every((c) => c.name && c.name !== "Unnamed cluster"));
+  });
+
+  it("no naming call starts after the budget is spent", async () => {
+    let t = 0;
+    const f = fakeRouter(async () => {
+      t += 70_000; // each answer takes 70 s
+      return { name: "Model Name", products: ["Checklist"] };
+    });
+    const clusters = await clusterSignals(signals, { router: f.router, nowFn: () => t, namingBudgetMs: 120_000 });
+    assert.equal(f.calls(), 2); // starts at 0 s and 70 s; at 140 s the budget is spent
+    assert.deepEqual(clusters.map((c) => c.name === "Model Name"), [true, true, false]);
+  });
+});
+
+describe("a naming call that outlives the budget is abandoned (#58 review)", () => {
+  it("clustering returns by the budget even when the model never answers", async () => {
+    const hang = { generateObject: () => new Promise(() => {}) } as unknown as AIRouter;
+    const sig = (id: string, embedding: number[]): ClusterSignal => ({
+      id,
+      sourceType: "reddit",
+      title: "Rent takes the whole budget",
+      content: null,
+      url: null,
+      analysis: { audience: "households", problem: "Rent takes the whole budget", intent: "strong", urgency: null, pdf_relevance: 0.7 },
+      embedding,
+    });
+    const t0 = Date.now();
+    const clusters = await clusterSignals([sig("a", [1, 0]), sig("b", [0, 1])], { router: hang, namingBudgetMs: 50 });
+    assert.ok(Date.now() - t0 < 1000);
+    assert.equal(clusters.length, 2);
+    assert.ok(clusters.every((c) => c.name && c.name !== "Unnamed cluster"));
   });
 });
