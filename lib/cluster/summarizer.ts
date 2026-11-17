@@ -12,6 +12,8 @@ export interface SummarizeClusterOptions {
   tier?: "cheap";
   /** Signals clustered in the whole run; scoring turns the cluster size into a share. */
   totalSignals?: number;
+  /** Called when the model call fails; the cluster keeps the name built from observed terms. */
+  onModelError?: (err: unknown) => void;
 }
 
 const URGENCY_PRIORITY: Record<string, number> = {
@@ -140,8 +142,9 @@ Respond with JSON:
 
       if (res.object.name) name = res.object.name;
       if (res.object.products.length > 0) relatedProducts = res.object.products;
-    } catch {
+    } catch (err) {
       // Provider error: keep the name built from observed problem terms
+      opts.onModelError?.(err);
     }
   }
 

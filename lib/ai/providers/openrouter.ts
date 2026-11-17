@@ -30,6 +30,8 @@ export interface OpenRouterConfig {
   referer: string;
   title: string;
   fetchFn: (input: string | URL, init?: RequestInit) => Promise<Response>;
+  /** Abort a request after this long; 0 = no timeout. */
+  timeoutMs?: number;
 }
 
 export function openRouterConfigFromEnv(
@@ -41,6 +43,8 @@ export function openRouterConfigFromEnv(
     referer: env.OPENROUTER_REFERER || "https://localhost/pdf-lab",
     title: env.OPENROUTER_TITLE || "pdf-lab",
     fetchFn: fetch,
+    // A free model can accept a request and never answer: one call hung 48 min (#58).
+    timeoutMs: 60_000,
   };
 }
 
@@ -81,6 +85,7 @@ export class OpenRouterProvider implements AIProvider {
     const apiKey = this.requireKey();
     const res = await this.config.fetchFn(`${this.config.baseUrl}/chat/completions`, {
       method: "POST",
+      signal: this.config.timeoutMs ? AbortSignal.timeout(this.config.timeoutMs) : undefined,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
@@ -120,6 +125,7 @@ export class OpenRouterProvider implements AIProvider {
     }
     const res = await this.config.fetchFn(`${this.config.baseUrl}/embeddings`, {
       method: "POST",
+      signal: this.config.timeoutMs ? AbortSignal.timeout(this.config.timeoutMs) : undefined,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
