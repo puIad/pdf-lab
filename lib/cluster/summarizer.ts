@@ -14,6 +14,8 @@ export interface SummarizeClusterOptions {
   totalSignals?: number;
   /** Called when the model call fails; the cluster keeps the name built from observed terms. */
   onModelError?: (err: unknown) => void;
+  /** Give up on the model call after this long (it cannot be cancelled; its answer is ignored). */
+  modelTimeoutMs?: number;
 }
 
 const URGENCY_PRIORITY: Record<string, number> = {
@@ -122,7 +124,7 @@ Respond with JSON:
   "products": ["Title 1 Checklist", "Title 2 Guide", "Title 3 Reference Sheet"]
 }`;
 
-      const res = await opts.router.generateObject({
+      const call = opts.router.generateObject({
         tier: opts.tier || "cheap",
         system: "You are a market research clustering specialist for procedural PDF products.",
         user: prompt,
@@ -139,6 +141,15 @@ Respond with JSON:
         maxTokens: 300,
         temperature: 0.2,
       });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const res = opts.modelTimeoutMs === undefined
+        ? await call
+        : await Promise.race([
+            call,
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(() => reject(new Error(`naming call passed ${opts.modelTimeoutMs} ms`)), opts.modelTimeoutMs);
+            }),
+          ]).finally(() => clearTimeout(timer));
 
       if (res.object.name) name = res.object.name;
       if (res.object.products.length > 0) relatedProducts = res.object.products;

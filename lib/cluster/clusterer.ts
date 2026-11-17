@@ -9,8 +9,9 @@ import { summarizeCluster } from "./summarizer.ts";
 export const DEFAULT_SIMILARITY_THRESHOLD = 0.72;
 /**
  * Model naming is optional (a cluster without it keeps a name from its observed terms), so it gets
- * a budget: after this long, or after one failed call, the remaining clusters are not sent to the
- * model. Without it 18 clusters at 60 s each overran the 5-minute clustering step (#58).
+ * a budget: a call still running when it ends is abandoned, and after it, or after one failed call,
+ * the remaining clusters are not sent to the model. Without it 18 clusters at 60 s each overran the
+ * 5-minute clustering step (#58). 120 s of naming + one embedding call (60 s timeout) fit in 300 s.
  */
 export const NAMING_BUDGET_MS = 120_000;
 
@@ -95,11 +96,13 @@ export async function clusterSignals(
   for (let i = 0; i < rawClusters.length; i++) {
     const cluster = rawClusters[i];
     const id = `cluster-${i + 1}`;
-    const useModel = !modelFailed && now() < namingEnds;
+    const left = namingEnds - now();
+    const useModel = !modelFailed && left > 0;
     const summarized = await summarizeCluster(id, cluster.signals, cluster.centroid, {
       router: useModel ? opts.router : undefined,
       tier: "cheap",
       totalSignals: rawClusters.reduce((n, c) => n + c.signals.length, 0),
+      modelTimeoutMs: left,
       onModelError: (err) => {
         modelFailed = true;
         console.warn(

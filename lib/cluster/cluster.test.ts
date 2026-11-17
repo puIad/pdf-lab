@@ -241,3 +241,23 @@ describe("cluster naming has a budget (#58)", () => {
     assert.deepEqual(clusters.map((c) => c.name === "Model Name"), [true, true, false]);
   });
 });
+
+describe("a naming call that outlives the budget is abandoned (#58 review)", () => {
+  it("clustering returns by the budget even when the model never answers", async () => {
+    const hang = { generateObject: () => new Promise(() => {}) } as unknown as AIRouter;
+    const sig = (id: string, embedding: number[]): ClusterSignal => ({
+      id,
+      sourceType: "reddit",
+      title: "Rent takes the whole budget",
+      content: null,
+      url: null,
+      analysis: { audience: "households", problem: "Rent takes the whole budget", intent: "strong", urgency: null, pdf_relevance: 0.7 },
+      embedding,
+    });
+    const t0 = Date.now();
+    const clusters = await clusterSignals([sig("a", [1, 0]), sig("b", [0, 1])], { router: hang, namingBudgetMs: 50 });
+    assert.ok(Date.now() - t0 < 1000);
+    assert.equal(clusters.length, 2);
+    assert.ok(clusters.every((c) => c.name && c.name !== "Unnamed cluster"));
+  });
+});
