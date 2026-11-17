@@ -1,5 +1,5 @@
 // lib/ai/providers/ollama.ts — Ollama local provider (OpenAI-compatible).
-// Per docs/07-AI-ROUTER.md + guides/ai-providers.md this is the FIRST cheap-tier
+// Per docs/AI-ROUTER.md this is the FIRST cheap-tier
 // choice for near-zero dev cost: free, offline, no key. Not installed in this
 // environment (no localhost:11434 here) — the router falls through to the next
 // configured provider and says so. Install: https://ollama.com/download,

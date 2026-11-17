@@ -1,5 +1,5 @@
 // lib/scoring/types.ts — Scoring & PDF suitability types (Phase 1 Part 1.4).
-// Normative specs: docs/05-PIPELINE-SCORING.md (§16, §53-§54) & PRD §17.
+// Normative specs: docs/PIPELINE-SCORING.md (§16, §53-§54) & PRD §17.
 
 export type TrendDirection =
   | "emerging"

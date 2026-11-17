@@ -1,4 +1,4 @@
-# 07 — AI MODEL ROUTER (PRD §32–§34)
+# AI MODEL ROUTER (PRD §32–§34)
 
 ## Provider interface (model-agnostic, PRD §32)
 
@@ -24,7 +24,7 @@ new file + registry line, zero caller changes.
 | Strong | Best reasoning available | synthesis, market reports, opportunity formulation, complex comparisons |
 | Embed | Dedicated embedding model | semantic search, clustering, duplicate detection, similarity |
 
-- `signal_analysis.embedding` dimension MUST equal the embed model's dim (`04-SCHEMA.md`).
+- `signal_analysis.embedding` dimension MUST equal the embed model's dim (`SCHEMA.md`).
   Changing embed models = migration + backfill plan, logged in DECISIONS.
 - Prompts are versioned in code; extraction outputs are validated objects (schema-checked),
   never free text parsed by regex.

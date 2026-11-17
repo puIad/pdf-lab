@@ -1,5 +1,5 @@
 // lib/sources/wikipedia/wikipedia-adapter.ts — Wikipedia pageviews adapter (Phase 3 Part 3.5).
-// Spec: docs/phases/phase-3-explorer.md Part 3.5, teardown in docs/research/.
+// Spec: Part 3.5 (see docs/README.md, History), teardown in docs/research/.
 //
 // Official, keyless APIs: MediaWiki Action API (title lookup) + Wikimedia
 // Analytics REST (per-article daily pageviews). Wikimedia asks for a

@@ -1,5 +1,5 @@
 // lib/sources/web/web-adapter.ts — Tier-1 web-search adapter (Serper).
-// Spec: docs/08-ADAPTERS.md + docs/guides/sources-reddit-trends-search.md,
+// Spec: docs/ADAPTERS.md,
 // provider pick logged in DEC-002 (Serper: 2,500 free credits, no card,
 // ~$1/1K → ~$0.30/1K; shape = raw Google SERP with URL+title+snippet+date).
 //
@@ -7,7 +7,7 @@
 // collect() throws SourceNotConfiguredError and healthCheck() reports
 // ok:false; the ingest pipeline turns that into an honest `skipped` source
 // (PRD §55 completeness), never filler. No raw usernames exist in SERP data;
-// `author` is always 'anonymous' (06-EVIDENCE-CONTRACT).
+// `author` is always 'anonymous' (EVIDENCE-CONTRACT).
 //
 // Part 3.7 (DEC-010): the same call also keeps Serper's `peopleAlsoAsk` and
 // `relatedSearches` blocks as phrase signals (external ids start `serp:`), the

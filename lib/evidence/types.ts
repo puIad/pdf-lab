@@ -1,4 +1,4 @@
-// lib/evidence/types.ts — Normative Evidence types per docs/04-SCHEMA.md & docs/06-EVIDENCE-CONTRACT.md.
+// lib/evidence/types.ts — Normative Evidence types per docs/SCHEMA.md & docs/EVIDENCE-CONTRACT.md.
 
 export type EntityType = "market" | "opportunity" | "trend" | "competition";
 

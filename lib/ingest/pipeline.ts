@@ -2,16 +2,16 @@
 //
 // Flow per adapter: collect → normalize → dedup on (source_id, external_id)
 // → insert. Dedup is enforced at BOTH layers: the DB unique constraint
-// (04-SCHEMA invariant 2) via `ignoreDuplicates`, with code-level counts so
+// (SCHEMA invariant 2) via `ignoreDuplicates`, with code-level counts so
 // the response can tell inserted vs duplicates apart.
 //
-// Degradation contract (08-ADAPTERS rule 3, PRD §55): one dead adapter NEVER
+// Degradation contract (ADAPTERS rule 3, PRD §55): one dead adapter NEVER
 // sinks the run. Unconfigured adapters (SourceNotConfiguredError) report
 // `skipped`; any other failure reports `failed` with the error text; the rest
 // complete and the summary says exactly what ran.
 //
 // Adapter boundary: this module talks to the REGISTRY only — never to an
-// adapter module directly (08-ADAPTERS rule 1). DB access is injected via
+// adapter module directly (ADAPTERS rule 1). DB access is injected via
 // IngestDeps so unit tests run with zero network and zero DB.
 
 import type { MarketSignal, SourceAdapter } from "../sources/types.ts";
@@ -46,7 +46,7 @@ export interface IngestSummary {
   };
 }
 
-/** One row for the `signals` table (04-SCHEMA.md). */
+/** One row for the `signals` table (SCHEMA.md). */
 export interface SignalRow {
   source_id: string;
   external_id: string;

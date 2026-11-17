@@ -1,8 +1,7 @@
-# 09 — UX SPEC (PRD §7–§9, §19, §26–§28, §40–§48)
+# UX SPEC (PRD §7–§9, §19, §26–§28, §40–§48)
 
 Scores shown are EVIDENCE-DERIVED (PRD §7 note). Any number without backing rows is a bug.
-Frontend rule: ALWAYS and ONLY use components, UI primitives, and directing prompts from
-`C:\Users\pulad\Desktop\frontend-ai-megalibrary`.
+Frontend rule: build from the primitives in `components/ui` (DEC-016).
 
 ## Navigation and home (Part 6.12)
 

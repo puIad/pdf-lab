@@ -1,4 +1,4 @@
-# 06 — EVIDENCE & ANTI-HALLUCINATION CONTRACT (PRD §30–§31, §53–§54)
+# EVIDENCE & ANTI-HALLUCINATION CONTRACT (PRD §30–§31, §53–§54)
 
 Binding on ALL phases. Violations fail review even if the feature "works".
 
@@ -17,7 +17,7 @@ output says so with low confidence (PRD §54) — it does not confabulate.
 - Good: "The system observed 312 relevant discussions across the selected sources during
   the last 90 days." (+ links)
 - Every evidence record carries: `source, URL, date, excerpt, signal type, confidence`.
-  (Maps to the `evidence` table in `04-SCHEMA.md`.)
+  (Maps to the `evidence` table in `SCHEMA.md`.)
 - Scores are evidence-derived (PRD §7-table note), never arbitrary AI judgment.
 
 ## The five QC rules (normative, re-stated for review use)

@@ -1,5 +1,5 @@
 // lib/sources/reddit/reddit-adapter.ts — Tier-1 Reddit adapter (read-only).
-// Spec: docs/08-ADAPTERS.md + docs/guides/sources-reddit-trends-search.md.
+// Spec: docs/ADAPTERS.md.
 //
 // Access strategy (ToS-clean, official API only):
 //  1. Preferred: app-only OAuth (client_credentials) when REDDIT_CLIENT_ID +

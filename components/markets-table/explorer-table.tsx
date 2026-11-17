@@ -123,7 +123,7 @@ export function ExplorerTable({
     );
   }
 
-  // 2. Empty State — Honest per 06-EVIDENCE-CONTRACT (never invent fake rows)
+  // 2. Empty State — Honest per EVIDENCE-CONTRACT (never invent fake rows)
   if (markets.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-6 shadow-2xs">

@@ -1,7 +1,7 @@
 // lib/sources/web/web-adapter.test.ts — unit tests, zero network.
 // Run: `pnpm test` (node:test + node:assert, no extra dependencies).
 // Fixture is labeled SAMPLE DATA (see __fixtures__/serper-response.json) and
-// never touches the DB — per docs/06-EVIDENCE-CONTRACT.md fixture rule.
+// never touches the DB — per docs/EVIDENCE-CONTRACT.md fixture rule.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

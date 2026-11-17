@@ -1,5 +1,5 @@
 // lib/cluster/types.ts — Problem clustering types (Phase 1 Part 1.4).
-// Normative specs: PRD §15 (cluster shape) & docs/05-PIPELINE-SCORING.md.
+// Normative specs: PRD §15 (cluster shape) & docs/PIPELINE-SCORING.md.
 
 import type { MarketScoreResult, TrendDirection } from "../scoring/types.ts";
 

@@ -1,5 +1,5 @@
 // lib/sources/wikipedia/wikipedia-adapter.test.ts — unit tests, zero network.
-// All API bodies below are SAMPLE DATA (fixture rule, 06-EVIDENCE-CONTRACT); nothing touches the DB.
+// All API bodies below are SAMPLE DATA (fixture rule, EVIDENCE-CONTRACT); nothing touches the DB.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";

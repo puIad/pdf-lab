@@ -1,5 +1,5 @@
 // lib/competition/types.ts — Competition analysis, landscape clustering & review mining types.
-// Specifications: docs/04-SCHEMA.md, docs/05-PIPELINE-SCORING.md (PRD §20, §21, §53 Rule 3).
+// Specifications: docs/SCHEMA.md, docs/PIPELINE-SCORING.md (PRD §20, §21, §53 Rule 3).
 
 export interface CompetitorProduct {
   id?: string;

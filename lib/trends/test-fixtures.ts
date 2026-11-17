@@ -1,6 +1,6 @@
 // lib/trends/test-fixtures.ts — TEST-ONLY sample topics. Invented text, never stored evidence.
 // Production code must not import this file (the radar reads stored rows only, see
-// docs/06-EVIDENCE-CONTRACT.md); `service.ts` has no default topics.
+// docs/EVIDENCE-CONTRACT.md); `service.ts` has no default topics.
 
 import type { MarketTopicData } from "./service.ts";
 

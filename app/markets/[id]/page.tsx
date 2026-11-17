@@ -1,4 +1,4 @@
-// app/markets/[id]/page.tsx — Market report page per docs/09-UX-SPEC.md (PRD §41–§42).
+// app/markets/[id]/page.tsx — Market report page per docs/UX-SPEC.md (PRD §41–§42).
 // Displays evidence-derived scores, buyer language, competitors, gaps, opportunities, and citations.
 
 import React from "react";

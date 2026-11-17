@@ -1,4 +1,4 @@
-// lib/runs/lifecycle.ts — Lifecycle state machine and trace tracker per docs/05-PIPELINE-SCORING.md.
+// lib/runs/lifecycle.ts — Lifecycle state machine and trace tracker per docs/PIPELINE-SCORING.md.
 
 import type { LifecycleState, LifecycleTraceStep } from "./types.ts";
 import { LIFECYCLE_STATES } from "./types.ts";

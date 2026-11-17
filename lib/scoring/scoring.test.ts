@@ -45,7 +45,7 @@ describe("evaluatePdfSuitability (PRD §17)", () => {
   });
 });
 
-describe("scoreMarket (05-PIPELINE-SCORING)", () => {
+describe("scoreMarket (PIPELINE-SCORING)", () => {
   it("returns zero score and confidence when signals array is empty", () => {
     const res = scoreMarket([]);
     assert.equal(res.score, 0);

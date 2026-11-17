@@ -1,4 +1,4 @@
-// lib/runs/orchestrator.ts — Research run lifecycle orchestrator per docs/05-PIPELINE-SCORING.md.
+// lib/runs/orchestrator.ts — Research run lifecycle orchestrator per docs/PIPELINE-SCORING.md.
 // Walks through all 10 states:
 // QUEUED -> COLLECTING -> NORMALIZING -> CLASSIFYING -> CLUSTERING -> TREND_ANALYSIS
 //   -> COMPETITION_ANALYSIS -> OPPORTUNITY_GENERATION -> REPORT_GENERATION -> COMPLETED
@@ -595,10 +595,10 @@ async function finishRun(
 
     const completeness = await deps.fetchCompleteness(runId);
 
-    // 10. COMPLETED (Invariant: zero-evidence run is forbidden per 05-PIPELINE-SCORING)
+    // 10. COMPLETED (Invariant: zero-evidence run is forbidden per PIPELINE-SCORING)
     if (completeness.evidenceCount === 0 && totalEvidenceCreated === 0) {
       throw new Error(
-        "Run produced zero evidence rows; refusing to mark COMPLETED per 05-PIPELINE-SCORING lifecycle invariant.",
+        "Run produced zero evidence rows; refusing to mark COMPLETED per PIPELINE-SCORING lifecycle invariant.",
       );
     }
 

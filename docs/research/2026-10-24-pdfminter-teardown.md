@@ -152,7 +152,7 @@ filter and a builder in one flow.
 | Cross-engine count as proof | source chips | evidence store with citations | feed engine count into confidence |
 | Competition | text heuristic | observed marketplace listings (2.3) | keep PDF Lab's; use the heuristic only as a fallback when no listings were found |
 | Auto-outline | Jaccard ranking over related searches | none | small, deterministic, works on evidence already stored |
-| PDF builder + export | yes | out of scope until after MVP (02-MASTER-PLAN, PRD §50 "auto PDF generation") | needs a scope decision before any work |
+| PDF builder + export | yes | out of scope until after MVP (`docs/README.md`, PRD §50 "auto PDF generation") | needs a scope decision before any work |
 | Tracked topics + "new this week" | daily re-scan | Phase 4.1/4.2 pending | adopt the snapshot-diff idea in 4.2 |
 
 PDF Lab is already ahead on evidence: cited signals, QC rules 1 to 5, LLM extraction, clustering,
@@ -164,8 +164,8 @@ Wikipedia fallback, the per-phrase badges and the deterministic outline.
 - Reimplement the method; do not paste the plugin's code. It is GPL, and algorithms are not
   the part worth copying anyway.
 - Every new source goes behind `SourceAdapter`, with `healthCheck`, caching and graceful
-  degradation (08-ADAPTERS rules 1 to 3).
-- Unofficial endpoints are a DECISIONS item before any code (08-ADAPTERS rule 2, DEC-007 precedent).
+  degradation (ADAPTERS rules 1 to 3).
+- Unofficial endpoints are a DECISIONS item before any code (ADAPTERS rule 2, DEC-007 precedent).
 
 ## Sources
 

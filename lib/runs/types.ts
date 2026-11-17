@@ -1,4 +1,4 @@
-// lib/runs/types.ts — Normative research run lifecycle types per docs/05-PIPELINE-SCORING.md & PRD §38, §55.
+// lib/runs/types.ts — Normative research run lifecycle types per docs/PIPELINE-SCORING.md & PRD §38, §55.
 
 export const LIFECYCLE_STATES = [
   "queued",

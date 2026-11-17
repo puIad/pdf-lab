@@ -33,7 +33,7 @@ interface StoredMarket {
   trend: string | null;
 }
 
-/** Names of the watched markets. Markets are public rows (04-SCHEMA.md), read like every market page. */
+/** Names of the watched markets. Markets are public rows (SCHEMA.md), read like every market page. */
 async function loadMarkets(ids: string[]): Promise<Map<string, StoredMarket>> {
   if (ids.length === 0) return new Map();
   const { data, error } = await createServiceSupabaseClient().from("markets").select("id, name, trend").in("id", ids);

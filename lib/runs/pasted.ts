@@ -2,7 +2,7 @@
 // PDF Lab collects the signals and writes ONE prompt. The user pastes it into a chat model
 // (Gemini online), then pastes the JSON reply back. PDF Lab validates every item on its own and
 // finishes the run with no model call of its own. The model only ever sees stored signal text
-// (06-EVIDENCE-CONTRACT), and its market names replace embedding-based clustering.
+// (EVIDENCE-CONTRACT), and its market names replace embedding-based clustering.
 
 import { FIELD_RULES, GROUNDING_RULE, validateExtraction, type ExtractionResult } from "../ai/extraction.ts";
 import { extractJsonSlice } from "../ai/router.ts";

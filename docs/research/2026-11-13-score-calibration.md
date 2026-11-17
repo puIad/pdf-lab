@@ -103,7 +103,7 @@ Listings with reviews, sorted: 0, 1, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 6, 7
 
 ## Market score (Deep runs)
 
-The same part changed the market score (`lib/scoring/scoring.ts`, see `05-PIPELINE-SCORING.md`).
+The same part changed the market score (`lib/scoring/scoring.ts`, see `PIPELINE-SCORING.md`).
 Its acceptance was checked on stored rows: for the signals of two stored runs, the demand index
 over each source's top half of rows and over all rows was the same (budgeting 72 and 72, meal
 prep 77 and 77). Both runs had no discussion source with reactions, so the index rested on Trends

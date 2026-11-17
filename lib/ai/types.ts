@@ -1,9 +1,9 @@
 // lib/ai/types.ts — model-agnostic AI contracts (Phase 1 Part 1.3).
-// Normative spec: docs/07-AI-ROUTER.md. App code calls AIRouter — NEVER a
+// Normative spec: docs/AI-ROUTER.md. App code calls AIRouter — NEVER a
 // provider SDK or fetch directly (review gate C). Adding a provider = new
 // file in lib/ai/providers/* + one registry line, zero caller changes.
 
-/** Task tier per docs/07-AI-ROUTER.md (cost control is architecture). */
+/** Task tier per docs/AI-ROUTER.md (cost control is architecture). */
 export type TaskTier = "cheap" | "strong" | "embed";
 
 /** Token/cost usage for one provider call. Free-tier calls report 0 cost. */

@@ -1,4 +1,4 @@
-// lib/evidence/writer.ts — Evidence persistence and querying per docs/04-SCHEMA.md & docs/06-EVIDENCE-CONTRACT.md.
+// lib/evidence/writer.ts — Evidence persistence and querying per docs/SCHEMA.md & docs/EVIDENCE-CONTRACT.md.
 // NOTE: Kept decoupled from next/headers so unit tests run cleanly without nextjs runtime.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
