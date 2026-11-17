@@ -118,6 +118,13 @@ export function validateAndRecountJson(input: string | unknown): ValidationResul
   const signalsCollected = typeof completeness.signalsCollected === "number" ? completeness.signalsCollected : 0;
   const signalsAnalyzed = typeof completeness.signalsAnalyzed === "number" ? completeness.signalsAnalyzed : 0;
   const marketsIdentified = typeof completeness.marketsIdentified === "number" ? completeness.marketsIdentified : 0;
+  const qcRules =
+    typeof completeness.qcRulesChecked === "number"
+      ? {
+          qcRulesChecked: completeness.qcRulesChecked,
+          qcRulesHeld: typeof completeness.qcRulesHeld === "number" ? completeness.qcRulesHeld : 0,
+        }
+      : {};
 
   const recalculated = calculateCompleteness({
     sourcesCovered,
@@ -127,6 +134,7 @@ export function validateAndRecountJson(input: string | unknown): ValidationResul
     opportunitiesGenerated: opportunitiesCount,
     evidenceCount: totalEvidenceCount,
     evidenceBackedOpportunitiesCount: evidenceBackedCount,
+    ...qcRules,
   });
 
   // 3. Round-trip fidelity checks

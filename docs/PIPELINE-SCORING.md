@@ -19,7 +19,9 @@ QUEUED → COLLECTING → NORMALIZING → CLASSIFYING → CLUSTERING → TREND_A
   CLASSIFYING and returns one prompt of stored signal text; `POST /api/deep/<runId>` takes the
   pasted reply, validates each item, stores the analyses (`prompt_version = extract-v3-paste`)
   and runs CLUSTERING to COMPLETED. Markets are the reply's market names, not embedding
-  clusters; a signal the reply marks `none` is in no market. PDF Lab calls no model.
+  clusters; a signal the reply marks `none` is in no market. PDF Lab calls no model. A signal an
+  earlier run analysed keeps that analysis and its embedding, as in a model run; the reply only
+  names its market (issue #40).
 
 ## Deep-research pipeline (PRD §39) — the 9 phases every `pdf-lab <niche>` run executes
 
@@ -86,3 +88,10 @@ Part 6.11 (`lib/scoring/scoring.ts`): the score is a rule-based index, not a mea
   (or `Uncertain + reason`, e.g. insufficient history).
 - Every completed run: completeness panel — sources covered, signals analyzed, markets
   identified, opportunities generated, evidence-backed count.
+- Completeness % = sources (3 = 20) + signals (20 = 20) + analysed share (20) + markets identified
+  (15) + evidence-backed share of opportunities (25) (`lib/runs/completeness.ts`). On one market's
+  page the market is always identified, so its 15 are the share of QC rules that hold among those
+  with rows to check.
+- A market page's panel and the Markdown export list QC Rules 1 to 5 as results on the market's
+  stored rows (`marketQcRules` in `lib/report/observed.ts`): what was counted, and whether the rule
+  holds, is broken, or has nothing to check. Never a fixed statement that a rule is enforced.

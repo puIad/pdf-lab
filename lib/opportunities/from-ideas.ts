@@ -45,13 +45,14 @@ export function pickDistinctIdeas(ideas: QuickIdea[], max = IDEA_CANDIDATES): Qu
 /**
  * The market that holds the most of the phrase's own words. The seed's words are left out: every
  * market of the run has them. Containment, not jaccard: jaccard divides by all of a market's text,
- * so the market with the fewest signals won every general idea (Part 6.16). A phrase that shares
- * nothing with any market goes to the run's strongest one.
+ * so the market with the fewest signals won every general idea (Part 6.16). A phrase with no word
+ * of its own in any market belongs to none: null, never the strongest market as a stand-in
+ * (issue #42).
  */
-export function marketFor(phrase: string, markets: OpportunityMarketInput[], seed: string): OpportunityMarketInput {
+export function marketFor(phrase: string, markets: OpportunityMarketInput[], seed: string): OpportunityMarketInput | null {
   const seedToks = new Set(tokens(seed));
   const toks = [...new Set(tokens(phrase))].filter((t) => !seedToks.has(t));
-  let best = markets[0];
+  let best: OpportunityMarketInput | null = null;
   let bestScore = -1;
   for (const m of markets) {
     const name = new Set(tokens(m.name));
@@ -59,6 +60,7 @@ export function marketFor(phrase: string, markets: OpportunityMarketInput[], see
     const share = (set: Set<string>) => (toks.length ? toks.filter((t) => set.has(t)).length / toks.length : 0);
     // A word in the market's name counts twice: "is meal prep healthy" belongs to "Healthy meal prep
     // plans", not to a market where one snippet says "healthy". Ties go to the stronger market.
+    if (share(hay) === 0) continue; // none of the phrase's own words is in this market
     const score = share(hay) + share(name) + m.demandScore / 1000;
     if (score > bestScore) {
       best = m;
@@ -68,6 +70,7 @@ export function marketFor(phrase: string, markets: OpportunityMarketInput[], see
   return best;
 }
 
+/** Quick ideas as candidates of a Deep run, each under the market its words are found in. */
 export function ideaCandidates(
   seed: string,
   ideas: QuickIdea[],
@@ -75,9 +78,13 @@ export function ideaCandidates(
   refs: Map<string, IdeaSignalRef>,
 ): GeneratedOpportunity[] {
   if (markets.length === 0) return [];
-  return pickDistinctIdeas(ideas).map((idea) => {
+  // An idea that fits no market of the run is left out of the run: `opportunities.market_id` is
+  // required, and filing it under an unrelated market would claim a link nobody observed. It
+  // stays a quick idea on the seed's scan.
+  return pickDistinctIdeas(ideas).flatMap((idea) => {
     const id = crypto.randomUUID();
     const market = marketFor(idea.phrase, markets, seed);
+    if (!market) return [];
     const format = IDEA_FORMAT_MAP[idea.format];
     const evidence: EvidenceInput[] = idea.evidence.map((e) => ({
       entityType: "opportunity",

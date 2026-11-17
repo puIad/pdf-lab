@@ -434,3 +434,39 @@ describe("Buyer-intent quotes are stored text only (Part 6.5)", () => {
     assert.deepEqual(overview.buyerIntentSignals.value?.sampleQuotes.map((q) => q.quote), ["I would pay for a budgeting planner"]);
   });
 });
+
+describe("Marketplace activity counts each listing once (issue #48)", () => {
+  // SAMPLE DATA (fixture rule). A Deep run stored one Etsy listing twice (competitor row + signal);
+  // a competition check stored one KDP listing as a signal only.
+  const listing = (id: string, type: string, title: string, url: string) => ({
+    id,
+    source_id: `src-${type}`,
+    external_id: url,
+    url,
+    title,
+    content: null,
+    published_at: null,
+    collected_at: "2026-11-10T10:00:00Z",
+    engagement: { price: "$7.00" },
+    sources: { type, name: type },
+    signal_analysis: null,
+  });
+
+  test("a listing stored as a competitor and as a signal is one product; platforms add up to the count", async () => {
+    const overview = await generateMarketOverview(
+      "budgeting",
+      createMockSupabase({
+        signals: [
+          listing("l-1", "etsy", "Budgeting Planner Printable", "https://www.etsy.com/listing/1"),
+          listing("l-2", "kdp", "Budgeting Workbook", "https://www.amazon.com/dp/B0TEST"),
+        ],
+        competitors: [{ id: "c-1", market_id: null, platform: "etsy", title: "Budgeting Planner Printable", url: "https://www.etsy.com/listing/1", price: "$7.00" }],
+      }),
+      { persistRun: false },
+    );
+    const value = overview.marketplaceActivity.value!;
+    assert.equal(value.productsCount, 2);
+    assert.deepEqual(value.platforms, { etsy: 1, amazon_kdp: 1 });
+    assert.equal(Object.values(value.platforms).reduce((a, n) => a + n, 0), value.productsCount);
+  });
+});

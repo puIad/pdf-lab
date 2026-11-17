@@ -56,7 +56,7 @@ export interface MarketRun {
 export interface FetchMarketsResult {
   markets: MarketRowData[];
   stats: MarketStats;
-  /** Completed runs with markets, newest first. */
+  /** Completed runs with markets that the viewer may see listed by seed, newest first (issue #39). */
   runs: MarketRun[];
   scope: string;
   /** Markets stored before run scoping (`run_id` null). */

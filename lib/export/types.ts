@@ -2,6 +2,7 @@
 // Supports Markdown, CSV (RFC 4180), and JSON formats with round-trip schema validation.
 
 import type { ResearchCompleteness } from "../runs/types.ts";
+import type { QcRuleResult } from "../report/observed.ts";
 
 export type ExportFormat = "markdown" | "csv" | "json";
 
@@ -70,6 +71,8 @@ export interface ReportExportData {
   query: string;
   market: ExportMarket;
   completeness: ResearchCompleteness;
+  /** QC rules checked on the market's stored rows (Part 6.14 follow-up, #52). */
+  qcRules: QcRuleResult[];
   competitors: ExportCompetitor[];
   productGaps: ExportProductGap[];
   customerQuotes: Array<{ quote: string; url?: string | null }>;

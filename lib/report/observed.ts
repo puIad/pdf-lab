@@ -8,6 +8,7 @@ const one = <T>(v: Rel<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v 
 
 /** A market's linked signal as the pages and the export read it. */
 export interface ReportSignal {
+  published_at?: string | null;
   sources?: Rel<{ type?: string | null }>;
   signal_analysis?: Rel<{
     audience?: string | null;
@@ -84,11 +85,14 @@ export function marketCompletenessCounts(input: {
   observations: MarketObservations;
   opportunityIds: string[];
   evidence: Array<{ entity_type: string; entity_id: string }>;
+  /** The market's QC rule results; when given they take the 15 points "markets identified" had. */
+  rules?: QcRuleResult[];
 }) {
   const opportunityIds = new Set(input.opportunityIds);
   const backed = new Set(
     input.evidence.filter((e) => e.entity_type === "opportunity" && opportunityIds.has(e.entity_id)).map((e) => e.entity_id),
   );
+  const checked = input.rules?.filter((r) => r.held !== null);
   return {
     sourcesCovered: input.observations.sources.length,
     signalsCollected: input.observations.totalSignals,
@@ -97,5 +101,88 @@ export function marketCompletenessCounts(input: {
     opportunitiesGenerated: input.opportunityIds.length,
     evidenceCount: input.evidence.length,
     evidenceBackedOpportunitiesCount: backed.size,
+    ...(checked ? { qcRulesChecked: checked.length, qcRulesHeld: checked.filter((r) => r.held).length } : {}),
   };
+}
+
+/** One QC rule (docs/EVIDENCE-CONTRACT.md) checked on stored rows: held, broken, or nothing to check (null). */
+export interface QcRuleResult {
+  rule: 1 | 2 | 3 | 4 | 5;
+  held: boolean | null;
+  text: string;
+}
+
+export interface QcEvidenceRow {
+  entity_type: string;
+  entity_id: string;
+  source_id?: string | null;
+  url?: string | null;
+  excerpt?: string | null;
+}
+
+// The write-time test of QC Rule 1 (lib/evidence/qc.ts): a row names a source and quotes or links it.
+const sourced = (e: QcEvidenceRow) => Boolean(e.source_id) && Boolean(e.url || e.excerpt);
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
+/**
+ * The five QC rules checked on ONE market's stored rows. Each result is a count over those rows,
+ * so the panel and the export state what was found, never that a rule is "enforced".
+ */
+export function marketQcRules(input: {
+  market: { trend: string | null; demand_score: number | null; competition_score: number | null };
+  signals: ReportSignal[];
+  competitorCount: number;
+  opportunityIds: string[];
+  evidence: QcEvidenceRow[];
+}): QcRuleResult[] {
+  const { market, signals, competitorCount, evidence } = input;
+
+  const opps = new Set(input.opportunityIds);
+  const backed = new Set(
+    evidence.filter((e) => e.entity_type === "opportunity" && opps.has(e.entity_id) && sourced(e)).map((e) => e.entity_id),
+  ).size;
+  const r1: QcRuleResult =
+    opps.size === 0
+      ? { rule: 1, held: null, text: "No opportunities stored" }
+      : { rule: 1, held: backed === opps.size, text: `${backed} of ${opps.size} opportunities have a sourced evidence row` };
+
+  // Dated observations as the orchestrator counts them: a publish date, or a Google Trends row.
+  const dated = signals.filter((s) => s.published_at || one(s.sources)?.type === "gtrends").length;
+  const trend = market.trend?.trim().toLowerCase() || "unknown";
+  const r2: QcRuleResult =
+    trend === "unknown"
+      ? { rule: 2, held: true, text: `No trend claimed (${count(dated, "dated observation")})` }
+      : {
+          rule: 2,
+          held: dated >= 2,
+          text: `Trend "${trend}" from ${count(dated, "dated observation")}${dated >= 2 ? "" : ", 2 needed"}`,
+        };
+
+  const r3: QcRuleResult =
+    competitorCount > 0
+      ? { rule: 3, held: true, text: `Competition from ${count(competitorCount, "stored listing")}` }
+      : market.competition_score != null
+        ? { rule: 3, held: false, text: `Competition score ${Math.round(market.competition_score)} with no stored listing` }
+        : { rule: 3, held: true, text: "No competition claimed: none observed" };
+
+  const r4: QcRuleResult =
+    market.demand_score == null
+      ? { rule: 4, held: null, text: "No demand score stored" }
+      : {
+          rule: 4,
+          held: signals.length > 0 || market.demand_score === 0,
+          text: `Demand ${Math.round(market.demand_score)} from ${count(signals.length, "linked signal")}`,
+        };
+
+  // The three layers are separate tables; as at write time (enforceRule5), interpretations and
+  // suggestions need a facts layer under them. A citation may be a computed count (trend rows) or
+  // a listing with no `sources` row, so a missing source_id is not a separation failure.
+  const analysed = signals.filter((s) => one(s.signal_analysis)).length;
+  const layers = `${count(evidence.length, "citation")}, ${count(analysed, "analysed signal")}, ${count(opps.size, "suggestion")} stored apart`;
+  const r5: QcRuleResult =
+    evidence.length === 0 && analysed + opps.size === 0
+      ? { rule: 5, held: null, text: "Nothing stored to separate" }
+      : { rule: 5, held: evidence.length > 0, text: evidence.length > 0 ? layers : `${layers}, with no facts layer` };
+
+  return [r1, r2, r3, r4, r5];
 }

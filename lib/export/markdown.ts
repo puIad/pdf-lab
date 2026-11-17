@@ -53,21 +53,12 @@ export function generateReportMarkdown(data: ReportExportData): string {
   lines.push("");
 
   lines.push("### Anti-Hallucination & Quality Control Status (PRD §53)");
-  lines.push(
-    `- **QC Rule 1 (Evidence Link):** ${data.completeness.evidenceBackedOpportunitiesCount} of ${data.completeness.opportunitiesGenerated} opportunities have evidence rows.`,
-  );
-  lines.push(
-    `- **QC Rule 2 (Temporal Evidence):** Stored market trend: \`${data.market.trend}\` ("unknown" means too few dated signals).`,
-  );
-  lines.push(
-    `- **QC Rule 3 (Observed Competitors):** ${
-      data.competitors.length > 0
-        ? `${data.competitors.length} stored marketplace listings.`
-        : "No competitors observed."
-    }`,
-  );
-  lines.push("- **QC Rule 4 (Counts-Backed Demand):** Scores are rule-based indexes over stored counts.");
-  lines.push("- **QC Rule 5 (Separation):** Facts, interpretations and suggestions are listed separately below.");
+  // Each line is the rule checked on the market's stored rows (#52), not a fixed statement.
+  const names = ["Evidence Link", "Temporal Evidence", "Observed Competitors", "Counts-Backed Demand", "Separation"];
+  for (const r of data.qcRules) {
+    const verdict = r.held === null ? "Nothing to check" : r.held ? "Holds" : "Broken";
+    lines.push(`- **QC Rule ${r.rule} (${names[r.rule - 1]}):** ${r.text}. ${verdict}.`);
+  }
   lines.push("");
   lines.push("---");
   lines.push("");

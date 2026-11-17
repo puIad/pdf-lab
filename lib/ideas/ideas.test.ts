@@ -8,6 +8,8 @@ import {
   buildIdeas,
   isTimely,
   classifyFormat,
+  matchFormat,
+  sharesWord,
   classifyIntent,
   ideaTitle,
   opportunity,
@@ -57,6 +59,15 @@ describe("classification", () => {
     assert.equal(classifyFormat("budgeting template excel"), "Worksheet");
     assert.equal(classifyFormat("keto diet recipes"), "Ebook");
     assert.equal(classifyFormat("what is keto diet"), "Guide");
+  });
+
+  it("names a format only when the text does; in prose a plan is not a planner (issue #49)", () => {
+    assert.equal(matchFormat("what is keto diet"), null);
+    assert.equal(matchFormat("keto diet plan"), "Planner");
+    assert.equal(matchFormat("Grocery spending exceeds the monthly plan", true), null);
+    assert.equal(matchFormat("My plans fail, I need a weekly planner", true), "Planner");
+    assert.equal(matchFormat("a beginner's guide to budgeting"), "Guide");
+    assert.equal(matchFormat("budget tracker guide"), "Planner"); // a more specific format word wins
   });
 
   it("reads intent, fit and specificity", () => {
@@ -139,6 +150,23 @@ describe("suggestOutline", () => {
     assert.ok(out.includes("How To Start Keto Diet"));
     assert.ok(out.includes("Keto Diet For Beginners"));
     assert.deepEqual(out.slice(4), ["Why keto diet plan matters", "What you need before you start"], "padded from defaults");
+  });
+
+  it("keeps one heading per theme: importance and \"matters\" are the same section (issue #46)", () => {
+    const out = suggestOutline({
+      phrase: "meal prep",
+      format: "Guide",
+      related: [
+        { phrase: "why is meal prep important", opportunity: 80 },
+        { phrase: "why meal prep matters", opportunity: 79 },
+        { phrase: "importance of meal prep", opportunity: 78 },
+        { phrase: "meal prep containers", opportunity: 40 },
+      ],
+    });
+    assert.equal(out.filter((h) => /important|importance|matters/i.test(h)).length, 1);
+    assert.equal(out[0], "Why is meal prep important?");
+    assert.ok(!out.includes("Why meal prep matters"), "the default with the same theme is left out too");
+    assert.ok(out.includes("What you need before you start"));
   });
 
   it("rotates on offset and respects the format's section count", () => {
@@ -289,5 +317,29 @@ describe("card ticks (Part 3.8)", () => {
   it("Hard formats fail the effort tick", () => {
     const hard = { ...plan, effort: "Hard" as const };
     assert.equal(ideaTicks(hard).find((t) => t.key === "effort")!.status, "fail");
+  });
+});
+
+describe("Google Trends related queries about something else (issue #47)", () => {
+  const result = buildIdeas(
+    "meal prep",
+    [
+      sig("gtrends", "gt:rq:1", { seed: "meal prep", related_query: "netflix new releases", interest_value: 900, rising: true }),
+      sig("gtrends", "gt:rq:2", { seed: "meal prep", related_query: "learn golang", interest_value: 40 }),
+      sig("gtrends", "gt:rq:3", { seed: "meal prep", related_query: "meal prepping for beginners", interest_value: 300, rising: true }),
+      sig("gtrends", "gt:rq:4", { seed: "meal prep", related_query: "food prep containers", interest_value: 55 }),
+    ],
+    new Date("2026-11-16T00:00:00Z"),
+  );
+
+  it("keeps a related query that shares a word with the seed, endings aside", () => {
+    assert.deepEqual(result.ideas.map((i) => i.phrase).sort(), ["food prep containers", "meal prepping for beginners"]);
+    assert.equal(sharesWord("budget planner 2027", "budgeting"), true);
+    assert.equal(sharesWord("learn golang", "meal prep"), false);
+  });
+
+  it("counts what it left out", () => {
+    assert.equal(result.stats.offTopic, 2);
+    assert.equal(result.stats.ideas, 2);
   });
 });

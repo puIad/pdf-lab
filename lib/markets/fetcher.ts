@@ -9,7 +9,7 @@ import type {
   TopOpportunity,
   BuyerIntentLevel,
 } from "./types.ts";
-import { isCurrent, listCompletedRuns } from "../runs/scope.ts";
+import { isCurrent, listCompletedRuns, listedRuns, type RunViewer } from "../runs/scope.ts";
 
 /**
  * Which markets to read (Part 6.7): "all" = the latest completed run of each seed plus legacy rows,
@@ -49,6 +49,8 @@ function resolveIntentFromScore(avg: number): BuyerIntentLevel {
 export async function fetchMarketsData(
   supabase: SupabaseClient,
   scope: MarketScope = "all",
+  /** Decides which runs are listed by seed in `runs`; none without a viewer. */
+  viewer: RunViewer | null = null,
 ): Promise<FetchMarketsResult> {
   // 1. Fetch markets, then keep the ones in scope
   const { data: marketsData, error: marketsErr } = await supabase
@@ -61,8 +63,9 @@ export async function fetchMarketsData(
   }
 
   const allMarkets = marketsData ?? [];
-  const runs = await listCompletedRuns(supabase);
-  const latest = new Set(runs.filter((r) => r.latest).map((r) => r.id));
+  const allRuns = await listCompletedRuns(supabase);
+  const latest = new Set(allRuns.filter((r) => r.latest).map((r) => r.id));
+  const runs = listedRuns(allRuns, viewer);
   const legacyCount = allMarkets.filter((m) => !m.run_id).length;
 
   const rawMarkets = allMarkets.filter((m) => {

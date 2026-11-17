@@ -12,7 +12,7 @@ import {
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
 import { commonWords, matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
-import { classifyFormat } from "../ideas/ideas.ts";
+import { matchFormat } from "../ideas/ideas.ts";
 import { IDEA_FORMAT_MAP } from "./from-ideas.ts";
 import {
   ALLOWED_FORMATS,
@@ -180,8 +180,8 @@ export function distinctEvidenceSets(
  * Candidates built only from stored rows: one per distinct (audience, problem) that extraction
  * found on a market's signals, backed by the market's signals that match that problem
  * (`matchSignals`, at most 5, its own first). A signal without both fields yields
- * nothing, so a thin market gives few candidates and an unanalysed one gives none. Format is a
- * suggestion read from the wording (`classifyFormat`: "guide" when no format word appears).
+ * nothing, so a thin market gives few candidates and an unanalysed one gives none. Format is the
+ * one the wording names (`matchFormat`), or null when it names none: no default (issue #49).
  * Price is the market's observed competitor range or null.
  */
 export function generateCandidatePool(
@@ -203,8 +203,9 @@ export function generateCandidatePool(
 
     for (const { audience, problem, signals } of groups.values()) {
       const wording = [problem, ...signals.map((s) => s.title ?? "")].join(" ");
-      const format = IDEA_FORMAT_MAP[classifyFormat(wording)];
-      const formatLabel = format.replace("_", " ");
+      const named = matchFormat(wording, true);
+      const format = named ? IDEA_FORMAT_MAP[named] : null;
+      const formatLabel = format ? format.replace("_", " ") : "PDF";
       const title = `${formatLabel.replace(/^\w/, (c) => c.toUpperCase())} for ${audience}: ${problem}`;
       const oppId = crypto.randomUUID();
 
@@ -270,7 +271,8 @@ export function selectDiversifiedOpportunities(
       }
 
       // Constraint 2: Format representation cap
-      if (formatCounts[cand.format] >= maxPerFormat) {
+      // A candidate with no named format is not a format, so the cap does not count it.
+      if (cand.format && formatCounts[cand.format] >= maxPerFormat) {
         continue;
       }
 
@@ -278,7 +280,7 @@ export function selectDiversifiedOpportunities(
       let maxSimToSelected = 0;
       for (const s of selected) {
         const audMatch = cand.targetAudience === s.targetAudience ? 0.4 : 0;
-        const fmtMatch = cand.format === s.format ? 0.35 : 0;
+        const fmtMatch = cand.format && cand.format === s.format ? 0.35 : 0;
         const probSim = jaccardSimilarity(cand.problem, s.problem) * 0.25;
         const sim = audMatch + fmtMatch + probSim;
         if (sim > maxSimToSelected) {
@@ -301,7 +303,7 @@ export function selectDiversifiedOpportunities(
       const chosenKey = `${normalizeKey(chosen.targetAudience)}::${normalizeKey(chosen.problem)}::${chosen.format}`;
       selected.push(chosen);
       selectedKeys.add(chosenKey);
-      formatCounts[chosen.format] = (formatCounts[chosen.format] || 0) + 1;
+      if (chosen.format) formatCounts[chosen.format] = (formatCounts[chosen.format] || 0) + 1;
     } else {
       // If constraints exhausted but still need slots, relax format cap gradually
       let found = false;
@@ -312,7 +314,7 @@ export function selectDiversifiedOpportunities(
           const chosen = remaining.splice(i, 1)[0];
           selected.push(chosen);
           selectedKeys.add(key);
-          formatCounts[chosen.format] = (formatCounts[chosen.format] || 0) + 1;
+          if (chosen.format) formatCounts[chosen.format] = (formatCounts[chosen.format] || 0) + 1;
           found = true;
           break;
         }
@@ -338,7 +340,7 @@ export function computeDiversificationStats(opportunities: GeneratedOpportunity[
   // Null sophistication, urgency or price means "not observed" and is not counted.
   for (const opp of opportunities) {
     audiences.add(opp.targetAudience);
-    formatCounts[opp.format] = (formatCounts[opp.format] || 0) + 1;
+    if (opp.format) formatCounts[opp.format] = (formatCounts[opp.format] || 0) + 1;
     if (opp.sophistication) sophisticationCounts[opp.sophistication] += 1;
     if (opp.urgency) urgencyCounts[opp.urgency] += 1;
     if (opp.priceRange) priceRanges.add(opp.priceRange);
@@ -372,9 +374,15 @@ export async function generate25Opportunities(
     ? await generateWithAIRouter(markets, options.router, options.tier ?? "strong").catch(() => [])
     : [];
   const seenKeys = new Set<string>();
+  const seenPairs = new Set<string>();
   const deduped = [...fromModel, ...generateCandidatePool(markets)].filter((c) => {
-    const key = `${normalizeKey(c.targetAudience)}::${normalizeKey(c.problem)}::${c.format}`;
-    return !seenKeys.has(key) && Boolean(seenKeys.add(key));
+    const pair = `${normalizeKey(c.targetAudience)}::${normalizeKey(c.problem)}`;
+    const key = `${pair}::${c.format}`;
+    // A candidate that names no format adds nothing to one with the same audience and problem.
+    if (seenKeys.has(key) || (!c.format && seenPairs.has(pair))) return false;
+    seenKeys.add(key);
+    seenPairs.add(pair);
+    return true;
   });
   deduped.push(...(options.extraCandidates ?? []));
 

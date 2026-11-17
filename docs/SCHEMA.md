@@ -174,9 +174,16 @@ create table usage_events (
 
 - One row per counted action. A quota is the count of rows in the current UTC day or month
   (`lib/quotas/quotas.ts`); a refused action writes no row. Service-role only, RLS on, no policy.
-- `public.users.id` equals `auth.users.id`, but there is no foreign key between them: deleting an
-  auth user leaves its `public.users` row (issue #34).
-- Migration: `supabase/migrations/20261116000009_auth_quotas.sql`.
+- The count and the insert are one step: `take_usage(user, anon_hash, kind, since, max)` takes an
+  advisory lock per caller and kind, counts, and inserts only below `max`. Two requests at the
+  limit cannot both pass. Service-role only.
+- `public.users.id` equals `auth.users.id`. There is no foreign key between them, so a trigger on
+  `auth.users` delete removes the `public.users` row. That cascades to the person's usage rows,
+  watchlist and research runs (`research_runs.user_id` is `on delete cascade`; a run's markets,
+  opportunities and competitors go with the run). Rows left by auth users deleted before the
+  trigger existed are removed once by migration 12.
+- Migrations: `supabase/migrations/20261116000009_auth_quotas.sql`,
+  `20261116000011_atomic_limits.sql`, `20261117000012_orphan_users_cleanup.sql`.
 
 ## Watchlist (Part 4.1)
 
@@ -196,12 +203,16 @@ create table watchlists (
 - One row per thing a signed-in person follows. Seeds and phrases are stored lowercased with
   single spaces (`lib/watchlist/watchlist.ts`), so the unique key is case-insensitive in practice.
 - `region` is not nullable: two nulls would not collide in the unique key.
-- Owner only, enforced twice: grants (`authenticated` may select, insert and delete; `anon`
-  nothing) and three policies on `(select auth.uid()) = user_id`. No update: a row is saved or
-  removed. The app reads and writes it as the signed-in person, not with the service role.
-- How many rows a plan holds is `WATCHLIST_LIMIT` in `lib/quotas/quotas.ts`, checked by
+- Owner only, enforced twice: grants (`authenticated` may select and delete; `anon` nothing) and
+  two policies on `(select auth.uid()) = user_id`. No update: a row is saved or removed. The app
+  reads and removes rows as the signed-in person.
+- Saving goes through `add_watch(user, kind, ref, region, seed, limit)`, service-role only. It
+  locks per person, counts, and inserts only below `limit`, answering `added`, `exists` or `full`
+  with the row count. A signed-in person cannot insert directly, so the cap cannot be passed.
+- How many rows a plan holds is `WATCHLIST_LIMIT` in `lib/quotas/quotas.ts`, passed by
   `POST /api/watchlist`.
-- Migration: `supabase/migrations/20261116000010_watchlists.sql`.
+- Migrations: `supabase/migrations/20261116000010_watchlists.sql`,
+  `20261116000011_atomic_limits.sql`.
 
 ## RLS (Supabase)
 

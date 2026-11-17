@@ -34,6 +34,8 @@ interface ReplyCounts {
   total: number;
   /** Signals the model found unrelated to the topic; they are in no market. */
   noMarket?: number;
+  /** Signals an earlier run analysed; their stored analysis was kept. */
+  kept?: number;
   problems: Array<{ n: number; reason: string }>;
   missing: number[];
 }
@@ -360,6 +362,11 @@ export function DeepView({
                 {(finished.noMarket ?? 0) > 0 && (
                   <p className="text-xs text-muted-foreground">
                     {finished.noMarket} signals had nothing to do with the topic according to the model. They are in no market.
+                  </p>
+                )}
+                {(finished.kept ?? 0) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {finished.kept} signals were analysed by an earlier run and kept that analysis. The reply named their market.
                   </p>
                 )}
                 {completed ? (

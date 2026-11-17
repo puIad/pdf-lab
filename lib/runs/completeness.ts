@@ -12,6 +12,8 @@ export interface CompletenessRawCounts {
   opportunitiesGenerated: number;
   evidenceCount: number;
   evidenceBackedOpportunitiesCount: number;
+  qcRulesChecked?: number;
+  qcRulesHeld?: number;
 }
 
 /**
@@ -20,7 +22,8 @@ export interface CompletenessRawCounts {
  * - Sources (up to 3 sources = 20%)
  * - Signals (up to 20 signals = 20%)
  * - Analysis (signalsAnalyzed / signalsCollected = 20%)
- * - Markets (marketsIdentified > 0 = 15%)
+ * - Markets (marketsIdentified > 0 = 15%); for one market, which is always identified, the QC
+ *   rules that held among those checked on its rows take these 15%
  * - Opportunities evidence backing (evidenceBacked / generated = 25%)
  */
 export function calculateCompleteness(counts: CompletenessRawCounts): ResearchCompleteness {
@@ -43,7 +46,14 @@ export function calculateCompleteness(counts: CompletenessRawCounts): ResearchCo
   score += analysisScore;
 
   // 4. Markets identified (15%)
-  const marketScore = counts.marketsIdentified > 0 ? 15 : 0;
+  const marketScore =
+    counts.qcRulesChecked !== undefined
+      ? counts.qcRulesChecked > 0
+        ? (Math.min(counts.qcRulesHeld ?? 0, counts.qcRulesChecked) / counts.qcRulesChecked) * 15
+        : 0
+      : counts.marketsIdentified > 0
+        ? 15
+        : 0;
   score += marketScore;
 
   // 5. Evidence-backed opportunities ratio (25%)

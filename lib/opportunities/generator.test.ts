@@ -224,7 +224,8 @@ test("Opportunity generator: observed fields only, never padded (Part 6.4)", asy
     assert.equal(couples.priceRange, "$4.99–$19"); // the market's observed range
     assert.equal(freelancers.priceRange, null); // no stored competitor prices
     assert.equal(students.format, "checklist"); // the signal's wording names the format
-    assert.equal(freelancers.format, "guide");
+    assert.equal(freelancers.format, null); // no format word in the wording: not observed, no default (issue #49)
+    assert.match(freelancers.title, /^PDF for /);
   });
 
   await t.test("selection keeps (audience, problem, format) distinct and caps a format at 36%", async () => {
@@ -557,11 +558,12 @@ test("a quick idea goes to the market holding its own words, not to the one with
     market("healthy", "Healthy meal prep plans", 26, ["They look for meal prep that is good for them."]),
     market("budget", "Budget meal prep", 33, ["They want 10 healthy meals in one hour on a budget."]),
   ];
-  // Only seed words: the strongest market, not the smallest.
-  assert.equal(marketFor("how to meal prep", markets, "meal prep").id, "big");
+  // Only seed words, or words found in no market: it belongs to none (issue #42).
+  assert.equal(marketFor("how to meal prep", markets, "meal prep"), null);
+  assert.equal(marketFor("can meal prep last 5 days", markets, "meal prep"), null);
   // Its own word is in one market's text.
-  assert.equal(marketFor("meal prep chicken recipes", markets, "meal prep").id, "big");
-  assert.equal(marketFor("vegetarian meal prep", markets, "meal prep").id, "small");
+  assert.equal(marketFor("meal prep chicken recipes", markets, "meal prep")?.id, "big");
+  assert.equal(marketFor("vegetarian meal prep", markets, "meal prep")?.id, "small");
   // A word in a market's name beats the same word in another market's snippet.
-  assert.equal(marketFor("is meal prep healthy", markets, "meal prep").id, "healthy");
+  assert.equal(marketFor("is meal prep healthy", markets, "meal prep")?.id, "healthy");
 });

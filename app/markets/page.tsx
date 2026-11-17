@@ -3,7 +3,9 @@
 // Renders the dashboard shell, evidence-derived explorer table, and filter tabs.
 
 import React from "react";
+import { headers } from "next/headers";
 import { createServiceSupabaseClient } from "@/lib/db/client";
+import { resolveCaller } from "@/lib/quotas/guard";
 import { fetchMarketsData, parseMarketScope } from "@/lib/markets/fetcher";
 import { DashboardShell } from "@/components/markets-table";
 
@@ -30,7 +32,8 @@ export default async function MarketsPage(props: { searchParams: Promise<{ run?:
   let legacyCount = 0;
 
   try {
-    const res = await fetchMarketsData(supabase, scope);
+    // The run picker lists the viewer's own runs only (issue #39).
+    const res = await fetchMarketsData(supabase, scope, await resolveCaller(await headers()));
     markets = res.markets;
     stats = res.stats;
     runs = res.runs;

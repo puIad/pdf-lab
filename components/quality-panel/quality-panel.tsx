@@ -11,15 +11,21 @@ import {
   Layers,
   Sparkles,
   ArrowDownToLine,
+  Check,
+  X,
+  Minus,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import type { ResearchCompleteness } from "@/lib/runs/types";
+import type { QcRuleResult } from "@/lib/report/observed";
 import { ExportActions } from "./export-actions";
 
 interface QualityPanelProps {
   marketId: string;
   completeness: ResearchCompleteness;
+  /** QC rules 1 to 5 checked on the market's stored rows (`marketQcRules`). */
+  rules: QcRuleResult[];
   marketName?: string;
   /** Source types behind `sourcesCovered`, as stored. */
   sourceTypes?: string[];
@@ -29,11 +35,14 @@ interface QualityPanelProps {
 export function QualityPanel({
   marketId,
   completeness,
+  rules,
   marketName,
   sourceTypes,
   className = "",
 }: QualityPanelProps) {
   const pct = Math.min(100, Math.max(0, completeness.completenessPercentage || 0));
+  const checked = rules.filter((r) => r.held !== null);
+  const held = checked.filter((r) => r.held).length;
   const isHighQuality = pct >= 80;
   const backingRate =
     completeness.opportunitiesGenerated > 0
@@ -66,8 +75,8 @@ export function QualityPanel({
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              Anti-hallucination contract (PRD §30–§31, §55){marketName ? ` for ${marketName}` : ""}. Every opportunity and score joins to
-              countable rows in Supabase.
+              Anti-hallucination contract (PRD §30–§31, §55){marketName ? ` for ${marketName}` : ""}. Every number below is a
+              count of this market&apos;s stored rows.
             </p>
           </div>
 
@@ -88,7 +97,7 @@ export function QualityPanel({
             <div className="flex items-center gap-2 font-medium">
               <span>Overall Research Completeness</span>
               <span className="text-xs text-muted-foreground">
-                (Sources 20% + Volume 20% + Analysis 20% + Clusters 15% + Backing 25%)
+                (Sources 20% + Volume 20% + Analysis 20% + QC rules held 15% + Backing 25%)
               </span>
             </div>
             <span className="font-mono text-base font-bold text-emerald-600 dark:text-emerald-400">
@@ -191,39 +200,39 @@ export function QualityPanel({
           </div>
         </div>
 
-        {/* QC Rules 1-5 Verification Checklist */}
+        {/* QC Rules 1-5, each checked on this market's stored rows (#52) */}
         <div className="border-t border-border/60 pt-4">
           <div className="flex items-center gap-2 mb-3">
             <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Normative QC Guarantee (PRD §53 Rules 1–5 Enforced)
+              QC rules checked on stored rows: {held} of {checked.length} hold
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 text-xs">
-            <div className="flex items-start gap-2 text-muted-foreground">
-              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">R1:</span>
-              <span>
-                {completeness.evidenceBackedOpportunitiesCount} of {completeness.opportunitiesGenerated} opportunities link to evidence rows
-              </span>
-            </div>
-            <div className="flex items-start gap-2 text-muted-foreground">
-              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">R2:</span>
-              <span>Trend velocity backed by temporal signal timestamps</span>
-            </div>
-            <div className="flex items-start gap-2 text-muted-foreground">
-              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">R3:</span>
-              <span>Competitors reflect real marketplace search observations</span>
-            </div>
-            <div className="flex items-start gap-2 text-muted-foreground">
-              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">R4:</span>
-              <span>Demand & scores derived mathematically, not AI opinions</span>
-            </div>
-            <div className="flex items-start gap-2 text-muted-foreground sm:col-span-2 lg:col-span-2">
-              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">R5:</span>
-              <span>Facts, AI interpretations, and product suggestions visually and structurally separated</span>
-            </div>
-          </div>
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 text-xs">
+            {rules.map((r) => {
+              const tone =
+                r.held === null
+                  ? "text-muted-foreground"
+                  : r.held
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-red-600 dark:text-red-400";
+              const Mark = r.held === null ? Minus : r.held ? Check : X;
+              return (
+                <li key={r.rule} className="flex items-start gap-2 text-muted-foreground">
+                  <span className={`flex items-center gap-0.5 font-mono font-bold ${tone}`}>
+                    <Mark className="h-3 w-3" aria-hidden />R{r.rule}:
+                  </span>
+                  <span>
+                    {r.text}
+                    <span className="sr-only">
+                      {r.held === null ? ", nothing to check" : r.held ? ", holds" : ", broken"}
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </CardContent>
     </Card>

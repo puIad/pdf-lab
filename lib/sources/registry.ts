@@ -7,7 +7,10 @@ import type { SourceAdapter } from "./types.ts";
 const adapters = new Map<string, SourceAdapter>();
 
 export function registerAdapter(adapter: SourceAdapter): void {
-  if (adapters.has(adapter.key)) {
+  // Under `next dev`, saving an adapter file runs its module again while this map survives, so
+  // the same key arrives twice: the new code replaces the old (issue #53). Anywhere else a second
+  // registration is two adapters claiming one key, which is a bug.
+  if (adapters.has(adapter.key) && process.env.NODE_ENV !== "development") {
     throw new Error(`SourceAdapter already registered for key '${adapter.key}'`);
   }
   adapters.set(adapter.key, adapter);

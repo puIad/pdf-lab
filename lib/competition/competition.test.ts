@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   calculateLandscape,
+  listingFormat,
   mineReviewsAndGaps,
   analyzeCompetition,
   type CompetitorProduct,
@@ -77,6 +78,16 @@ const SAMPLE_COMPETITORS: CompetitorProduct[] = [
     ],
   },
 ];
+
+describe("listingFormat", () => {
+  it("reads the format a listing title names, and never defaults to one", () => {
+    assert.equal(listingFormat("Monthly Budget Planner Printable"), "planner");
+    assert.equal(listingFormat("ADHD Cleaning Cheat Sheet"), "cheat_sheet");
+    assert.equal(listingFormat("Debt Free Guide"), "guide");
+    assert.equal(listingFormat("Budget by Paycheck"), "not stated");
+    assert.equal(listingFormat(null), "not stated");
+  });
+});
 
 describe("calculateLandscape (PRD §20)", () => {
   it("computes platform, format, and price tier shares that sum strictly to 100.0%", () => {

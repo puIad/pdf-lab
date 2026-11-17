@@ -391,6 +391,10 @@ export function DashboardShell({
             onChange={(e) => router.push(`${pathname}?run=${encodeURIComponent(e.target.value)}`)}
           >
             <NativeSelectOption value="latest">Latest run of each seed</NativeSelectOption>
+            {/* A run opened by its link that is not the viewer's own: shown, its seed not named. */}
+            {scope !== "latest" && scope !== "legacy" && scope !== "all" && !runs.some((r) => r.id === scope) && (
+              <NativeSelectOption value={scope}>This run</NativeSelectOption>
+            )}
             {runs.map((r) => (
               <NativeSelectOption key={r.id} value={r.id}>
                 {r.query}

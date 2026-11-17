@@ -595,22 +595,24 @@ export async function generateMarketOverview(
       url?: string | null;
     }> = [];
 
-    for (const c of matchedCompetitors) {
-      const plat = c.platform || "web";
-      platforms[plat] = (platforms[plat] || 0) + 1;
-      sampleProducts.push({
-        title: c.title || "Existing Product",
-        platform: plat,
-        price: c.price,
-        url: c.url,
-      });
-    }
-
-    // Also check signals from marketplace sources (etsy, gumroad, kdp)
+    // One entry per listing (issue #48). A Deep run stores a listing twice, as a competitor row
+    // and as a marketplace signal; an on-demand competition check stores the signal only. Both
+    // are observed listings that match this query, so both count, each once and under one
+    // platform name. Before, the signals raised the platform counts but not the product count.
+    const seen = new Set<string>();
+    const add = (platform: string, title: string | null | undefined, url: string | null | undefined, price?: string | null) => {
+      const key = url || `${platform}:${(title || "").toLowerCase()}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      platforms[platform] = (platforms[platform] || 0) + 1;
+      sampleProducts.push({ title: title || "Existing Product", platform, price, url });
+    };
+    for (const c of matchedCompetitors) add(c.platform || "web", c.title, c.url, c.price);
     for (const s of matchedSignals) {
       const src = s.sources?.type;
       if (src === "etsy" || src === "gumroad" || src === "kdp") {
-        platforms[src] = (platforms[src] || 0) + 1;
+        const price = typeof s.engagement?.price === "string" ? s.engagement.price : null;
+        add(src === "kdp" ? "amazon_kdp" : src, s.title, s.url, price);
       }
     }
 
@@ -649,7 +651,7 @@ export async function generateMarketOverview(
       },
       rawLabel: `${totalProducts} products observed across ${Object.keys(platforms).length} platforms`,
       evidence: citations,
-      note: "Observed listings from Gumroad, Etsy, Amazon KDP, and web vendors",
+      note: "Stored listings from Gumroad, Etsy, Amazon KDP and web stores that match this query, each counted once. They come from Deep runs and from competition checks.",
     };
   })();
 

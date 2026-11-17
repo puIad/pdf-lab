@@ -14,7 +14,7 @@ import {
   enforceRule5_SeparationOfConcerns,
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
-import { mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
+import { listingFormat, mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
 import { marketForCompetitor } from "../competition/map.ts";
 import { isDemandOnly, isListing } from "../sources/demand-only.ts";
 import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
@@ -111,8 +111,9 @@ export interface OrchestratorOpportunityItem {
   targetAudience: string;
   problem: string;
   solution: string;
-  format: string;
-  priceRange?: string | null;
+  /** Null when the wording names no format ("Not observed"). */
+  format: string | null;
+  priceRange?: string| null;
   opportunityScore: number;
   confidence: number;
   /** Signals of the market that match this problem, of `marketSignals` (QC Rule 4, Part 6.8). */
@@ -170,11 +171,14 @@ export interface OrchestratorDeps {
   saveMarkets: (markets: OrchestratorMarketItem[], runId: string) => Promise<Array<{ id: string; name: string }>>;
   saveEvidence: (items: EvidenceInput[]) => Promise<EvidenceRow[]>;
   /** `seed`: the stored quick ideas of this seed join the candidate pool (Part 3.8). */
-  /** The array may carry `droppedUnsourced`: candidates the generator removed for lacking sourced evidence. */
+  /**
+   * The array may carry `droppedUnsourced` (candidates the generator removed for lacking sourced
+   * evidence) and `ideasInNoMarket` (quick ideas left out because their words are in no market).
+   */
   generateOpportunities: (markets: OrchestratorMarketItem[], seed: string) => Promise<Array<{
     opportunity: OrchestratorOpportunityItem;
     evidence: EvidenceInput[];
-  }> & { droppedUnsourced?: number }>;
+  }> & { droppedUnsourced?: number; ideasInNoMarket?: number }>;
   saveOpportunities: (items: OrchestratorOpportunityItem[], runId: string) => Promise<Array<{ id: string; title: string }>>;
   observeCompetition: (signals: StoredSignalForRun[]) => Promise<OrchestratorCompetitorItem[]>;
   saveCompetitors?: (competitors: Array<{
@@ -487,7 +491,7 @@ async function finishRun(
           title: c.title,
           url: c.url || null,
           price: c.price || null,
-          format: c.format || "guide",
+          format: c.format || listingFormat(c.title),
           rating: c.rating || null,
           reviewCount: c.reviewCount || null,
           positioning: c.positioning || null,
@@ -584,11 +588,13 @@ async function finishRun(
         opportunities: savedOppsCount,
         opportunitiesFromIdeas: fromIdeas,
         opportunitiesDroppedUnsourced: droppedUnsourced,
+        ideasInNoMarket: generatedPairs.ideasInNoMarket ?? 0,
         evidenceCreated: totalEvidenceCreated,
       },
       message:
         `Saved ${savedOppsCount} of ${OPPORTUNITY_TARGET} target opportunities` +
         (savedOppsCount < OPPORTUNITY_TARGET ? ", limited by evidence" : "") +
+        (generatedPairs.ideasInNoMarket ? `; ${generatedPairs.ideasInNoMarket} quick ideas fit no market and were left out` : "") +
         `; assembling research completeness panel and reconciling database counts`,
     });
     await deps.updateRunStatus(runId, "report_generation");

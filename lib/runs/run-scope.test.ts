@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isStoreUrl, marketForCompetitor, type CompetitorMarket } from "../competition/map.ts";
 import { loadRunSignals, recordRunSignals } from "./run-signals.ts";
-import { isCurrent, listCompletedRuns } from "./scope.ts";
+import { isCurrent, listCompletedRuns, listedRuns } from "./scope.ts";
 import { fetchMarketsData, parseMarketScope } from "../markets/fetcher.ts";
 import { executeResearchRun, type OrchestratorDeps, type StoredSignalForRun } from "./orchestrator.ts";
 
@@ -133,6 +133,21 @@ describe("run scope for readers", () => {
     assert.equal(isCurrent(runs[2].id, latest), false);
   });
 
+  it("lists a run's seed only to its owner; all on a dev server, none signed out (issue #39)", async () => {
+    const owned = [{ ...runs[0], user_id: "user-a" }, { ...runs[1], user_id: "user-b" }, { ...runs[2], user_id: null }];
+    const list = await listCompletedRuns(fakeSupabase({ ...tables, research_runs: owned }).client);
+    assert.deepEqual(listedRuns(list, { plan: "free", userId: "user-a" }).map((r) => r.query), ["Budgeting"]);
+    assert.equal(listedRuns(list, { plan: "local", userId: null }).length, 3);
+    assert.equal(listedRuns(list, { plan: "internal", userId: null }).length, 3);
+    assert.deepEqual(listedRuns(list, { plan: "anon", userId: null }), []);
+    assert.deepEqual(listedRuns(list, null), []);
+    assert.ok(!("userId" in listedRuns(list, { plan: "free", userId: "user-a" })[0]));
+    // Which markets are current does not depend on who looks.
+    const res = await fetchMarketsData(fakeSupabase({ ...tables, research_runs: owned }).client, "latest", { plan: "anon", userId: null });
+    assert.deepEqual(res.runs, []);
+    assert.deepEqual(res.markets.map((m) => m.name).sort(), ["meal", "new-budget"]);
+  });
+
   it("a run that completed with no market never replaces the last good run of its seed", async () => {
     const empty = { id: "44444444-4444-4444-8444-444444444444", query: "budgeting", completed_at: "2026-11-14T10:00:00Z", markets: [] };
     const withEmpty = { ...tables, research_runs: [empty, ...runs] };
@@ -149,7 +164,7 @@ describe("run scope for readers", () => {
     assert.deepEqual(await names(runs[2].id), ["old-budget"]);
     assert.deepEqual(await names("legacy"), ["legacy"]);
     assert.deepEqual(await names(), ["legacy", "meal", "new-budget"]);
-    const res = await fetchMarketsData(fakeSupabase(tables).client, "latest");
+    const res = await fetchMarketsData(fakeSupabase(tables).client, "latest", { plan: "local", userId: null });
     assert.equal(res.legacyCount, 1);
     assert.deepEqual(res.runs.map((r) => r.id), runs.map((r) => r.id));
   });

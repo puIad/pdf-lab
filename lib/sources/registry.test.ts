@@ -48,4 +48,15 @@ describe("source registry", () => {
     registerAdapter(fakeAdapter("fake-dup-source"));
     assert.throws(() => registerAdapter(fakeAdapter("fake-dup-source")), /already registered/);
   });
+
+  it("replaces an adapter under a dev server, where hot reload registers it again (issue #53)", () => {
+    const before = process.env.NODE_ENV;
+    try {
+      (process.env as Record<string, string>).NODE_ENV = "development";
+      registerAdapter({ ...fakeAdapter("fake-dup-source"), displayName: "Reloaded" });
+      assert.equal(getAdapter("fake-dup-source")?.displayName, "Reloaded");
+    } finally {
+      (process.env as Record<string, string | undefined>).NODE_ENV = before;
+    }
+  });
 });

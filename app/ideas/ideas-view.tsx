@@ -731,6 +731,12 @@ export function IdeasView({ initialSeed, initialRegion, watchKeys }: { initialSe
             </div>
           </div>
 
+          {(data.stats.offTopic ?? 0) > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {data.stats.offTopic} Google Trends related {data.stats.offTopic === 1 ? "query was" : "queries were"} left out: no word in common with this topic.
+            </p>
+          )}
+
           {ideas.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-sm text-muted-foreground">

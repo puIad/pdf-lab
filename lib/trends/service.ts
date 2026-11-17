@@ -96,22 +96,27 @@ export class TrendingRadarService {
    * Builds synchronized snapshots for all 4 windows.
    */
   getFourWindowSnapshots(options: RadarFilterOptions = {}): Record<TimeWindow, RadarSnapshot> {
-    const analyses = this.getAnalyzedTopics(options);
+    const { plotted, notPlotted } = this.plottable(options);
+    const snapshot = (window: TimeWindow) => withNotPlotted(buildRadarSnapshot(plotted, window), notPlotted);
+    return { "7d": snapshot("7d"), "30d": snapshot("30d"), "90d": snapshot("90d"), "12m": snapshot("12m") };
+  }
 
-    return {
-      "7d": buildRadarSnapshot(analyses, "7d"),
-      "30d": buildRadarSnapshot(analyses, "30d"),
-      "90d": buildRadarSnapshot(analyses, "90d"),
-      "12m": buildRadarSnapshot(analyses, "12m"),
-    };
+  /**
+   * A place on the radar is a trend claim, so a market whose trend is "unknown" (too few dated
+   * signals, QC Rule 2) is counted but not plotted (issue #51).
+   */
+  private plottable(options: RadarFilterOptions): { plotted: TopicTrendAnalysis[]; notPlotted: number } {
+    const analyses = this.getAnalyzedTopics(options);
+    const plotted = analyses.filter((a) => a.classification !== "unknown");
+    return { plotted, notPlotted: analyses.length - plotted.length };
   }
 
   /**
    * Retrieves single window snapshot.
    */
   getSnapshot(window: TimeWindow, options: RadarFilterOptions = {}): RadarSnapshot {
-    const analyses = this.getAnalyzedTopics(options);
-    return buildRadarSnapshot(analyses, window);
+    const { plotted, notPlotted } = this.plottable(options);
+    return withNotPlotted(buildRadarSnapshot(plotted, window), notPlotted);
   }
 
   /**
@@ -180,3 +185,7 @@ export class TrendingRadarService {
   }
 }
 
+
+function withNotPlotted(snapshot: RadarSnapshot, notPlotted: number): RadarSnapshot {
+  return { ...snapshot, summary: { ...snapshot.summary, notPlotted } };
+}
