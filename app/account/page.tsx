@@ -8,6 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataControls } from "./data-controls";
 import { PlanCard, type PlanRow } from "@/components/limits/plan-card";
 import { stubAllowed } from "@/lib/billing/stub";
 import { deepRunCostLine, summarizeRuns } from "@/lib/usage/cost";
@@ -157,6 +158,8 @@ export default async function AccountPage() {
             </CardContent>
           </Card>
         )}
+
+        {caller.userId && <DataControls />}
       </div>
     </main>
   );

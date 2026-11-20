@@ -19,7 +19,11 @@ export async function GET(req: Request) {
     if (!adapter) throw new Error("youtube adapter not registered");
     const result = await runYouTubeRetention({ store: supabaseRetentionStore(), refresher: adapter });
     return NextResponse.json({ ok: true, ...result });
-  } catch {
-    return NextResponse.json({ ok: false, error: "retention job failed" }, { status: 500 });
+  } catch (err) {
+    console.error("youtube retention failed", err);
+    return NextResponse.json(
+      { ok: false, error: "retention job failed", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
   }
 }
