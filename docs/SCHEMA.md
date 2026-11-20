@@ -29,7 +29,7 @@ create table research_runs (
   started_at timestamptz not null default now(),
   completed_at timestamptz,
   prompt_version text,  -- planner rule-set version (Phase 3.4, migration 20260928000005)
-  plan jsonb            -- structured NL query + mode + pipeline depth (PRD §26–§27)
+  plan jsonb            -- structured NL query + mode + pipeline depth (PRD §26–§27); `plan.work` holds the run's cost figures (issue #72)
 );
 
 -- One row per configured source (reddit, gtrends, web, etsy, gumroad, ...)

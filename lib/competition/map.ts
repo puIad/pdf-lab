@@ -63,6 +63,41 @@ export function marketForCompetitor(
   return bestNamed > 0 || bestShared >= MIN_SHARED_WORDS ? best : null;
 }
 
+/**
+ * Issue #72: what a run does with one listing. A listing is on topic when its title holds every
+ * word of the seed, or shares a word with a market's name or signals. Anything else ("Noctua Wood
+ * PC" for a PC troubleshooting seed) is dropped. An on-topic listing goes to the market it matches
+ * best, or, when it overlaps none beyond the seed, to the market with the most signals (the
+ * niche's main market) so it is not left on the run only.
+ */
+export function placeCompetitor(
+  listing: { title: string; signalId?: string | null },
+  markets: CompetitorMarket[],
+  seed: string,
+): { relevant: boolean; marketId: string | null } {
+  const direct = marketForCompetitor(listing, markets, seed);
+  if (direct) return { relevant: true, marketId: direct };
+  const seedStems = tokens(seed).map(stem);
+  const all = tokens(listing.title);
+  // One seed word says nothing ("budgeting"): only a seed of two or more words, all in the title, counts.
+  const holdsSeed = seedStems.length >= 2 && seedStems.every((s) => all.some((t) => stem(t) === s));
+  const words = all.filter((t) => !PRODUCT_WORDS.has(t) && !seedStems.includes(stem(t)));
+  let best: CompetitorMarket | null = null;
+  let bestShared = 0;
+  for (const m of markets) {
+    const hay = new Set(tokens([m.name, ...m.texts].join(" ")));
+    const shared = words.filter((t) => hay.has(t)).length;
+    if (shared > bestShared) {
+      best = m;
+      bestShared = shared;
+    }
+  }
+  if (best) return { relevant: true, marketId: best.id };
+  if (!holdsSeed) return { relevant: false, marketId: null };
+  const main = [...markets].sort((a, b) => b.signalIds.length - a.signalIds.length)[0];
+  return { relevant: true, marketId: main?.id ?? null };
+}
+
 // Stores whose pages are products. A `web` result from any other host is a discussion, not a competitor.
 const STORE_HOSTS = /(^|\.)(etsy\.com|gumroad\.com|payhip\.com|teacherspayteachers\.com|creativemarket\.com|amazon\.[a-z.]{2,6})$/;
 

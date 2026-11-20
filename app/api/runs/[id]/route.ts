@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { fetchRunCompleteness } from "@/lib/runs/completeness";
+import { workOfPlan } from "@/lib/runs/work";
 import { LIFECYCLE_STATES } from "@/lib/runs/types";
 import { ownsRun, resolveCaller } from "@/lib/quotas/guard";
 import type { LifecycleState, LifecycleTraceStep } from "@/lib/runs/types";
@@ -23,7 +24,7 @@ export async function GET(
   const supabase = createServiceSupabaseClient();
   const { data: run, error: runErr } = await supabase
     .from("research_runs")
-    .select("id, query, mode, status, started_at, completed_at, user_id")
+    .select("id, query, mode, status, started_at, completed_at, user_id, plan")
     .eq("id", id)
     .single();
 
@@ -90,5 +91,6 @@ export async function GET(
       trace,
     },
     completeness,
+    work: workOfPlan(run.plan),
   });
 }

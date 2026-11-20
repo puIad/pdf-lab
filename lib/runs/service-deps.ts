@@ -13,6 +13,7 @@ import type { ClusterSignal } from "../cluster/types.ts";
 import { writeEvidence } from "../evidence/writer.ts";
 import { createServerEvidenceDeps } from "../evidence/service-deps.ts";
 import { fetchRunCompleteness } from "./completeness.ts";
+import { mergeWork, workOfPlan } from "./work.ts";
 import { loadRunSignals, recordRunSignals } from "./run-signals.ts";
 import { isStoreUrl } from "../competition/map.ts";
 import { generate25Opportunities, ideaCandidates, OPPORTUNITY_TARGET, pickDistinctIdeas, type OpportunityMarketInput } from "../opportunities/index.ts";
@@ -459,5 +460,17 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
     },
 
     fetchCompleteness: (runId) => fetchRunCompleteness(supabase, runId),
+
+    recordRunWork: async (runId, patch) => {
+      const { data } = await supabase.from("research_runs").select("plan").eq("id", runId).single();
+      const plan = (data?.plan && typeof data.plan === "object" ? data.plan : {}) as Record<string, unknown>;
+      const work = mergeWork(workOfPlan(plan), patch);
+      // Tokens come from the ledger when its table exists and has rows for this run; otherwise unobserved.
+      const { data: rows, error: ledgerErr } = await supabase.from("ai_usage_ledger").select("total_tokens").eq("run_id", runId);
+      if (!ledgerErr && rows && rows.length > 0) work.tokens = rows.reduce((n, r) => n + Number(r.total_tokens ?? 0), 0);
+      const { error } = await supabase.from("research_runs").update({ plan: { ...plan, work } }).eq("id", runId);
+      if (error) console.error("Failed to store the run's work figures:", error.message);
+      return work;
+    },
   };
 }
