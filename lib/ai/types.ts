@@ -122,3 +122,22 @@ export function summarizeCostLog(entries: CostLogEntry[]): CostLogSummary {
     models: [...new Set(entries.map((e) => e.model))],
   };
 }
+
+/** Which key paid for a call: the person's own (`byok`) or the hosted quota (`hosted`). */
+export type KeySource = "byok" | "hosted";
+
+/** True when an upstream error says the key was refused (HTTP 401 or 403): revoked, expired or wrong. */
+export function isAuthFailure(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\bHTTP (401|403)\b/.test(msg);
+}
+
+/** One metered call, handed to the router's `onCall` hook (the usage ledger). */
+export interface MeteredCall {
+  provider: string;
+  model: string;
+  tier: TaskTier;
+  keySource: KeySource;
+  usage: CallUsage;
+  latencyMs: number;
+}

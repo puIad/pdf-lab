@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { enforceQuota } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { getRouter } from "@/lib/ai/index";
+import { routerForUser } from "@/lib/keys/server";
 import { clusterSignals } from "@/lib/cluster/index";
 import type { ClusterSignal } from "@/lib/cluster/index";
 import { cosineSimilarity } from "@/lib/cluster/similarity";
@@ -92,7 +92,7 @@ export async function POST(req: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
-  const router = getRouter();
+  const { router } = await routerForUser(null);
   const costEntries: CostLogEntry[] = [];
 
   // 1. Fetch signals that have a valid signal_analysis row

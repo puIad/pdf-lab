@@ -34,6 +34,7 @@ in `.env.example` (placeholders only), in client bundles, or in chat.**
 | `OPENROUTER_API_KEY` | Server-only | Not set yet (Phase 1 Part 1.3) | Same as above, for the OpenRouter provider path. |
 | Web-search API key (ONE of Brave / Serper / Tavily / Bing — DEC-002) | Server-only | Not set yet (Phase 1 Part 1.2) | Provider picked in Part 1.2; only the winner gets a key row here. |
 | `CRON_SECRET` | Server-only | Not set yet (Phase 4 Part 4.2) | Only if Vercel Cron / scheduler path is chosen in DEC-001. |
+| `KEY_VAULT_SECRET` | **Server-only, secret** | `.env.local` locally; Vercel dashboard → Production + Preview, **Sensitive** | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts people's BYOK provider keys (Part 5.2). Without it, key saving fails and every run uses the hosted quota. **Rotating it makes every stored key undecryptable** (they are skipped, people must save them again); there is no re-encryption path yet. |
 | `PDFLAB_UNOFFICIAL_AUTOCOMPLETE` | Server-only flag | `.env.local` ONLY. Never in Vercel. | `1` enables the local-only search-suggestion adapter (DEC-008, Part 3.5). Ignored when `NODE_ENV=production` or `VERCEL` is set; the source then reports `skipped`. |
 | `AUTOCOMPLETE_GEO` | Server-only, optional | `.env.local` | Country code for suggestions, default `us`. Amazon stays on the US marketplace. |
 | `WIKIMEDIA_USER_AGENT` | Server-only, optional | `.env.local` / Vercel | Overrides the default `PDF-Lab/0.1 (+<prod URL>)` sent to Wikimedia. Must name a contact URL; do not put a personal email here. |
