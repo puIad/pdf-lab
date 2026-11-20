@@ -40,6 +40,7 @@ in `.env.example` (placeholders only), in client bundles, or in chat.**
 | `AUTOCOMPLETE_GEO` | Server-only, optional | `.env.local` | Country code for suggestions, default `us`. Amazon stays on the US marketplace. |
 | `WIKIMEDIA_USER_AGENT` | Server-only, optional | `.env.local` / Vercel | Overrides the default `PDF-Lab/0.1 (+<prod URL>)` sent to Wikimedia. Must name a contact URL; do not put a personal email here. |
 | `METRICS_ADMIN_EMAILS` | Server-only, optional | `.env.local` / Vercel | Comma-separated emails that may open `/admin/metrics` (Part 6.2). Unset: only a local dev server can. Anyone else gets a 404. |
+| `BILLING_STUB_ENABLED` | Server-only, optional | `.env.local` / Vercel | `1` lets anyone signed in flip their own plan with the test-mode upgrade button in production (Part 5.3). No money moves. Unset in production: the stub answers 403. |
 
 ## Local setup
 
