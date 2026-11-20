@@ -16,6 +16,7 @@
 
 import type { MarketSignal, SourceAdapter } from "../sources/types.ts";
 import { SourceNotConfiguredError } from "../sources/types.ts";
+import { normalizeUrlKey } from "../takedown/takedown.ts";
 
 export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
@@ -30,6 +31,8 @@ export interface IngestSourceResult {
   normalized: number;
   inserted: number;
   duplicates: number;
+  /** Signals dropped because their URL is on the takedown blocklist (issue #76). */
+  blocked: number;
   error?: string;
 }
 
@@ -43,6 +46,7 @@ export interface IngestSummary {
     normalized: number;
     inserted: number;
     duplicates: number;
+    blocked: number;
   };
 }
 
@@ -75,6 +79,8 @@ export interface IngestDeps {
   resolveSourceId: (adapterKey: string) => Promise<string | null>;
   /** Upsert rows; returns the count actually INSERTED (DB ignores conflicts). */
   upsertSignals: (rows: SignalRow[]) => Promise<number>;
+  /** Which of these normalized URL keys are blocked (takedown list). Absent = nothing is blocked. */
+  blockedUrlKeys?: (keys: string[]) => Promise<Set<string>>;
 }
 
 /** Receives each source's normalized signals once they are stored (Part 3.6 quick ideas). */
@@ -95,11 +101,20 @@ async function ingestOne(
     normalized: 0,
     inserted: 0,
     duplicates: 0,
+    blocked: 0,
   };
   try {
     const raw = await adapter.collect({ query, limit, ...(geo ? { geo } : {}) });
     const normalized: MarketSignal[] = [];
     for (const item of raw) normalized.push(adapter.normalize(item));
+    let kept = normalized;
+    if (deps.blockedUrlKeys) {
+      const keyOf = (s: MarketSignal) => normalizeUrlKey(s.url) ?? normalizeUrlKey(s.source_id);
+      const blocked = await deps.blockedUrlKeys(
+        normalized.map(keyOf).filter((k): k is string => k !== null),
+      );
+      if (blocked.size > 0) kept = normalized.filter((s) => !blocked.has(keyOf(s) ?? ""));
+    }
     const sourceUuid = await deps.resolveSourceId(adapter.key);
     if (!sourceUuid) {
       return {
@@ -111,19 +126,20 @@ async function ingestOne(
       };
     }
     const inserted =
-      normalized.length > 0
+      kept.length > 0
         ? await deps.upsertSignals(
-            normalized.map((s) => toSignalRow(sourceUuid, s)),
+            kept.map((s) => toSignalRow(sourceUuid, s)),
           )
         : 0;
-    sink?.(adapter.key, normalized);
+    sink?.(adapter.key, kept);
     return {
       ...base,
       status: "ok",
       collected: raw.length,
       normalized: normalized.length,
       inserted,
-      duplicates: normalized.length - inserted,
+      duplicates: kept.length - inserted,
+      blocked: normalized.length - kept.length,
     };
   } catch (err) {
     if (err instanceof SourceNotConfiguredError) {
@@ -164,8 +180,9 @@ export async function runIngest(
       normalized: acc.normalized + s.normalized,
       inserted: acc.inserted + s.inserted,
       duplicates: acc.duplicates + s.duplicates,
+      blocked: acc.blocked + s.blocked,
     }),
-    { collected: 0, normalized: 0, inserted: 0, duplicates: 0 },
+    { collected: 0, normalized: 0, inserted: 0, duplicates: 0, blocked: 0 },
   );
   return { query, limit, ingestedAt: new Date().toISOString(), sources, totals };
 }

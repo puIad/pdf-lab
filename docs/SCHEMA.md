@@ -214,11 +214,35 @@ create table watchlists (
 - Migrations: `supabase/migrations/20261116000010_watchlists.sql`,
   `20261116000011_atomic_limits.sql`.
 
+## Takedown blocklist (issue #76)
+
+```sql
+create table takedowns (
+  url_key text primary key,   -- normalized URL: no scheme, no www, no fragment, no trailing slash,
+                              -- no utm_*/fbclid/gclid/ref params, remaining params sorted
+  url text not null,          -- the URL as given
+  reason text,
+  created_at timestamptz not null default now()
+);
+```
+
+- Service role only (RLS on, no grant to `anon` or `authenticated`). The key is built by
+  `normalizeUrlKey` in `lib/takedown/takedown.ts`; a Google redirect (`google.com/url?q=`) keys as
+  its target.
+- Ingest (`runIngest`, so the competition check too) drops any signal whose URL, or whose source id
+  when that is a URL, is blocked, before storing and before the quick-ideas and check sinks see it.
+  The summary counts them as `blocked`.
+- Add an entry and delete what is stored: `node --env-file=.env.local scripts/takedown.ts <url> [reason]`.
+  It blocks first, then deletes the `signals`, `evidence` and `competitors` rows whose URL has the
+  same key. Rows linked to a deleted signal (`signal_analysis`, `market_signals`, `run_signals`)
+  cascade. Counts per table are printed as JSON.
+- Migration: `supabase/migrations/20261120000017_takedowns.sql`.
+
 ## RLS (Supabase)
 
 - Public read: `markets`, `opportunities`, `competitors`, `evidence`, `sources` (anon can
   browse explorer within free-tier limits enforced app-side).
-- Private: `users` (owner only), `watchlists` (owner only, Part 4.1), `research_runs` + `signals`/`signal_analysis`/
+- Private: `takedowns` (service role only), `users` (owner only), `watchlists` (owner only, Part 4.1), `research_runs` + `signals`/`signal_analysis`/
   `market_signals`/`run_signals` (owner's runs + linked rows, or service-role only in MVP; tighten in Phase 5).
 - Enforce with policies + tests in Phase 0 Part 0.2; service-role key NEVER ships to client.
 

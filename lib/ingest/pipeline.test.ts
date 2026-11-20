@@ -8,6 +8,7 @@ import { runIngest, toSignalRow } from "./pipeline.ts";
 import type { IngestDeps, SignalRow } from "./pipeline.ts";
 import type { MarketSignal, SourceAdapter } from "../sources/types.ts";
 import { SourceNotConfiguredError } from "../sources/types.ts";
+import { normalizeUrlKey } from "../takedown/takedown.ts";
 
 function signal(source: string, externalId: string): MarketSignal {
   return {
@@ -82,7 +83,7 @@ describe("runIngest", () => {
     assert.equal(summary.query, "pc troubleshooting");
     assert.equal(summary.sources.length, 2);
     assert.ok(summary.sources.every((s) => s.status === "ok"));
-    assert.deepEqual(summary.totals, { collected: 3, normalized: 3, inserted: 3, duplicates: 0 });
+    assert.deepEqual(summary.totals, { collected: 3, normalized: 3, inserted: 3, duplicates: 0, blocked: 0 });
     assert.equal(deps.rows.length, 3);
   });
 
@@ -91,7 +92,7 @@ describe("runIngest", () => {
     const first = await runIngest({ query: "q", limit: 5 }, deps);
     assert.equal(first.totals.inserted, 1);
     const second = await runIngest({ query: "q", limit: 5 }, deps);
-    assert.deepEqual(second.totals, { collected: 1, normalized: 1, inserted: 0, duplicates: 1 });
+    assert.deepEqual(second.totals, { collected: 1, normalized: 1, inserted: 0, duplicates: 1, blocked: 0 });
     assert.equal(deps.rows.length, 1);
   });
 
@@ -162,5 +163,19 @@ describe("toSignalRow", () => {
       published_at: null,
       engagement: {},
     });
+  });
+
+  it("skips a blocked URL, counts it, and never stores it on a second collect (issue #76)", async () => {
+    const deps = fakeDeps([fakeAdapter("alpha", [{ externalId: "a1" }, { externalId: "a2" }])]);
+    // The blocklist holds a2 under a different spelling (www, http, trailing slash, tracking).
+    const blocked = new Set([normalizeUrlKey("http://www.EXAMPLE.com/item/a2/?utm_source=x#top")!]);
+    deps.blockedUrlKeys = async (keys) => new Set(keys.filter((k) => blocked.has(k)));
+    const seen: string[] = [];
+    const first = await runIngest({ query: "q" }, deps, (_k, signals) => seen.push(...signals.map((s) => s.source_id)));
+    const second = await runIngest({ query: "q" }, deps);
+    assert.deepEqual(deps.rows.map((r) => r.external_id), ["a1"]);
+    assert.deepEqual(seen, ["a1"]);
+    assert.deepEqual(first.totals, { collected: 2, normalized: 2, inserted: 1, duplicates: 0, blocked: 1 });
+    assert.deepEqual(second.totals, { collected: 2, normalized: 2, inserted: 0, duplicates: 1, blocked: 1 });
   });
 });
