@@ -31,3 +31,24 @@ grant execute on function ledger_run_costs(timestamptz) to service_role;
 
 -- ledger_run_costs filters on created_at alone; the existing (user_id, created_at) index cannot serve it.
 create index on ai_usage_ledger (created_at);
+
+-- The plan flip and its log row are one transaction: an RPC call runs as one statement's transaction,
+-- so a failed insert rolls the users update back and no unlogged plan change survives a retry.
+-- Service role only, like take_usage. Returns the plan_changes id.
+create function public.stub_change_plan(p_user uuid, p_from text, p_to text)
+  returns uuid
+  language plpgsql set search_path = '' as $$
+declare
+  v_id uuid;
+begin
+  update public.users set plan = p_to where id = p_user;
+  if not found then
+    raise exception 'stub_change_plan: no user %', p_user;
+  end if;
+  insert into public.plan_changes (user_id, from_plan, to_plan, source, charged_cents)
+    values (p_user, p_from, p_to, 'stub', 0)
+    returning id into v_id;
+  return v_id;
+end $$;
+revoke execute on function public.stub_change_plan(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.stub_change_plan(uuid, text, text) to service_role;

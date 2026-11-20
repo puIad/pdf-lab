@@ -12,12 +12,9 @@ export function billingStore(): BillingStore {
       return (data.plan === "premium" ? "premium" : "free") as PlanName;
     },
     async apply(c) {
-      const { error: e1 } = await db.from("users").update({ plan: c.toPlan }).eq("id", c.userId);
-      if (e1) throw new Error(e1.message);
-      const { error: e2 } = await db
-        .from("plan_changes")
-        .insert({ user_id: c.userId, from_plan: c.fromPlan, to_plan: c.toPlan, source: c.source, charged_cents: c.chargedCents });
-      if (e2) throw new Error(e2.message);
+      // One transaction in stub_change_plan (migration 16): the plan flip and its log row commit together.
+      const { error } = await db.rpc("stub_change_plan", { p_user: c.userId, p_from: c.fromPlan, p_to: c.toPlan });
+      if (error) throw new Error(error.message);
     },
   };
 }
