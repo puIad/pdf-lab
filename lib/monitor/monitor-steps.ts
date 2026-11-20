@@ -4,6 +4,8 @@
 import { createServiceSupabaseClient } from "../db/client.ts";
 import { loadRunSignals } from "../runs/run-signals.ts";
 import { afterRun, buildChangeReport, marketJobKey, normalizeSeed } from "./diff.ts";
+import { marketAlerts } from "../alerts/alerts.ts";
+import { supabaseAlertStore } from "../alerts/supabase-store.ts";
 import { supabaseMonitorStore } from "./supabase-store.ts";
 import type { ChangeReport } from "./types.ts";
 
@@ -42,6 +44,12 @@ export async function finishMonitorStep(input: { runId: string; seed: string; st
   });
   if (input.extractionError) report.note = [report.note, `Extraction did not finish: ${input.extractionError}`].filter(Boolean).join(" ");
   await store.saveReport(report);
+  try {
+    const alerts = supabaseAlertStore();
+    await alerts.addAlerts(marketAlerts(await alerts.marketWatchers(input.seed), report));
+  } catch (err) {
+    console.error("alerts: could not write market alerts", err); // never fails the run (migration 20 may not be applied yet)
+  }
   const { error } = await db.from("research_runs").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", input.runId);
   if (error) throw new Error(`could not complete the run: ${error.message}`);
   return report;

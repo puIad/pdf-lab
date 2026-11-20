@@ -11,6 +11,8 @@ export const EXPORT_TABLES = {
   research_runs: "id, query, mode, status, started_at, completed_at",
   ai_usage_ledger: "run_id, provider, model, tier, key_source, total_tokens, estimated_cost_usd, created_at",
   plan_changes: "from_plan, to_plan, source, charged_cents, created_at",
+  alert_settings: "watch_id, threshold, muted, updated_at",
+  alerts: "kind, seed, region, title, detail, created_at, read_at",
   // Key metadata only. Never `ciphertext`: the export must not carry key material, even encrypted.
   user_provider_keys: "provider, last4, options, status, created_at, rotated_at",
 } as const;

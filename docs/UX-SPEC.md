@@ -67,7 +67,10 @@ positioning, search keywords, customer language, evidence sources.
 ## Watchlist / monitoring / alerts / export (PRD §43–§46)
 
 - Watchlist (Phase 4.1) → scheduled re-research + change reports (4.2) → in-app alerts
-  first, email/browser optional (4.3).
+  first (4.3); email/browser stay off until after the MVP.
+- Built in 4.3: `/alerts` shows the weekly digest (N new ideas this week; each seed line lists its phrases with first-seen dates,
+  each market line its re-run dates), the alert feed (unread badge, Mark all read, each alert with its dated evidence and a
+  link to the scan or market) and per-watch threshold and Mute controls. Linked from `/watchlist`.
 - Built in 4.1: `/watchlist` ("My watchlist") groups Markets, Tracked seeds and Saved ideas, each
   row with Remove, and shows the plan's cap. Rows are added with Watch market on a market report,
   Track this seed on a scan, and Save on an idea card. The header links to it on the right. A
