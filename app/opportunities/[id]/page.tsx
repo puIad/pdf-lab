@@ -5,7 +5,9 @@
 
 import React from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { resolveCaller } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import {
   ArrowLeft,
@@ -32,6 +34,8 @@ import {
 } from "@/components/evidence";
 import { parseEvidenceClaim, type EvidenceRow } from "@/lib/evidence/types";
 import { NOT_OBSERVED, platformCounts } from "@/lib/report/observed";
+import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
+import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
 import { ideaOnlyNote, isIdeaOnly } from "@/lib/opportunities/from-ideas";
 
 export const dynamic = "force-dynamic";
@@ -64,7 +68,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
       id, market_id, title, target_audience, problem, solution, format,
       price_range, opportunity_score, confidence, created_at, matching_signals, market_signal_count,
       markets (
-        id, name, trend, demand_score, pdf_fit_score
+        id, run_id, name, trend, demand_score, pdf_fit_score
       )
     `)
     .eq("id", id)
@@ -88,6 +92,8 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   ]);
 
   const market = Array.isArray(opp.markets) ? opp.markets[0] : opp.markets;
+  const caller = await resolveCaller(await headers()).catch(() => null);
+  const nicheTrend = await fetchNicheTrendOfRun(supabase, (market?.run_id as string | null | undefined) ?? null, caller);
   const directEvidence = (evidenceRows ?? []) as EvidenceRow[];
   const marketRows = (marketEvidence ?? []) as EvidenceRow[];
 
@@ -273,6 +279,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
               ) : (
                 <p>No trend evidence row is stored for this market.</p>
               )}
+              {nicheTrend && <NicheTrendNote trend={nicheTrend} />}
             </CardContent>
           </Card>
         </section>

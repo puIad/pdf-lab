@@ -35,6 +35,8 @@ import { calculateLandscape, listingFormat, mineReviewsAndGaps, type CompetitorP
 import { parsePrice } from "@/lib/sources/marketplace-helper";
 import { QualityPanel } from "@/components/quality-panel";
 import { calculateCompleteness } from "@/lib/runs/completeness";
+import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
+import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
 import {
   marketCompletenessCounts,
   marketQcRules,
@@ -61,13 +63,15 @@ export default async function MarketPage(props: MarketPageProps) {
   // 1. Fetch market details
   const { data: market, error: mErr } = await supabase
     .from("markets")
-    .select("id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at")
+    .select("id, run_id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at")
     .eq("id", id)
     .single();
 
   if (mErr || !market) {
     notFound();
   }
+  const caller = await resolveCaller(await headers()).catch(() => null);
+  const nicheTrend = await fetchNicheTrendOfRun(supabase, market.run_id as string | null, caller);
 
   // 2. Fetch linked signals & analysis
   const { data: marketSignals } = await supabase
@@ -181,9 +185,7 @@ export default async function MarketPage(props: MarketPageProps) {
   const completeness = calculateCompleteness(counts);
 
   // 7. Is this market on the visitor's watchlist (Part 4.1)? Signed out, or unknown: shown as not saved.
-  const saved = await resolveCaller(await headers())
-    .then((caller) => watchKeys(caller.userId))
-    .catch((): string[] => []);
+  const saved = await (caller ? watchKeys(caller.userId) : Promise.resolve<string[]>([])).catch((): string[] => []);
   const watched = saved.includes(watchKey("market", market.id));
 
   return (
@@ -241,6 +243,8 @@ export default async function MarketPage(props: MarketPageProps) {
             </Badge>
             <WatchToggle watch={{ kind: "market", ref: market.id }} initialWatched={watched} on="Watching" off="Watch market" size="xs" />
           </div>
+
+          {nicheTrend && <NicheTrendNote trend={nicheTrend} />}
 
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             {market.name}

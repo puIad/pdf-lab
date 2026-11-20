@@ -20,14 +20,19 @@ export interface RunViewer {
   userId: string | null;
 }
 
+/** The one visibility rule for a run's seed: the owner sees it, the server key and a dev server see all, a signed-out visitor none. */
+export function ownsRun(viewer: RunViewer | null, ownerId: string | null): boolean {
+  if (!viewer || viewer.plan === "anon") return false;
+  return !viewer.userId || viewer.userId === ownerId;
+}
+
 /**
  * The runs a viewer may see listed by seed. A seed is what someone searched for, so a person
  * sees their own runs, the server key and a dev server see all, and a signed-out visitor none
  * (Part 5.1, issue #39). The owner's id is left out of the result.
  */
 export function listedRuns(runs: CompletedRun[], viewer: RunViewer | null): Omit<CompletedRun, "userId">[] {
-  if (!viewer || viewer.plan === "anon") return [];
-  return runs.filter((r) => !viewer.userId || r.userId === viewer.userId).map((r) => ({ id: r.id, query: r.query, completedAt: r.completedAt, latest: r.latest }));
+  return runs.filter((r) => ownsRun(viewer, r.userId)).map((r) => ({ id: r.id, query: r.query, completedAt: r.completedAt, latest: r.latest }));
 }
 
 export const seedKey = (query: string): string => query.trim().toLowerCase();
