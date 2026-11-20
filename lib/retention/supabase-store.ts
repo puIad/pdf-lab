@@ -17,14 +17,14 @@ export function supabaseRetentionStore(): RetentionStore {
       if (!id) return [];
       const { data, error } = await db
         .from("signals")
-        .select("id, external_id, engagement")
+        .select("id, external_id, url, engagement")
         .eq("source_id", id)
         .lt("collected_at", cutoffIso)
         .not("external_id", "is", null)
         .order("collected_at", { ascending: true })
         .limit(limit);
       if (error) throw error;
-      return (data ?? []) as { id: string; external_id: string; engagement: Record<string, unknown> }[];
+      return (data ?? []) as { id: string; external_id: string; url: string; engagement: Record<string, unknown> }[];
     },
     async removeStaleEvidence(cutoffIso) {
       const id = await source();
@@ -35,6 +35,13 @@ export function supabaseRetentionStore(): RetentionStore {
         .eq("source_id", id)
         .lt("created_at", cutoffIso)
         .select("id");
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+    async removeEvidenceByUrl(urls) {
+      const id = await source();
+      if (!id || urls.length === 0) return 0;
+      const { data, error } = await db.from("evidence").delete().eq("source_id", id).in("url", urls).select("id");
       if (error) throw error;
       return data?.length ?? 0;
     },

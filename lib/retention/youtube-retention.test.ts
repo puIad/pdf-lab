@@ -6,6 +6,8 @@ import { YouTubeAdapter } from "../sources/youtube/youtube-adapter.ts";
 const NOW = Date.parse("2026-11-20T00:00:00Z");
 const day = 86_400_000;
 
+const evidenceUrls = new Set(['u/a', 'u/b', 'u/c']);
+
 function fakeStore(rows: Array<StaleSignal & { collected_at: number; content: string }>) {
   const store: RetentionStore = {
     async listStale(cutoffIso, limit) {
@@ -14,6 +16,11 @@ function fakeStore(rows: Array<StaleSignal & { collected_at: number; content: st
     },
     async removeStaleEvidence() {
       return 3;
+    },
+    async removeEvidenceByUrl(urls) {
+      let n = 0;
+      for (const u of urls) if (evidenceUrls.delete(u)) n++;
+      return n;
     },
     async update(id, patch) {
       const r = rows.find((x) => x.id === id)!;
@@ -29,9 +36,9 @@ function fakeStore(rows: Array<StaleSignal & { collected_at: number; content: st
 }
 
 const seed = () => [
-  { id: "a", external_id: "yt_comment_a", engagement: { upvotes: 1, comments: 4 }, collected_at: NOW - 31 * day, content: "old a" },
-  { id: "b", external_id: "yt_comment_b", engagement: { upvotes: 2, comments: 0 }, collected_at: NOW - 45 * day, content: "old b" },
-  { id: "c", external_id: "yt_comment_c", engagement: {}, collected_at: NOW - 5 * day, content: "fresh c" },
+  { id: "a", external_id: "yt_comment_a", url: "u/a", engagement: { upvotes: 1, comments: 4 }, collected_at: NOW - 31 * day, content: "old a" },
+  { id: "b", external_id: "yt_comment_b", url: "u/b", engagement: { upvotes: 2, comments: 0 }, collected_at: NOW - 45 * day, content: "old b" },
+  { id: "c", external_id: "yt_comment_c", url: "u/c", engagement: {}, collected_at: NOW - 5 * day, content: "fresh c" },
 ];
 
 function apiReturning(ids: string[], status = 200) {
@@ -49,7 +56,8 @@ test("stale comments are refreshed or deleted; fresh ones stay; none older than 
   const rows = seed();
   const adapter = new YouTubeAdapter({ apiKey: "k", minIntervalMs: 0, nowFn: () => NOW, fetchFn: apiReturning(["a"]) });
   const res = await runYouTubeRetention({ store: fakeStore(rows), refresher: adapter, now: () => NOW });
-  assert.equal(res.evidenceDeleted, 3);
+  assert.equal(res.evidenceDeleted, 3 + 2); // sweep + evidence quoting refreshed a and deleted b
+  assert.deepEqual([...evidenceUrls], ["u/c"]); // fresh signal's evidence stays
   assert.deepEqual({ examined: res.examined, refreshed: res.refreshed, deleted: res.deleted }, { examined: 2, refreshed: 1, deleted: 1 });
   assert.deepEqual(rows.map((r) => r.id).sort(), ["a", "c"]);
   const a = rows.find((r) => r.id === "a")!;

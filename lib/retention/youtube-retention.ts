@@ -13,6 +13,7 @@ export const MAX_BATCHES = 20; // per run; leftovers are picked up by the next d
 export interface StaleSignal {
   id: string;
   external_id: string;
+  url: string;
   engagement: Record<string, unknown>;
 }
 
@@ -28,6 +29,8 @@ export interface RetentionStore {
   listStale(cutoffIso: string, limit: number): Promise<StaleSignal[]>;
   /** Evidence copies of YouTube text (excerpt, claim) have no FK to signals; delete those older than the cutoff. */
   removeStaleEvidence(cutoffIso: string): Promise<number>;
+  /** Evidence quoting these signals (matched by url) goes with them, whatever its own age. */
+  removeEvidenceByUrl(urls: string[]): Promise<number>;
   update(id: string, patch: SignalRefresh): Promise<void>;
   remove(ids: string[]): Promise<void>;
 }
@@ -95,6 +98,8 @@ export async function runYouTubeRetention(opts: {
       for (const row of byExternal.values()) toDelete.push(row.id);
       result.deletedOnFailure += toDelete.length;
     }
+    // refreshed rows too: evidence may hold the pre-refresh text
+    result.evidenceDeleted += await opts.store.removeEvidenceByUrl(rows.map((r) => r.url));
     if (toDelete.length) await opts.store.remove(toDelete);
     result.deleted += toDelete.length;
   }
