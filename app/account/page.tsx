@@ -8,6 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataControls } from "./data-controls";
 import { resolveCaller, usageStore } from "@/lib/quotas/guard";
 import { KIND_LABEL, quotaState, USAGE_KINDS, windowStart, LIMITS, type QuotaState } from "@/lib/quotas/quotas";
 
@@ -128,6 +129,8 @@ export default async function AccountPage() {
             </CardContent>
           </Card>
         )}
+
+        {caller.userId && <DataControls />}
       </div>
     </main>
   );
