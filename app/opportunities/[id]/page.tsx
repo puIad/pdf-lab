@@ -36,6 +36,7 @@ import { parseEvidenceClaim, type EvidenceRow } from "@/lib/evidence/types";
 import { NOT_OBSERVED, platformCounts } from "@/lib/report/observed";
 import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
 import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
+import { ideaOnlyNote, isIdeaOnly } from "@/lib/opportunities/from-ideas";
 
 export const dynamic = "force-dynamic";
 
@@ -194,6 +195,9 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
               <span className="font-bold text-foreground font-mono">{score === null ? NOT_OBSERVED : `${score} / 100`}</span>
             </div>
             <div>Direct Citations: <span className="font-bold text-foreground font-mono">{directEvidence.length} verified rows</span></div>
+            {isIdeaOnly(directEvidence.map((e) => e.claim)) && (
+              <div className="basis-full font-medium text-amber-600">{ideaOnlyNote()}</div>
+            )}
             {opp.matching_signals != null && opp.market_signal_count != null && (
               <div>
                 Demand:{" "}

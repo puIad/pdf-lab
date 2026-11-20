@@ -178,7 +178,7 @@ export interface OrchestratorDeps {
   generateOpportunities: (markets: OrchestratorMarketItem[], seed: string) => Promise<Array<{
     opportunity: OrchestratorOpportunityItem;
     evidence: EvidenceInput[];
-  }> & { droppedUnsourced?: number; ideasInNoMarket?: number }>;
+  }> & { droppedUnsourced?: number; ideasInNoMarket?: number; mergedSimilar?: number }>;
   saveOpportunities: (items: OrchestratorOpportunityItem[], runId: string) => Promise<Array<{ id: string; title: string }>>;
   observeCompetition: (signals: StoredSignalForRun[]) => Promise<OrchestratorCompetitorItem[]>;
   saveCompetitors?: (competitors: Array<{
@@ -589,11 +589,13 @@ async function finishRun(
         opportunitiesFromIdeas: fromIdeas,
         opportunitiesDroppedUnsourced: droppedUnsourced,
         ideasInNoMarket: generatedPairs.ideasInNoMarket ?? 0,
+        opportunitiesMergedSimilar: generatedPairs.mergedSimilar ?? 0,
         evidenceCreated: totalEvidenceCreated,
       },
       message:
         `Saved ${savedOppsCount} of ${OPPORTUNITY_TARGET} target opportunities` +
         (savedOppsCount < OPPORTUNITY_TARGET ? ", limited by evidence" : "") +
+        (generatedPairs.mergedSimilar ? `; ${generatedPairs.mergedSimilar} merged into another with the same audience and problem` : "") +
         (generatedPairs.ideasInNoMarket ? `; ${generatedPairs.ideasInNoMarket} quick ideas fit no market and were left out` : "") +
         `; assembling research completeness panel and reconciling database counts`,
     });
