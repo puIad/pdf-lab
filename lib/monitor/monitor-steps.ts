@@ -3,7 +3,7 @@
 
 import { createServiceSupabaseClient } from "../db/client.ts";
 import { loadRunSignals } from "../runs/run-signals.ts";
-import { afterRun, buildChangeReport, marketJobKey } from "./diff.ts";
+import { afterRun, buildChangeReport, marketJobKey, normalizeSeed } from "./diff.ts";
 import { supabaseMonitorStore } from "./supabase-store.ts";
 import type { ChangeReport } from "./types.ts";
 
@@ -18,11 +18,12 @@ export async function findBaseline(runId: string, seed: string, startedAt: strin
     .eq("status", "completed")
     .in("mode", ["deep", "monitor"])
     .lt("started_at", startedAt)
+    .neq("id", runId)
+    .ilike("query", normalizeSeed(seed).replace(/[\\%_]/g, "\\$&")) // no wildcard left: a case-insensitive equality
     .order("started_at", { ascending: false })
-    .limit(50);
+    .limit(1);
   if (error) throw new Error(`baseline lookup failed: ${error.message}`);
-  const key = seed.trim().toLowerCase();
-  const row = (data ?? []).find((r) => r.id !== runId && String(r.query).trim().toLowerCase() === key);
+  const row = data?.[0];
   return row ? { runId: row.id as string, at: (row.completed_at ?? row.started_at) as string } : null;
 }
 

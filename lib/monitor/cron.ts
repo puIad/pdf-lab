@@ -40,23 +40,22 @@ export async function runMonitorCron(deps: CronDeps): Promise<CronResult> {
   const result: CronResult = { seedScans: [], marketRuns: [], skipped: [] };
   const targets = await store.watchTargets();
 
-  const due = async <T>(items: T[], keyOf: (t: T) => string, max: number): Promise<T[]> => {
+  const due = async <T>(items: T[], keyOf: (t: T) => string, max: number): Promise<Array<{ t: T; job: Awaited<ReturnType<typeof store.getJob>> }>> => {
     const rows = await Promise.all(items.map(async (t) => ({ t, job: await store.getJob(keyOf(t)) })));
     const ready = rows.filter((r) => isDue(r.job, clock(), deps.force));
     for (const r of rows) if (!ready.includes(r)) result.skipped.push({ key: keyOf(r.t), reason: "not due" });
     // Oldest success first (never-run first): a missed day is caught up in order, without a burst.
     ready.sort((a, b) => (a.job?.lastOkAt ?? "").localeCompare(b.job?.lastOkAt ?? ""));
     for (const r of ready.slice(max)) result.skipped.push({ key: keyOf(r.t), reason: "budget" });
-    return ready.slice(0, max).map((r) => r.t);
+    return ready.slice(0, max);
   };
 
-  for (const { seed, region } of await due(targets.seeds, (s) => seedJobKey(s.seed, s.region), MAX_SEED_SCANS)) {
+  for (const { t: { seed, region }, job } of await due(targets.seeds, (s) => seedJobKey(s.seed, s.region), MAX_SEED_SCANS)) {
     const key = seedJobKey(seed, region);
     if (Date.now() - started > budget) {
       result.skipped.push({ key, reason: "budget" });
       continue;
     }
-    const job = await store.getJob(key);
     try {
       const signals = await deps.scan(seed, region);
       const ideas = buildIdeas(seed, signals);
@@ -73,9 +72,8 @@ export async function runMonitorCron(deps: CronDeps): Promise<CronResult> {
     }
   }
 
-  for (const seed of await due(targets.marketSeeds, marketJobKey, MAX_MARKET_RUNS)) {
+  for (const { t: seed, job } of await due(targets.marketSeeds, marketJobKey, MAX_MARKET_RUNS)) {
     const key = marketJobKey(seed);
-    const job = await store.getJob(key);
     try {
       const runId = await deps.startMarketRun(seed);
       // Counted as ok at start so the next call does not start it twice; a failed workflow reports its own failure.

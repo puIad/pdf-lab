@@ -21,7 +21,7 @@ import { recordEventSafely } from "@/lib/analytics/store";
 import { listWatches } from "@/lib/watchlist/store";
 import { loadMonitorView, type MarketView, type SeedView } from "@/lib/monitor/view";
 import { supabaseMonitorStore } from "@/lib/monitor/supabase-store";
-import { COUNT_KEYS } from "@/lib/monitor/diff";
+import { COUNT_KEYS, followedMarketIds } from "@/lib/monitor/diff";
 import type { WatchItem } from "@/lib/watchlist/watchlist";
 
 export const dynamic = "force-dynamic";
@@ -93,13 +93,14 @@ export default async function WatchlistPage() {
     await recordEventSafely(createServiceSupabaseClient(), returnEvent(caller.userId, new Date()));
     try {
       items = await listWatches(caller.userId);
-      markets = await loadMarkets(items.filter((i) => i.kind === "market").map((i) => i.ref));
       // The monitoring tables come with migration 19: before it is applied the rows show without changes.
       try {
         ({ seeds: seedViews, markets: marketViews } = await loadMonitorView(supabaseMonitorStore(), items));
       } catch (err) {
         console.error("Could not read monitoring data:", err);
       }
+      // After the monitor view: the followed markets (newest run of each seed) are loaded too.
+      markets = await loadMarkets([...items.filter((i) => i.kind === "market").map((i) => i.ref), ...followedMarketIds(marketViews)]);
     } catch (err) {
       loadError = err instanceof Error ? err.message : String(err);
     }

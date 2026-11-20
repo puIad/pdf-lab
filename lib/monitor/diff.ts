@@ -122,12 +122,20 @@ export function diffSnapshots(earlier: SeedSnapshot[], current: SeedSnapshot): P
   return changes;
 }
 
+/** Ids of the markets the watched markets currently follow (the same-named market of the seed's newest run). */
+export const followedMarketIds = (views: Record<string, { market: { id: string } | null }>): string[] =>
+  Object.values(views).flatMap((v) => (v.market ? [v.market.id] : []));
+
 /** Phrases whose first appearance is in a snapshot of the last 7 days that is not the seed's first. Dated. */
 export function newThisWeek(snapshots: SeedSnapshot[], now: Date = new Date()): { count: number; since: string; phrases: Array<{ phrase: string; firstSeen: string }> } {
   const since = new Date(now.getTime() - NEW_WINDOW_DAYS * 86_400_000).toISOString();
+  const seen = new Set<string>();
   const first = new Map<string, string>();
   snapshots.forEach((s, i) => {
-    for (const p of s.phrases) if (i > 0 && !snapshots.slice(0, i).some((e) => e.phrases.some((q) => q.phrase === p.phrase)) && !first.has(p.phrase)) first.set(p.phrase, s.scannedAt);
+    for (const { phrase } of s.phrases) {
+      if (i > 0 && !seen.has(phrase)) first.set(phrase, s.scannedAt);
+      seen.add(phrase);
+    }
   });
   const phrases = [...first].filter(([, at]) => at >= since).map(([phrase, firstSeen]) => ({ phrase, firstSeen }));
   return { count: phrases.length, since, phrases };

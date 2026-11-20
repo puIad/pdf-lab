@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { MarketSignal } from "../sources/types.ts";
 import type { StoredSignalForRun } from "../runs/orchestrator.ts";
-import { afterRun, buildChangeReport, countsOf, diffSnapshots, isDue, newThisWeek, reconciles, seedJobKey, marketJobKey } from "./diff.ts";
+import { afterRun, buildChangeReport, countsOf, diffSnapshots, followedMarketIds, isDue, newThisWeek, reconciles, seedJobKey, marketJobKey } from "./diff.ts";
 import { runMonitorCron } from "./cron.ts";
 import { followMarket } from "./follow.ts";
 import type { ChangeReport, Job, MonitorStore, SeedSnapshot } from "./types.ts";
@@ -151,4 +151,11 @@ test("a watched market follows its seed to the newest run by name", () => {
   assert.equal(followMarket(watched, "r1", [])?.id, "m1");
   assert.equal(followMarket(watched, "r2", [latest[1]]), null);
   assert.equal(followMarket({ ...watched, runId: null }, "r2", latest)?.id, "m1");
+});
+
+test("a phrase that reappears is new only once; followed market ids come from the views", () => {
+  const snap = (at: string, phrases: string[]): SeedSnapshot => ({ seed: "x", region: "us", scannedAt: at, phrases: phrases.map((phrase) => ({ phrase, demand: 10, opportunity: 10, trend: null })) });
+  const w = newThisWeek([snap("2026-11-10T00:00:00Z", ["a"]), snap("2026-11-18T00:00:00Z", ["a", "b"]), snap("2026-11-19T00:00:00Z", ["a"]), snap("2026-11-20T00:00:00Z", ["a", "b"])], new Date("2026-11-21T00:00:00Z"));
+  assert.deepEqual(w.phrases, [{ phrase: "b", firstSeen: "2026-11-18T00:00:00Z" }]);
+  assert.deepEqual(followedMarketIds({ w1: { market: { id: "m2" } }, w2: { market: null } }), ["m2"]);
 });
