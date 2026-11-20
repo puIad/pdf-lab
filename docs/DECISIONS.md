@@ -43,6 +43,13 @@ are in git history (`README.md`, "History").
   shape (unlimited wall time per step, 30 s to 5 min of CPU per step, retried and persisted steps;
   the Workers Free plan's 10 ms CPU and 50 subrequests do not). Open risk: `google-trends-api` needs
   Node's `https` under `nodejs_compat`. Add it as option (d) when 4.2 decides.
+- Verified 2026-11-20 (issue #24, Context7 and vercel.com/docs/workflows/pricing, /functions/limitations,
+  /cron-jobs/usage-and-pricing): no mismatch. The Workflow SDK is `workflow` (5.6.1 installed). A step's
+  maximum run time is the plan's function limit (Hobby 300 s, Pro and Enterprise 800 s), a workflow run
+  has no overall limit, so a 5 to 18 minute Deep run fits as many steps. Deep runs are therefore cut into
+  steps of at most one slice of work (collect; extraction in slices of 20 signals, 200 s at 10 s a signal;
+  finish). Hobby cron jobs run once a day, which only matters for the schedules of Part 4.2 (#26).
+  The cloud session's DEC-017 for this issue was dropped: its question (connect Vercel) is answered.
 - Interim (user, 2026-10-25): Deep runs stay local. Production does not run them until 4.2; the
   `x-api-key` guard on Deep mode stays, and no NVIDIA key goes to Vercel for now.
 

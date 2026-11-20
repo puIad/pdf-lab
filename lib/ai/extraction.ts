@@ -177,6 +177,8 @@ export interface ExtractionJobOptions {
   providerName?: string;
   /** With `providerName`: the exact model to use (the saved extraction mode, Part 6.9). */
   model?: string;
+  /** Aborting stops issuing model calls; calls already in flight finish but their result is not stored. */
+  signal?: AbortSignal;
   sleepFn?: (ms: number) => Promise<void>;
 }
 
@@ -325,6 +327,7 @@ export async function runExtractionJob(opts: ExtractionJobOptions): Promise<Extr
   let next = 0;
   async function worker(): Promise<void> {
     while (next < units.length) {
+      if (opts.signal?.aborted) return;
       const i = next++;
       if (delayMs > 0 && i > 0) await sleepFn(delayMs);
       const unit = units[i];
@@ -344,6 +347,7 @@ export async function runExtractionJob(opts: ExtractionJobOptions): Promise<Extr
   // Only the ids without a valid item are retried, one call each.
   let consecutiveFailures = 0;
   for (const signal of retry) {
+    if (opts.signal?.aborted) break;
     if (consecutiveFailures >= MAX_CONSECUTIVE_RETRY_FAILURES) {
       outcomes.push({ signalId: signal.id, ok: false, error: "not retried: the provider failed several single calls in a row" });
       continue;

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { describeWork } from "@/lib/runs/work";
 import type { RunWork } from "@/lib/runs/types";
+import { isFinalStatus, useRunPoll, type PolledRun } from "@/lib/runs/use-run-poll";
 
 const MODEL_URL = "https://gemini.google.com/app";
 
@@ -52,6 +53,41 @@ interface FinishedRun extends ReplyCounts {
     work?: RunWork;
   };
 }
+
+// The report is built by a background workflow after the reply is stored; this page follows it by polling.
+function toFinished(polled: PolledRun, counts: ReplyCounts | null): FinishedRun {
+  const c = polled.completeness;
+  return {
+    analysed: counts?.analysed ?? c.signalsAnalyzed,
+    total: counts?.total ?? c.signalsCollected,
+    noMarket: counts?.noMarket,
+    kept: counts?.kept,
+    problems: counts?.problems ?? [],
+    missing: counts?.missing ?? [],
+    run: {
+      runId: polled.run.id,
+      status: polled.run.status,
+      error: polled.error,
+      counts: {
+        marketsCreated: c.marketsIdentified,
+        opportunitiesCreated: c.opportunitiesGenerated,
+        evidenceCount: c.evidenceCount,
+        signalsAnalyzed: c.signalsAnalyzed,
+        signalsCollected: c.signalsCollected,
+      },
+      trace: polled.lifecycle.trace,
+      work: polled.work ?? undefined,
+    },
+  };
+}
+
+const STAGE_LABEL: Record<string, string> = {
+  clustering: "Grouping signals into markets",
+  trend_analysis: "Checking trends",
+  competition_analysis: "Looking at competition",
+  opportunity_generation: "Writing opportunities",
+  report_generation: "Assembling the report",
+};
 
 type Phase = "idle" | "collecting" | "waiting" | "finishing" | "done";
 
@@ -116,14 +152,23 @@ export function DeepView({
   initialError: string | null;
 }) {
   const [seed, setSeed] = useState(initialSeed);
-  const [phase, setPhase] = useState<Phase>(initialRun ? (initialRun.status === "classifying" ? "waiting" : "done") : "idle");
+  const [rawPhase, setPhase] = useState<Phase>(
+    initialRun ? (initialRun.status === "classifying" ? "waiting" : isFinalStatus(initialRun.status) ? "done" : "finishing") : "idle",
+  );
   const [paused, setPaused] = useState<PausedRun | null>(initialRun);
   const [reply, setReply] = useState("");
   const [rejected, setRejected] = useState<ReplyCounts | null>(null);
-  const [finished, setFinished] = useState<FinishedRun | null>(null);
+  const [replyCounts, setReplyCounts] = useState<ReplyCounts | null>(null);
   const [error, setError] = useState<string | null>(initialError);
   const [copied, setCopied] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  // After the reply is stored the run goes on in the background: follow it, also after a reload.
+  const following = rawPhase === "finishing" || (rawPhase === "done" && !replyCounts);
+  const { data: polledRaw, refused } = useRunPoll(following ? (paused?.runId ?? null) : null);
+  const polled = polledRaw && polledRaw.run.id === paused?.runId ? polledRaw : null;
+  const phase: Phase = rawPhase === "finishing" && polled && isFinalStatus(polled.run.status) ? "done" : rawPhase;
+  const finished: FinishedRun | null = phase === "done" && polled && isFinalStatus(polled.run.status) ? toFinished(polled, replyCounts) : null;
 
   async function collect(e: React.FormEvent) {
     e.preventDefault();
@@ -132,7 +177,7 @@ export function DeepView({
     setPhase("collecting");
     setError(null);
     setPaused(null);
-    setFinished(null);
+    setReplyCounts(null);
     setRejected(null);
     setReply("");
     try {
@@ -188,13 +233,14 @@ export function DeepView({
         setPhase("waiting");
         return;
       }
-      if (!body.run) {
+      if (res.status !== 202) {
         setError(explain(res.status, body));
         setPhase("waiting");
         return;
       }
-      setFinished(body);
-      setPhase("done");
+      // Stored. The report is built in the background; the poll above picks the run up.
+      setReplyCounts(body);
+      setPaused({ ...paused, status: body.status ?? "clustering", prompt: null });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
       setPhase("waiting");
@@ -203,6 +249,7 @@ export function DeepView({
 
   const hasRun = phase === "waiting" || phase === "finishing" || phase === "done";
   const completed = finished?.run.status === "completed";
+  const stage = polled ? (STAGE_LABEL[polled.run.status] ?? polled.run.status) : "Starting";
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
@@ -331,14 +378,16 @@ export function DeepView({
                   {phase === "finishing" ? (
                     <>
                       <Loader2 className="animate-spin" />
-                      Building the report
+                      {stage}
                     </>
                   ) : (
                     "Check and build the report"
                   )}
                 </Button>
-                <span className="text-xs text-muted-foreground">
-                  Each item is checked on its own. Wrong or missing ones are listed, never guessed.
+                <span className="text-xs text-muted-foreground" role="status">
+                  {phase === "finishing"
+                    ? "The report is built in the background. You can close this tab: open this page again to see the result."
+                    : "Each item is checked on its own. Wrong or missing ones are listed, never guessed."}
                 </span>
               </div>
             </form>
@@ -405,10 +454,10 @@ export function DeepView({
         )}
       </Card>
 
-      {error && (
+      {(error ?? (rawPhase === "finishing" ? refused : null)) && (
         <p className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert">
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
-          <span>{error}</span>
+          <span>{error ?? refused}</span>
         </p>
       )}
     </div>
