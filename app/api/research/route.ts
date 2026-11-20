@@ -10,7 +10,9 @@ import { generateMarketOverview } from "@/lib/search";
 import { fetchMarketsData } from "@/lib/markets/fetcher";
 import { detectTopicTrend, type SignalRecord } from "@/lib/trends";
 import { executeResearchRun } from "@/lib/runs/orchestrator";
+import { pastedModeResponse } from "@/lib/settings/pasted-gate";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
+import { routerForUser } from "@/lib/keys/server";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { OPPORTUNITY_PROMPT_VERSION } from "@/lib/opportunities";
 import { isDemandOnly } from "@/lib/sources/demand-only";
@@ -96,6 +98,11 @@ export async function POST(req: Request) {
     if (!text) {
       return NextResponse.json({ error: "Deep research needs a niche, e.g. `pdf-lab pc troubleshooting`", plan }, { status: 400 });
     }
+    const pasted = await pastedModeResponse();
+    if (pasted) {
+      await refund(guard);
+      return pasted;
+    }
     const result = await executeResearchRun(
       {
         query: text,
@@ -110,7 +117,7 @@ export async function POST(req: Request) {
           pipelinePromptVersions: { extraction: EXTRACTION_PROMPT_VERSION, opportunity: OPPORTUNITY_PROMPT_VERSION },
         },
       },
-      createServerOrchestratorDeps(),
+      createServerOrchestratorDeps({ userRouter: await routerForUser(userId) }),
     );
     return NextResponse.json(
       { runId: result.runId, plan, result: { mode: "deep", run: result } },

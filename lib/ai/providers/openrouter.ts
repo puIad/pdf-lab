@@ -32,6 +32,8 @@ export interface OpenRouterConfig {
   fetchFn: (input: string | URL, init?: RequestInit) => Promise<Response>;
   /** Abort a request after this long; 0 = no timeout. */
   timeoutMs?: number;
+  /** Registry name; defaults to `openrouter` (a BYOK instance uses its own). */
+  name?: string;
 }
 
 export function openRouterConfigFromEnv(
@@ -60,11 +62,12 @@ function toUsage(raw: unknown): CallUsage {
 }
 
 export class OpenRouterProvider implements AIProvider {
-  readonly name = OPENROUTER_KEY;
+  readonly name: string;
   private readonly config: OpenRouterConfig;
 
   constructor(config: OpenRouterConfig) {
     this.config = config;
+    this.name = config.name ?? OPENROUTER_KEY;
   }
 
   get isConfigured(): boolean {

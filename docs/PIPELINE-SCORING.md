@@ -32,6 +32,7 @@ QUEUED → COLLECTING → NORMALIZING → CLASSIFYING → CLUSTERING → TREND_A
 5. Competition — find existing PDF products (§20).
 6. Market gaps — review mining → unmet needs (§21).
 7. Opportunity generation — 50 candidates → 25 distinct (§29).
+   Candidates with the same audience and a near-identical problem (token overlap 0.6) merge into the best-scoring one across markets and formats (issue #70, counted as `opportunitiesMergedSimilar`). An opportunity whose evidence is only quick-idea phrase rows says so on the market list and the opportunity page.
 8. Evidence-backed ranking — score + confidence + evidence_count (§16).
 9. Final report — human-readable research page (§19, §47).
 
@@ -55,7 +56,11 @@ Part 6.11 (`lib/scoring/scoring.ts`): the score is a rule-based index, not a mea
   the median reactions of a discussion (only the engagement keys named per source in
   `lib/sources/engagement.ts`), the highest Google Trends interest among the market's Trends rows,
   the share of question phrasings, and the number of source types (capped at 3). Weights 35 / 35 /
-  15 / 15. Engagement and Trends are left out when not observed, never counted as zero.
+  15 / 15. Engagement and Trends are left out when not observed, never counted as zero. The result
+  is scaled by min(1, linked signals / 5): shares and medians of one or two rows are not a market
+  (defect #60: one viral question post scored 67 against 63 for an 18-signal market; it now scores
+  at most 17: sources cap at 1/3 for one signal). A lone signal can still beat a large market whose own
+  engagement, questions and sources are weaker; the cap bounds it, it does not rank by size.
 - **ProblemFrequency** is the market's share of the run's clustered signals (1.0 at 25 %).
 - **BuyerIntent** is the mean over analysed signals only, reported with "n analysed of m". No
   analysed signal means intent is not observed and the score is 0.
@@ -78,9 +83,17 @@ Part 6.11 (`lib/scoring/scoring.ts`): the score is a rule-based index, not a mea
 1. No opportunity without evidence.
 2. No trend claim without temporal evidence.
 3. No competition claim without observed competitors.
+   Listings are placed per market by title overlap; a listing about something else is dropped and
+   counted in `plan.work.listingsDropped` (issue #72).
+
 4. No "high demand" from AI opinion alone.
 5. Separate observed facts vs AI interpretation vs product suggestion — in schema
    (`evidence` vs analysis fields vs `opportunities.solution`) AND in UI.
+
+**Run cost (issue #72).** Each run stores `plan.work` on `research_runs`: adapter calls, extraction
+   model calls, tokens (null when none was metered, as in a pasted run), active milliseconds
+   (the wait for a pasted reply excluded) and dropped listings. `GET /api/runs/<id>` returns it and
+   the Deep page shows it. It does not depend on the usage ledger.
 
 ## Confidence + completeness display (PRD §54–§55)
 

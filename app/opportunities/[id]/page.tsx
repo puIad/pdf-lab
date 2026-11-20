@@ -5,7 +5,9 @@
 
 import React from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { resolveCaller } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import {
   ArrowLeft,
@@ -22,6 +24,7 @@ import {
   Users,
   ExternalLink,
 } from "lucide-react";
+import { UsefulVote } from "@/components/metrics/useful-vote";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
@@ -31,6 +34,9 @@ import {
 } from "@/components/evidence";
 import { parseEvidenceClaim, type EvidenceRow } from "@/lib/evidence/types";
 import { NOT_OBSERVED, platformCounts } from "@/lib/report/observed";
+import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
+import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
+import { ideaOnlyNote, isIdeaOnly } from "@/lib/opportunities/from-ideas";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +68,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
       id, market_id, title, target_audience, problem, solution, format,
       price_range, opportunity_score, confidence, created_at, matching_signals, market_signal_count,
       markets (
-        id, name, trend, demand_score, pdf_fit_score
+        id, run_id, name, trend, demand_score, pdf_fit_score
       )
     `)
     .eq("id", id)
@@ -86,6 +92,8 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   ]);
 
   const market = Array.isArray(opp.markets) ? opp.markets[0] : opp.markets;
+  const caller = await resolveCaller(await headers()).catch(() => null);
+  const nicheTrend = await fetchNicheTrendOfRun(supabase, (market?.run_id as string | null | undefined) ?? null, caller);
   const directEvidence = (evidenceRows ?? []) as EvidenceRow[];
   const marketRows = (marketEvidence ?? []) as EvidenceRow[];
 
@@ -171,6 +179,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {opp.title}
           </h1>
+          <UsefulVote opportunityId={opp.id} />
 
           <div className="flex flex-wrap items-center gap-6 pt-1 text-xs text-muted-foreground">
             <div>
@@ -187,6 +196,9 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
               <span className="font-bold text-foreground font-mono">{score === null ? NOT_OBSERVED : `${score} / 100`}</span>
             </div>
             <div>Direct Citations: <span className="font-bold text-foreground font-mono">{directEvidence.length} verified rows</span></div>
+            {isIdeaOnly(directEvidence.map((e) => e.claim)) && (
+              <div className="basis-full font-medium text-amber-600">{ideaOnlyNote()}</div>
+            )}
             {opp.matching_signals != null && opp.market_signal_count != null && (
               <div>
                 Demand:{" "}
@@ -267,6 +279,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
               ) : (
                 <p>No trend evidence row is stored for this market.</p>
               )}
+              {nicheTrend && <NicheTrendNote trend={nicheTrend} />}
             </CardContent>
           </Card>
         </section>

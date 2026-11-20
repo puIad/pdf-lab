@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { enforceQuota } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { getRouter } from "@/lib/ai/index";
+import { routerForUser } from "@/lib/keys/server";
 import { generate25Opportunities, observedPriceRange } from "@/lib/opportunities/index";
 import type { OpportunityMarketInput, OpportunitySignalInput } from "@/lib/opportunities/index";
 import { writeEvidence } from "@/lib/evidence/writer";
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   }
 
   const supabase = createServiceSupabaseClient();
-  const router = getRouter();
+  const { router } = await routerForUser(null);
 
   // 1. Fetch relevant markets
   let marketQuery = supabase

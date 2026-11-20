@@ -29,7 +29,7 @@ create table research_runs (
   started_at timestamptz not null default now(),
   completed_at timestamptz,
   prompt_version text,  -- planner rule-set version (Phase 3.4, migration 20260928000005)
-  plan jsonb            -- structured NL query + mode + pipeline depth (PRD §26–§27)
+  plan jsonb            -- structured NL query + mode + pipeline depth (PRD §26–§27); `plan.work` holds the run's cost figures (issue #72)
 );
 
 -- One row per configured source (reddit, gtrends, web, etsy, gumroad, ...)
@@ -214,6 +214,91 @@ create table watchlists (
 - Migrations: `supabase/migrations/20261116000010_watchlists.sql`,
   `20261116000011_atomic_limits.sql`.
 
+## BYOK keys and the AI usage ledger (Part 5.2)
+
+```sql
+create table user_provider_keys (
+  user_id uuid references users(id) on delete cascade not null,
+  provider text not null check (provider in ('gemini', 'openai-compatible', 'bedrock', 'openrouter')),
+  ciphertext text not null,        -- AES-256-GCM, bound to (user_id, provider); see lib/keys/crypto.ts
+  last4 text not null,             -- the only part of a key ever shown
+  options jsonb not null default '{}',  -- non-secret: baseUrl, region, model
+  status text not null default 'active' check (status in ('active', 'revoked')),
+  status_detail text,
+  created_at timestamptz not null default now(),
+  rotated_at timestamptz,
+  primary key (user_id, provider)
+);
+create table ai_usage_ledger (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade,      -- null: a server-key call
+  run_id uuid references research_runs(id) on delete set null,
+  provider text not null, model text not null,
+  tier text not null check (tier in ('cheap', 'strong', 'embed')),
+  key_source text not null check (key_source in ('byok', 'hosted')),   -- who paid
+  prompt_tokens integer not null default 0, completion_tokens integer not null default 0,
+  total_tokens integer not null default 0,
+  estimated_cost_usd numeric(12, 6) not null default 0,
+  cost_basis text not null check (cost_basis in ('reported', 'table', 'unpriced')),
+  created_at timestamptz not null default now()
+);
+```
+
+- `user_provider_keys`: service-role only (RLS on, all grants revoked, no policy). Not even the owner
+  reads a row through the API; `GET /api/keys` returns the masked view. Saving over a row is a
+  rotation (new ciphertext, `rotated_at` set, status active again). A provider that answers a key
+  with HTTP 401 or 403 sets `status = 'revoked'`; the key is then skipped until replaced.
+- `ai_usage_ledger`: one row per model call (embeddings included), written by the router's
+  `onCall` hook. The owner may select their own rows; only the service role writes. `cost_basis` says
+  where the number came from: `reported` by the provider, `table` (token counts times the rate table in
+  `lib/usage/ledger.ts`), or `unpriced` (tokens counted, cost 0).
+- Migration: `supabase/migrations/20261120000013_byok_keys_ledger.sql`.
+
+## Success metrics (Part 6.2, PRD §58 to §59)
+
+```sql
+create table metric_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade not null,
+  kind text not null check (kind in ('saved', 'useful_vote', 'new_market', 'research_to_creation', 'monitor_return')),
+  subject_type text not null,  -- market | seed | idea | opportunity | brief
+  subject_ref text not null,
+  value smallint,              -- useful_vote only: 1 useful, 0 not useful
+  dedupe_key text unique,      -- one row per fact (a vote, a day's return, a first save); null may repeat
+  created_at timestamptz not null default now()
+);
+```
+
+- Service-role only, RLS on, no policy (like `usage_events`). Written by `lib/analytics/store.ts`;
+  a failed write is logged and never fails the action it measures.
+- Writers: `saved` in `POST /api/watchlist` when a row is added (first save only); `useful_vote` in
+  `POST /api/metrics/vote` (a second vote replaces the first); `new_market` after a Deep run saves
+  markets, for each whose exact name no earlier market has; `research_to_creation` in
+  `POST /api/briefs/export` (signed in); `monitor_return` when a signed-in person opens
+  `/watchlist`, one per day (re-scan monitoring is Part 4.2, so an open is the return signal until then).
+- Claim-evidence coverage is computed, not stored: opportunities of the window with at least one
+  evidence row naming a source and a url or excerpt, over all of them.
+- North star, shown at `/admin/metrics`: validated opportunities (completed Deep run, sourced
+  evidence, `completed_at` in the last 30 days) divided by active signed-in users (a `usage_events`
+  or `metric_events` row in the window). No active user shows "Not observed". Searches are not in it.
+- Migration: `supabase/migrations/20261120000014_metric_events.sql`.
+
+## App settings (Part 6.9, DEC-015)
+
+```sql
+create table app_settings (
+  key text primary key check (char_length(key) between 1 and 80),
+  value jsonb not null,
+  updated_at timestamptz not null default now()
+);
+```
+
+- Server-wide key/value settings. RLS on, no policy, no grant to `anon` or `authenticated`:
+  service-role only.
+- Key `extraction_mode`: `{"kind":"model","provider":"nvidia","model":"..."}` or `{"kind":"pasted"}`.
+  No row means no mode was chosen and the router keeps its tier defaults.
+- Migration: `supabase/migrations/20261120000015_app_settings.sql`.
+
 ## Takedown blocklist (issue #76)
 
 ```sql
@@ -238,11 +323,12 @@ create table takedowns (
   cascade. Counts per table are printed as JSON.
 - Migration: `supabase/migrations/20261120000017_takedowns.sql`.
 
+
 ## RLS (Supabase)
 
 - Public read: `markets`, `opportunities`, `competitors`, `evidence`, `sources` (anon can
   browse explorer within free-tier limits enforced app-side).
-- Private: `takedowns` (service role only), `users` (owner only), `watchlists` (owner only, Part 4.1), `research_runs` + `signals`/`signal_analysis`/
+- Private: `takedowns` (service role only), `user_provider_keys` (service role only, Part 5.2), `ai_usage_ledger` (owner reads), `users` (owner only), `watchlists` (owner only, Part 4.1), `research_runs` + `signals`/`signal_analysis`/
   `market_signals`/`run_signals` (owner's runs + linked rows, or service-role only in MVP; tighten in Phase 5).
 - Enforce with policies + tests in Phase 0 Part 0.2; service-role key NEVER ships to client.
 
@@ -252,3 +338,26 @@ create table takedowns (
 2. `(source_id, external_id)` unique on `signals` — dedup at the DB, not just in code.
 3. `signal_analysis.signal_id` unique — one extraction row per signal (re-runs UPDATE).
 4. Every score shown in UI joins to countable `evidence` rows (see `EVIDENCE-CONTRACT.md`).
+
+## Billing stub and cost per run (Part 5.3)
+
+```sql
+create table plan_changes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade not null,
+  from_plan text not null, to_plan text not null,           -- free | premium
+  source text not null check (source in ('stub')),
+  charged_cents integer not null default 0 check (charged_cents = 0),  -- a stub never charges
+  created_at timestamptz not null default now()
+);
+-- ledger_run_costs(p_since): per run_id (with research_runs.mode) calls, tokens, cost, unpriced calls.
+```
+
+- `plan_changes` is service-role only (RLS on, no policy). Written by `lib/billing/stub.ts` through
+  `POST /api/billing/stub`, which also sets `users.plan`. `ledger_run_costs` is executable by the
+  service role only and feeds `/admin/costs` and the account page's cost line.
+- `stub_change_plan(p_user, p_from, p_to)` sets `users.plan` and inserts the `plan_changes` row in one
+  transaction, so a failed insert rolls the plan flip back. It returns the new row's id. Service role
+  only (no grant to anon or authenticated), like `take_usage`. `apply` in `lib/billing/store.ts` calls it.
+- `create index on ai_usage_ledger (created_at)` lets that function's date filter avoid a full scan.
+- Migration: `supabase/migrations/20261120000016_billing_stub.sql`.

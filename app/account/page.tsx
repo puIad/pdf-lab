@@ -8,7 +8,12 @@ import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PlanCard, type PlanRow } from "@/components/limits/plan-card";
+import { stubAllowed } from "@/lib/billing/stub";
+import { deepRunCostLine, summarizeRuns } from "@/lib/usage/cost";
+import { loadRunCosts } from "@/lib/usage/load";
 import { resolveCaller, usageStore } from "@/lib/quotas/guard";
+import { canManageSettings } from "@/lib/settings/access";
 import { KIND_LABEL, quotaState, USAGE_KINDS, windowStart, LIMITS, type QuotaState } from "@/lib/quotas/quotas";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +40,21 @@ export default async function AccountPage() {
       loadError = err instanceof Error ? err.message : String(err);
     }
   }
+
+  const rows: PlanRow[] = USAGE_KINDS.map((k) => ({
+    label: KIND_LABEL[k],
+    free: `${LIMITS.free[k].max} a ${LIMITS.free[k].window}`,
+    premium: `${LIMITS.premium[k].max} a ${LIMITS.premium[k].window}`,
+  }));
+  let costLine = "";
+  if (caller.userId) {
+    try {
+      costLine = deepRunCostLine(summarizeRuns(await loadRunCosts()));
+    } catch {
+      costLine = "The cost per run could not be read just now.";
+    }
+  }
+  const atLimit = quotas.filter((q) => q.limit > 0 && q.remaining === 0).map((q) => KIND_LABEL[q.kind]);
 
   return (
     <main className="flex-1 bg-background text-foreground">
@@ -67,6 +87,11 @@ export default async function AccountPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {canManageSettings(caller) && (
+              <Link href="/settings" className="mb-3 block text-sm font-medium underline underline-offset-2">
+                Settings: extraction mode
+              </Link>
+            )}
             {caller.userId ? (
               <form action="/auth/signout" method="post">
                 <Button type="submit" variant="outline" size="sm">
@@ -85,6 +110,10 @@ export default async function AccountPage() {
           <p className="text-sm text-destructive" role="alert">
             Could not read your usage: {loadError}
           </p>
+        )}
+
+        {caller.userId && (caller.plan === "free" || caller.plan === "premium") && (
+          <PlanCard plan={caller.plan} rows={rows} costLine={costLine} stubOpen={stubAllowed(process.env)} atLimit={caller.plan === "free" ? atLimit : []} />
         )}
 
         {quotas.length > 0 && (

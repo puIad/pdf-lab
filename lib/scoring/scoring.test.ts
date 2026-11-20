@@ -203,7 +203,15 @@ describe("score honesty (Part 6.11)", () => {
     assert.equal(onlyWeb.basis.medianEngagement, null);
     assert.equal(onlyWeb.basis.trendsInterest, null);
     assert.equal(onlyWeb.basis.questionShare, 1);
-    assert.equal(onlyWeb.demand, Math.round(((15 * 1 + 15 * (1 / 3)) / 30) * 100));
+    assert.equal(onlyWeb.demand, Math.round(((15 * 1 + 15 * (1 / 3)) / 30) * (2 / 5) * 100)); // 2 of 5 signals of support
+  });
+
+  it("a single viral signal cannot outscore a market with many signals (#60)", () => {
+    const lone = demandFromSignals([{ ...reddit(0, 5000), title: "budget thread" }]).demand; // a viral post that is not a question
+    const loneQuestion = demandFromSignals([{ ...reddit(0, 5000), title: "how do I budget?" }]).demand;
+    const many = demandFromSignals(ranked(18)).demand;
+    assert.ok(loneQuestion <= 17, `lone signal demand ${loneQuestion}`);
+    assert.ok(lone < many && loneQuestion < many, `lone ${lone}/${loneQuestion} vs 18 signals ${many}`);
   });
 
   it("buyer intent is the mean over analysed signals only, with the analysed count", () => {

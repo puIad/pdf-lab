@@ -105,6 +105,7 @@ export async function GET(req: Request) {
       runs: data.runs,
       scope: data.scope,
       legacyCount: data.legacyCount,
+      nicheTrends: data.nicheTrends ?? [],
     });
   } catch (err) {
     return NextResponse.json(

@@ -6,7 +6,9 @@ import { NextResponse } from "next/server";
 import { enforceQuota, resolveCaller } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { executeResearchRun } from "@/lib/runs/orchestrator";
+import { pastedModeResponse } from "@/lib/settings/pasted-gate";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
+import { routerForUser } from "@/lib/keys/server";
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +66,12 @@ export async function POST(req: Request) {
     sourceKeys = body.source_keys as string[];
   }
 
+  // Every mode runs extraction, so pasted replies gate them all (Part 6.9).
+  const pasted = await pastedModeResponse();
+  if (pasted) return pasted;
+
   try {
-    const deps = createServerOrchestratorDeps();
+    const deps = createServerOrchestratorDeps({ userRouter: await routerForUser(null) });
     const result = await executeResearchRun(
       {
         query: body.query.trim(),

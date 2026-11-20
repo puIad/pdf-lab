@@ -424,6 +424,11 @@ are in git history (`README.md`, "History").
   beforehand, and also pasted replies option, switchable in settings". No single fixed model: the
   extraction mode is a setting. It is one of several chat models, each tested for a response before it
   can be chosen, or pasted replies (the `/deep` flow of Part 6.15). Built in Part 6.9's issue (#25).
+- Added 2026-11-20 (Part 6.9, issue #25, live): `openai/gpt-oss-20b` is gone for good (HTTP 410,
+  end of life 2026-11-18). Response tests: `nvidia/nemotron-3.5-bolt-e4b` answered in 1.4 s,
+  `minimaxai/minimax-m3.1-flash` in 3.3 s, `openrouter/free` in 1.3 s. Batched extraction of 100
+  stored signals with nemotron-3.5-bolt-e4b: 100 of 100 analysed, 10 calls (10 batch, 0 single),
+  133 s wall time.
 - Note 2026-11-20 (issue #67): NVIDIA now answers `openai/gpt-oss-20b` with HTTP 410, end of life
   2026-11-18. The code default (`NVIDIA_DEFAULT_CHAT_MODEL`) is now `nvidia/nemotron-3.5-bolt-e4b`
   (answered in 1.0 s live with `reasoning_effort: "low"`), so a call that falls back to the default
