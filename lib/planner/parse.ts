@@ -162,7 +162,7 @@ function inferMode(body: string, f: ReturnType<typeof extractFilters>): Research
 /** The prompt as typed, minus a `pdf-lab ` or `<mode>:` prefix: the seed quick-idea rows are stored under. */
 export function seedOf(prompt: string): string {
   const raw = prompt.trim();
-  return (raw.match(SIGNATURE_RE)?.[1] ?? raw.match(EXPLICIT_RE)?.[2] ?? raw).trim().toLowerCase();
+  return (raw.match(SIGNATURE_RE)?.[1] ?? raw.match(EXPLICIT_RE)?.[2] ?? raw).trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 /**

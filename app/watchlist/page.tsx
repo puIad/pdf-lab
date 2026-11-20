@@ -1,7 +1,7 @@
 // app/watchlist/page.tsx — My Watchlist (Phase 4 Part 4.1, PRD §43): the markets, tracked seeds
 // and saved ideas of the signed-in person, grouped by kind. Signed out, the page asks for a
-// sign-in: nothing is kept in the browser. Re-scans and change reports arrive with Part 4.2;
-// until then the page says the rows are not re-scanned.
+// sign-in: nothing is kept in the browser. Part 4.2: a daily cron re-scans tracked seeds and
+// re-runs watched markets' seeds; rows show "N new this week", phrase changes and change reports.
 
 import React from "react";
 import Link from "next/link";
@@ -19,6 +19,9 @@ import { WATCHLIST_LIMIT } from "@/lib/quotas/quotas";
 import { returnEvent } from "@/lib/analytics/metrics";
 import { recordEventSafely } from "@/lib/analytics/store";
 import { listWatches } from "@/lib/watchlist/store";
+import { loadMonitorView, type MarketView, type SeedView } from "@/lib/monitor/view";
+import { supabaseMonitorStore } from "@/lib/monitor/supabase-store";
+import { COUNT_KEYS, followedMarketIds } from "@/lib/monitor/diff";
 import type { WatchItem } from "@/lib/watchlist/watchlist";
 
 export const dynamic = "force-dynamic";
@@ -83,12 +86,21 @@ export default async function WatchlistPage() {
   let items: WatchItem[] = [];
   let markets = new Map<string, StoredMarket>();
   let loadError: string | null = null;
+  let seedViews: Record<string, SeedView> = {};
+  let marketViews: Record<string, MarketView> = {};
   // Retention event (Part 6.2): one per person per day.
   if (caller.userId) {
     await recordEventSafely(createServiceSupabaseClient(), returnEvent(caller.userId, new Date()));
     try {
       items = await listWatches(caller.userId);
-      markets = await loadMarkets(items.filter((i) => i.kind === "market").map((i) => i.ref));
+      // The monitoring tables come with migration 19: before it is applied the rows show without changes.
+      try {
+        ({ seeds: seedViews, markets: marketViews } = await loadMonitorView(supabaseMonitorStore(), items));
+      } catch (err) {
+        console.error("Could not read monitoring data:", err);
+      }
+      // After the monitor view: the followed markets (newest run of each seed) are loaded too.
+      markets = await loadMarkets([...items.filter((i) => i.kind === "market").map((i) => i.ref), ...followedMarketIds(marketViews)]);
     } catch (err) {
       loadError = err instanceof Error ? err.message : String(err);
     }
@@ -104,7 +116,7 @@ export default async function WatchlistPage() {
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">My watchlist</h1>
           <p className="text-sm text-muted-foreground">
             {caller.userId
-              ? `${items.length} of ${WATCHLIST_LIMIT[plan]} saved on the ${plan} plan. Saved rows are not re-scanned automatically yet.`
+              ? `${items.length} of ${WATCHLIST_LIMIT[plan]} saved on the ${plan} plan. Seeds and markets are re-checked once a day.`
               : "Markets, seeds and ideas you save, kept with your account."}
           </p>
         </div>
@@ -140,7 +152,10 @@ export default async function WatchlistPage() {
               empty="No market saved yet."
             >
               {marketRows.map((item) => {
-                const market = markets.get(item.ref);
+                const view = marketViews[item.id];
+                // The market follows its seed: a newer run of the seed shows its same-named market.
+                const market = view?.market ? (markets.get(view.market.id) ?? markets.get(item.ref)) : markets.get(item.ref);
+                const report = view?.report;
                 return (
                   <Row key={item.id} item={item}>
                     {market ? (
@@ -153,6 +168,15 @@ export default async function WatchlistPage() {
                     <p className="text-xs text-muted-foreground">
                       {market ? `Trend: ${market.trend ?? "unknown"} · ` : ""}saved {day(item.created_at)}
                     </p>
+                    {view && !view.market ? <p className="text-xs text-muted-foreground">Not in the newest run of its seed.</p> : null}
+                    {report ? (
+                      <p className="text-xs text-muted-foreground">
+                        {report.deltas
+                          ? `Since ${day(report.baselineAt ?? report.createdAt)}: ${COUNT_KEYS.map((k) => `${report.deltas![k] > 0 ? "+" : ""}${report.deltas![k]} ${k}`).join(", ")}`
+                          : `First reading ${day(report.createdAt)}.`}
+                        {report.note ? ` ${report.note}` : ""}
+                      </p>
+                    ) : null}
                   </Row>
                 );
               })}
@@ -173,6 +197,14 @@ export default async function WatchlistPage() {
                   <p className="text-xs text-muted-foreground">
                     {regionLabel(item.region)} · saved {day(item.created_at)}
                   </p>
+                  {seedViews[item.id]?.lastScanAt ? (
+                    <p className="text-xs text-muted-foreground">
+                      {seedViews[item.id].newThisWeek.count} new this week (since {day(seedViews[item.id].newThisWeek.since)}) · last scan {day(seedViews[item.id].lastScanAt!)}
+                      {seedViews[item.id].newThisWeek.phrases.slice(0, 3).map((p) => ` · “${p.phrase}” first seen ${day(p.firstSeen)}`)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Not scanned yet: the first daily scan sets the baseline.</p>
+                  )}
                 </Row>
               ))}
             </Group>

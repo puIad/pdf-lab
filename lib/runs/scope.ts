@@ -35,7 +35,10 @@ export function listedRuns(runs: CompletedRun[], viewer: RunViewer | null): Omit
   return runs.filter((r) => ownsRun(viewer, r.userId)).map((r) => ({ id: r.id, query: r.query, completedAt: r.completedAt, latest: r.latest }));
 }
 
-export const seedKey = (query: string): string => query.trim().toLowerCase();
+/** One seed rule for every reader: case, edge spaces and repeated inner spaces do not make a different seed. */
+export const normalizeSeed = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+export const seedKey = normalizeSeed;
 
 /**
  * Completed Deep runs that saved at least one market, newest first. A run that completed with no
