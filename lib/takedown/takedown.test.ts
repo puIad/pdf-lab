@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addTakedown, normalizeUrlKey } from "./takedown.ts";
+import { addTakedown, normalizeUrlKey, readBlockedKeys } from "./takedown.ts";
 
 test("spellings of one page share a key", () => {
   const key = "etsy.com/listing/123/pdf-planner";
@@ -69,4 +69,19 @@ test("a takedown of text that is not a URL stores nothing", async () => {
   const { client, blocklist } = fakeSupabase({ signals: [], evidence: [], competitors: [] });
   await assert.rejects(addTakedown(client, "etsy listing 1"), /http or https URL/);
   assert.equal(blocklist.length, 0);
+});
+
+function lookupClient(error: { code?: string; message: string } | null, rows: { url_key: string }[] = []) {
+  return {
+    from: () => ({ select: () => ({ in: async () => ({ data: error ? null : rows, error }) }) }),
+  } as unknown as SupabaseClient;
+}
+
+test("a missing takedowns table reads as an empty blocklist; any other error throws", async () => {
+  for (const code of ["PGRST205", "42P01"]) {
+    assert.equal((await readBlockedKeys(lookupClient({ code, message: "missing" }), ["a.com"])).size, 0);
+  }
+  await assert.rejects(readBlockedKeys(lookupClient({ code: "57014", message: "timeout" }), ["a.com"]), /lookup failed: timeout/);
+  await assert.rejects(readBlockedKeys(lookupClient({ message: "fetch failed" }), ["a.com"]), /lookup failed/);
+  assert.deepEqual([...(await readBlockedKeys(lookupClient(null, [{ url_key: "a.com" }]), ["a.com"]))], ["a.com"]);
 });

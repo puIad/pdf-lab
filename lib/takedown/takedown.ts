@@ -36,6 +36,9 @@ export async function readBlockedKeys(supabase: SupabaseClient, keys: string[]):
   const unique = [...new Set(keys)];
   for (let i = 0; i < unique.length; i += 50) {
     const { data, error } = await supabase.from("takedowns").select("url_key").in("url_key", unique.slice(i, i + 50));
+    // shortcut: migration 17 not applied yet reads as an empty blocklist; drop once it is applied everywhere.
+    // Any other error (timeout, network, 5xx) still throws, so a takedown never silently stops applying.
+    if (error?.code === "PGRST205" || error?.code === "42P01") return out;
     if (error) throw new Error(`takedowns lookup failed: ${error.message}`);
     for (const r of (data ?? []) as { url_key: string }[]) out.add(r.url_key);
   }

@@ -179,20 +179,13 @@ describe("toSignalRow", () => {
     assert.deepEqual(second.totals, { collected: 2, normalized: 2, inserted: 0, duplicates: 1, blocked: 1 });
   });
 
-  it("ingests normally when the blocklist cannot be read (table missing)", async () => {
-    const deps = fakeDeps([fakeAdapter("alpha", [{ externalId: "a1" }, { externalId: "a2" }])]);
+  it("fails the source, storing nothing, when the blocklist cannot be read", async () => {
+    const deps = fakeDeps([fakeAdapter("alpha", [{ externalId: "a1" }])]);
     deps.blockedUrlKeys = async () => {
-      throw new Error('relation "takedowns" does not exist');
+      throw new Error("takedowns lookup failed: timeout");
     };
-    const warn = console.warn;
-    console.warn = () => {};
-    try {
-      const r = await runIngest({ query: "q" }, deps);
-      assert.deepEqual(deps.rows.map((x) => x.external_id), ["a1", "a2"]);
-      assert.equal(r.totals.inserted, 2);
-      assert.equal(r.totals.blocked, 0);
-    } finally {
-      console.warn = warn;
-    }
+    const r = await runIngest({ query: "q" }, deps);
+    assert.equal(r.sources[0].status, "failed");
+    assert.deepEqual(deps.rows, []);
   });
 });
