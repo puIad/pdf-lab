@@ -7,6 +7,7 @@ import type { ExtractionInput } from "@/lib/ai/index";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { buildSearchFilter } from "@/lib/db/search";
 import { isDemandOnly } from "@/lib/sources/demand-only";
+import { extractionModeGate } from "@/lib/settings/pasted-gate";
 
 // POST /api/extract — Phase 1 Part 1.3.
 // Turns STORED signals into validated `signal_analysis` rows (one per
@@ -76,6 +77,9 @@ export async function POST(req: Request) {
   if (body.provider !== undefined && typeof body.provider !== "string") {
     return NextResponse.json({ error: "provider must be a string" }, { status: 400 });
   }
+  // The saved extraction mode (Part 6.9) applies unless the caller names a provider.
+  const mode = body.provider === undefined ? await extractionModeGate() : null;
+  if (mode?.response) return mode.response;
   const onlyMissing = body.only_missing === undefined ? true : body.only_missing === true;
 
   let signalIds: string[] | undefined;
@@ -158,6 +162,7 @@ export async function POST(req: Request) {
       router: (await routerForUser(null)).router,
       tier: "cheap",
       providerName: body.provider as string | undefined,
+      ...mode?.pin,
     });
   } catch (err) {
     return NextResponse.json(

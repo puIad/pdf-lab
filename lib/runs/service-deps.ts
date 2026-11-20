@@ -18,6 +18,7 @@ import { isStoreUrl } from "../competition/map.ts";
 import { generate25Opportunities, ideaCandidates, OPPORTUNITY_TARGET, pickDistinctIdeas, type OpportunityMarketInput } from "../opportunities/index.ts";
 import { loadStoredIdeas } from "../ideas/stored.ts";
 import type { OrchestratorDeps, OrchestratorCompetitorItem } from "./orchestrator.ts";
+import { extractionPin, loadExtractionMode } from "../settings/extraction-mode.ts";
 import { recordNewMarkets } from "../analytics/store.ts";
 import { parseMarketplaceProduct } from "../sources/marketplace-helper.ts";
 
@@ -101,10 +102,16 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         url: s.url,
       }));
 
+      // The saved extraction mode (Part 6.9): a model mode pins that exact model; no mode keeps the tier defaults.
+      const mode = await loadExtractionMode(supabase).catch((err) => {
+        console.error("extraction mode unreadable, using tier defaults:", err instanceof Error ? err.message : err);
+        return null;
+      });
       const job = await runExtractionJob({
         signals: inputs,
         router,
         tier: "cheap",
+        ...extractionPin(mode),
         batchSize: Number(process.env.EXTRACTION_BATCH_SIZE) || undefined,
       });
 

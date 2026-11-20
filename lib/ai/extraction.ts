@@ -175,6 +175,8 @@ export interface ExtractionJobOptions {
   /** Ms between dispatching calls (default 750 — same reason). */
   interCallDelayMs?: number;
   providerName?: string;
+  /** With `providerName`: the exact model to use (the saved extraction mode, Part 6.9). */
+  model?: string;
   sleepFn?: (ms: number) => Promise<void>;
 }
 
@@ -182,7 +184,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-type CallOptions = Required<Pick<ExtractionJobOptions, "router">> & Pick<ExtractionJobOptions, "tier" | "providerName">;
+type CallOptions = Required<Pick<ExtractionJobOptions, "router">> & Pick<ExtractionJobOptions, "tier" | "providerName" | "model">;
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err)).slice(0, 300);
 
@@ -202,6 +204,7 @@ async function extractOne(signal: ExtractionInput, opts: CallOptions): Promise<E
       temperature: 0,
       maxTokens: 500,
       providerName: opts.providerName,
+      model: opts.model,
     });
     const latencyMs = Date.now() - t0;
     return {
@@ -271,6 +274,7 @@ async function extractBatch(signals: ExtractionInput[], opts: CallOptions): Prom
       temperature: 0,
       maxTokens: 250 * signals.length + 200,
       providerName: opts.providerName,
+      model: opts.model,
     });
     const cost = opts.router.costEntry({ tier, provider: res.provider, model: res.model, usage: res.usage, latencyMs: Date.now() - t0 });
     const outcomes: ExtractionOutcome[] = [];
@@ -295,7 +299,7 @@ export async function runExtractionJob(opts: ExtractionJobOptions): Promise<Extr
   const batchSize = Math.max(1, Math.min(MAX_BATCH_SIZE, Math.floor(opts.batchSize ?? DEFAULT_BATCH_SIZE) || DEFAULT_BATCH_SIZE));
   const delayMs = Math.max(0, opts.interCallDelayMs ?? 750);
   const sleepFn = opts.sleepFn ?? sleep;
-  const call: CallOptions = { router: opts.router, tier, providerName: opts.providerName };
+  const call: CallOptions = { router: opts.router, tier, providerName: opts.providerName, model: opts.model };
 
   const outcomes: ExtractionOutcome[] = [];
   const costLog: CostLogEntry[] = [];
