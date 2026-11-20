@@ -10,7 +10,7 @@ export const MIN_SHARED_WORDS = 2;
 const PRODUCT_WORDS = new Set(
   ("pdf printable print digital download instant editable template planner guide ebook book workbook checklist tracker sheet " +
     "spreadsheet journal notebook bundle kit pack page edition kindle store notion excel google canva free best seller " +
-    "complete simple ultimate beginner size letter a4 a5").split(" "),
+    "complete simple ultimate beginner size letter a4 a5 monthly weekly daily yearly annual").split(" "),
 );
 
 const stem = (t: string): string => t.replace(/(ing|s)$/, "");
@@ -61,6 +61,34 @@ export function marketForCompetitor(
     }
   }
   return bestNamed > 0 || bestShared >= MIN_SHARED_WORDS ? best : null;
+}
+
+/**
+ * Issue #72: what a run does with one listing. A listing is on topic when its title holds every
+ * word of the seed, has no words beyond seed and product words, or matches a market (see
+ * marketForCompetitor). Anything else ("Noctua Wood PC" for a PC troubleshooting seed) is dropped.
+ * A listing holding the whole seed goes to the main market (most signals); one with nothing but
+ * seed and product words stays on the run only.
+ */
+export function placeCompetitor(
+  listing: { title: string; signalId?: string | null },
+  markets: CompetitorMarket[],
+  seed: string,
+): { relevant: boolean; marketId: string | null } {
+  const direct = marketForCompetitor(listing, markets, seed);
+  if (direct) return { relevant: true, marketId: direct };
+  const seedStems = tokens(seed).map(stem);
+  const all = tokens(listing.title);
+  const holdsSeed = seedStems.length > 0 && seedStems.every((s) => all.some((t) => stem(t) === s));
+  const words = all.filter((t) => !PRODUCT_WORDS.has(t) && !seedStems.includes(stem(t)));
+  // A one-word seed ("budgeting") keeps the listing on the run only: only a seed of two or more words sends it to the main market.
+  if (holdsSeed && seedStems.length >= 2) {
+    const main = [...markets].sort((a, b) => b.signalIds.length - a.signalIds.length)[0];
+    return { relevant: true, marketId: main?.id ?? null };
+  }
+  // Holding the seed, or nothing but seed and product words ("Monthly Budget Planner" for `budgeting`): on topic, kept on the run.
+  if (holdsSeed || words.length === 0) return { relevant: true, marketId: null };
+  return { relevant: false, marketId: null };
 }
 
 // Stores whose pages are products. A `web` result from any other host is a discussion, not a competitor.
