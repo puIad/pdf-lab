@@ -37,7 +37,8 @@ let sharedHosted: AIProvider[] | null = null;
 
 function registerByok(router: AIRouter, key: ByokKey): void {
   const name = `${BYOK_PREFIX}${key.provider}`;
-  const fetchFn = fetch;
+  // The baseUrl check covers only the first hop, so a BYOK request never follows a redirect.
+  const fetchFn: typeof fetch = (u, init) => fetch(u, { ...init, redirect: "error" });
   const timeoutMs = 60_000;
   const model = key.options.model;
   switch (key.provider) {
@@ -47,7 +48,7 @@ function registerByok(router: AIRouter, key: ByokKey): void {
       return router.registerByok(new BedrockProvider({ apiKey: key.apiKey, region: key.options.region, name, fetchFn, timeoutMs }), model);
     case "openrouter":
       return router.registerByok(
-        new OpenRouterProvider({ ...openRouterConfigFromEnv({} as NodeJS.ProcessEnv), apiKey: key.apiKey, name }),
+        new OpenRouterProvider({ ...openRouterConfigFromEnv({} as NodeJS.ProcessEnv), apiKey: key.apiKey, name, fetchFn }),
         model,
       );
     case "openai-compatible":

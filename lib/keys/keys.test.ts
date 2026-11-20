@@ -112,7 +112,13 @@ function stubFetch(geminiStatus: number, seen: string[] = []) {
     const headers = (init?.headers ?? {}) as Record<string, string>;
     seen.push(`${url} ${headers["x-goog-api-key"] ?? headers.Authorization ?? ""}`);
     if (url.includes("generativelanguage.googleapis.com")) {
-      if (geminiStatus !== 200) return new Response(`{"error":"API key not valid"}`, { status: geminiStatus });
+      if (geminiStatus !== 200) {
+        // Gemini answers a dead key with 400 and this body, not 401.
+        return new Response(
+          JSON.stringify({ error: { code: geminiStatus, message: "API key not valid. Please pass a valid API key.", status: "INVALID_ARGUMENT", details: [{ reason: "API_KEY_INVALID" }] } }),
+          { status: geminiStatus },
+        );
+      }
       return Response.json({
         candidates: [{ content: { parts: [{ text: `{"ok":true}` }] } }],
         usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 20, totalTokenCount: 120 },
@@ -184,7 +190,7 @@ describe("per-request routing and the ledger", () => {
     const keys = memoryKeys();
     const ledger = memoryLedger();
     await saveKey(keys, secret, { userId: USER, provider: "gemini", apiKey: GEMINI_KEY });
-    stubFetch(401);
+    stubFetch(400);
     const { router } = await createUserRouter({ userId: USER, keys, ledger, secret: () => secret, env: HOSTED_ENV });
     const r = await router.generateObject({ tier: "cheap", system: "s", user: "u", validate: ok });
     assert.equal(r.keySource, "hosted");

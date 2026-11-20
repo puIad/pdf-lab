@@ -9,6 +9,7 @@ import { totalLedger, type LedgerRow } from "@/lib/usage/ledger";
 
 export const dynamic = "force-dynamic";
 
+const ROW_CAP = 10000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(req: Request) {
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
     const now = new Date();
     q = q.gte("created_at", new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString());
   }
-  const { data, error } = await q.limit(10000);
+  const { data, error } = await q.limit(ROW_CAP);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const rows: LedgerRow[] = (data ?? []).map((r) => ({
     userId,
@@ -41,5 +42,6 @@ export async function GET(req: Request) {
     estimatedCostUsd: Number(r.estimated_cost_usd),
     costBasis: r.cost_basis,
   }));
-  return NextResponse.json({ scope: run ? "run" : "month", runId: run, totals: totalLedger(rows) });
+  // shortcut: totals are summed here from at most ROW_CAP rows; move to a SQL sum() before Part 5.3 bills from this.
+  return NextResponse.json({ scope: run ? "run" : "month", runId: run, totals: totalLedger(rows), truncated: rows.length >= ROW_CAP });
 }

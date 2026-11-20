@@ -69,6 +69,9 @@ export class KeyInputError extends Error {}
 const PRIVATE_HOST =
   /^(localhost|.*\.localhost|.*\.internal|.*\.local|0\.0\.0\.0|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|\[?f[cd][0-9a-f]{2}:)/i;
 
+// shortcut: only the typed hostname is checked. DNS is not resolved, so a public name that points at a
+// private address (e.g. 127.0.0.1.nip.io) passes; redirects are blocked in lib/ai/index.ts. Resolve and
+// pin the address if the app ever runs on a host with an internal network.
 /** An endpoint the server will call with the person's key: https, and not an address inside our network. */
 export function validateBaseUrl(raw: string): string {
   let url: URL;
