@@ -32,6 +32,7 @@ QUEUED → COLLECTING → NORMALIZING → CLASSIFYING → CLUSTERING → TREND_A
 5. Competition — find existing PDF products (§20).
 6. Market gaps — review mining → unmet needs (§21).
 7. Opportunity generation — 50 candidates → 25 distinct (§29).
+   Candidates with the same audience and a near-identical problem (token overlap 0.6) merge into the best-scoring one across markets and formats (issue #70, counted as `opportunitiesMergedSimilar`). An opportunity whose evidence is only quick-idea phrase rows says so on the market list and the opportunity page.
 8. Evidence-backed ranking — score + confidence + evidence_count (§16).
 9. Final report — human-readable research page (§19, §47).
 
