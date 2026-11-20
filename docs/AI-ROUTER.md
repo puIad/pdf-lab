@@ -26,6 +26,9 @@ new file + registry line, zero caller changes.
 
 - `signal_analysis.embedding` dimension MUST equal the embed model's dim (`SCHEMA.md`).
   Changing embed models = migration + backfill plan, logged in DECISIONS.
+- NVIDIA's default chat model is `nvidia/nemotron-3.5-bolt-e4b` (`NVIDIA_DEFAULT_CHAT_MODEL`); the
+  earlier `openai/gpt-oss-20b` has been end of life since 2026-11-18 (HTTP 410, DEC-015). Override
+  per tier with `NVIDIA_CHEAP_MODEL` / `NVIDIA_STRONG_MODEL`.
 - Prompts are versioned in code; extraction outputs are validated objects (schema-checked),
   never free text parsed by regex.
 - Extraction is batched (Part 6.9, `lib/ai/extraction.ts`): 10 signals per call by default
