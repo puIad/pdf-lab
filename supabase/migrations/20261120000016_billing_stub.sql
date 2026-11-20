@@ -28,3 +28,6 @@ language sql stable security invoker set search_path = public as $$
 $$;
 revoke all on function ledger_run_costs(timestamptz) from public, anon, authenticated;
 grant execute on function ledger_run_costs(timestamptz) to service_role;
+
+-- ledger_run_costs filters on created_at alone; the existing (user_id, created_at) index cannot serve it.
+create index on ai_usage_ledger (created_at);

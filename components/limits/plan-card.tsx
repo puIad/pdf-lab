@@ -7,6 +7,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export interface PlanRow {
   label: string;
@@ -45,24 +46,24 @@ export function PlanCard({ plan, rows, costLine, stubOpen, atLimit }: { plan: "f
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-muted-foreground">
-              <th className="py-1 font-medium">Limit</th>
-              <th className="py-1 font-medium">Free</th>
-              <th className="py-1 font-medium">Premium</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
+        <Table>
+          <TableHeader>
+            <TableRow className="text-xs text-muted-foreground hover:bg-transparent">
+              <TableHead className="font-medium">Limit</TableHead>
+              <TableHead className="font-medium">Free</TableHead>
+              <TableHead className="font-medium">Premium</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((r) => (
-              <tr key={r.label}>
-                <td className="py-1.5 capitalize">{r.label}</td>
-                <td className="py-1.5 font-mono tabular-nums">{r.free}</td>
-                <td className="py-1.5 font-mono tabular-nums">{r.premium}</td>
-              </tr>
+              <TableRow key={r.label}>
+                <TableCell className="capitalize">{r.label}</TableCell>
+                <TableCell className="font-mono tabular-nums">{r.free}</TableCell>
+                <TableCell className="font-mono tabular-nums">{r.premium}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
         {stubOpen ? (
           <div className="space-y-2">
             <Button type="button" size="sm" variant={plan === "free" ? "default" : "outline"} disabled={busy} onClick={change}>

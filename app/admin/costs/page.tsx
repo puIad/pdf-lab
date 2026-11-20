@@ -6,7 +6,8 @@ import React from "react";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { resolveCaller } from "@/lib/quotas/guard";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { isMetricsAdmin, resolveCaller } from "@/lib/quotas/guard";
 import { LIMITS, PLAN_BUDGET_USD, worstCaseMonthlyUsd, USAGE_KINDS, KIND_LABEL, type Plan } from "@/lib/quotas/quotas";
 import { COST_CEILING_USD, formatUsd, summarizeRuns, type RunCost } from "@/lib/usage/cost";
 import { COST_WINDOW_DAYS, loadRunCosts } from "@/lib/usage/load";
@@ -19,8 +20,7 @@ const usd = (n: number | null) => (n === null ? "Not observed" : formatUsd(n));
 
 export default async function CostsPage() {
   const caller = await resolveCaller(await headers());
-  const admins = (process.env.METRICS_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
-  if (!(caller.plan === "local" || (caller.email !== null && admins.includes(caller.email.toLowerCase())))) notFound();
+  if (!isMetricsAdmin(caller)) notFound();
 
   let runs: RunCost[] = [];
   let loadError = "";
@@ -79,29 +79,29 @@ export default async function CostsPage() {
                 {modes.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Not observed: no run has a ledger row yet.</p>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-muted-foreground">
-                        <th className="py-1 font-medium">Mode</th>
-                        <th className="py-1 font-medium">Runs</th>
-                        <th className="py-1 font-medium">Median</th>
-                        <th className="py-1 font-medium">Max</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="text-xs text-muted-foreground hover:bg-transparent">
+                        <TableHead className="font-medium">Mode</TableHead>
+                        <TableHead className="font-medium">Runs</TableHead>
+                        <TableHead className="font-medium">Median</TableHead>
+                        <TableHead className="font-medium">Max</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {modes.map((m) => {
                         const s = summarizeRuns(runs.map((r) => ({ ...r, mode: r.mode ?? "unknown" })), m);
                         return (
-                          <tr key={m}>
-                            <td className="py-1.5">{m}</td>
-                            <td className="py-1.5 tabular-nums">{s.runs}</td>
-                            <td className="py-1.5 font-mono tabular-nums">{usd(s.medianUsd)}</td>
-                            <td className="py-1.5 font-mono tabular-nums">{usd(s.maxUsd)}</td>
-                          </tr>
+                          <TableRow key={m}>
+                            <TableCell>{m}</TableCell>
+                            <TableCell className="tabular-nums">{s.runs}</TableCell>
+                            <TableCell className="font-mono tabular-nums">{usd(s.medianUsd)}</TableCell>
+                            <TableCell className="font-mono tabular-nums">{usd(s.maxUsd)}</TableCell>
+                          </TableRow>
                         );
                       })}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>
@@ -119,26 +119,26 @@ export default async function CostsPage() {
                     </li>
                   ))}
                 </ul>
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left text-xs text-muted-foreground">
-                      <th className="py-1 font-medium">Plan</th>
-                      <th className="py-1 font-medium">Budget</th>
-                      <th className="py-1 font-medium">Worst case</th>
-                      <th className="py-1 font-medium">Deep cap</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="text-xs text-muted-foreground hover:bg-transparent">
+                      <TableHead className="font-medium">Plan</TableHead>
+                      <TableHead className="font-medium">Budget</TableHead>
+                      <TableHead className="font-medium">Worst case</TableHead>
+                      <TableHead className="font-medium">Deep cap</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {(["anon", "free", "premium"] as Plan[]).map((p) => (
-                      <tr key={p}>
-                        <td className="py-1.5">{p}</td>
-                        <td className="py-1.5 font-mono tabular-nums">{formatUsd(PLAN_BUDGET_USD[p])}</td>
-                        <td className="py-1.5 font-mono tabular-nums">{formatUsd(worstCaseMonthlyUsd(p))}</td>
-                        <td className="py-1.5 tabular-nums">{LIMITS[p].deep.max} a month</td>
-                      </tr>
+                      <TableRow key={p}>
+                        <TableCell>{p}</TableCell>
+                        <TableCell className="font-mono tabular-nums">{formatUsd(PLAN_BUDGET_USD[p])}</TableCell>
+                        <TableCell className="font-mono tabular-nums">{formatUsd(worstCaseMonthlyUsd(p))}</TableCell>
+                        <TableCell className="tabular-nums">{LIMITS[p].deep.max} a month</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </>

@@ -40,8 +40,8 @@ function quantile(sorted: number[], q: number): number {
 }
 
 /** Summarises runs of one mode (default: Deep). Nothing observed gives nulls, never a made-up figure. */
-export function summarizeRuns(runs: RunCost[], mode: string | null = "deep", ceiling = COST_CEILING_USD.deep): CostSummary {
-  const rows = runs.filter((r) => mode === null || r.mode === mode);
+export function summarizeRuns(runs: RunCost[], mode = "deep"): CostSummary {
+  const rows = runs.filter((r) => r.mode === mode);
   if (rows.length === 0) return { runs: 0, partlyUnpriced: 0, meanUsd: null, medianUsd: null, p90Usd: null, maxUsd: null, overCeiling: [] };
   const costs = rows.map((r) => r.costUsd).sort((a, b) => a - b);
   return {
@@ -51,7 +51,7 @@ export function summarizeRuns(runs: RunCost[], mode: string | null = "deep", cei
     medianUsd: round(quantile(costs, 0.5)),
     p90Usd: round(quantile(costs, 0.9)),
     maxUsd: round(costs[costs.length - 1]),
-    overCeiling: rows.filter((r) => r.costUsd > ceiling),
+    overCeiling: rows.filter((r) => r.costUsd > COST_CEILING_USD.deep),
   };
 }
 

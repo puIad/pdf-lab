@@ -113,7 +113,7 @@ export default async function AccountPage() {
         )}
 
         {caller.userId && (caller.plan === "free" || caller.plan === "premium") && (
-          <PlanCard plan={caller.plan} rows={rows} costLine={costLine} stubOpen={stubAllowed(process.env)} atLimit={atLimit} />
+          <PlanCard plan={caller.plan} rows={rows} costLine={costLine} stubOpen={stubAllowed(process.env)} atLimit={caller.plan === "free" ? atLimit : []} />
         )}
 
         {quotas.length > 0 && (

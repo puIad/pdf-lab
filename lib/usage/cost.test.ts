@@ -22,6 +22,13 @@ test("a run priced from the rate table lands inside the Deep ceiling", async () 
   assert.equal(priceCall({ model: "unknown-model", usage: usage(1, 1) }).basis, "unpriced");
 });
 
+test("summary counts only runs of the asked mode, never explore or validate runs", () => {
+  const s = summarizeRuns([run("a", 0.05), run("e", 0.9, "explore"), run("v", 0.8, "validate")]);
+  assert.equal(s.runs, 1);
+  assert.equal(s.maxUsd, 0.05);
+  assert.deepEqual(s.overCeiling, []);
+});
+
 test("summary: median, max, and runs over the ceiling", () => {
   const s = summarizeRuns([run("a", 0.05), run("b", 0.07), run("c", 0.09), run("d", 0.3), run("x", 9, "explore")]);
   assert.equal(s.runs, 4);

@@ -28,6 +28,13 @@ export async function resolveCaller(headers: Headers): Promise<Caller> {
   return { plan: "anon", userId: null, anonHash, email: null };
 }
 
+/** Who may open the internal dashboards: the developer on a dev server, or an email in METRICS_ADMIN_EMAILS. */
+export function isMetricsAdmin(caller: Caller): boolean {
+  if (caller.plan === "local") return true;
+  const admins = (process.env.METRICS_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return caller.email !== null && admins.includes(caller.email.toLowerCase());
+}
+
 export function usageStore(): UsageStore {
   const db = createServiceSupabaseClient();
   return {

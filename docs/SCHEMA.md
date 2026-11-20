@@ -331,4 +331,5 @@ create table plan_changes (
 - `plan_changes` is service-role only (RLS on, no policy). Written by `lib/billing/stub.ts` through
   `POST /api/billing/stub`, which also sets `users.plan`. `ledger_run_costs` is executable by the
   service role only and feeds `/admin/costs` and the account page's cost line.
+- `create index on ai_usage_ledger (created_at)` lets that function's date filter avoid a full scan.
 - Migration: `supabase/migrations/20261120000016_billing_stub.sql`.
