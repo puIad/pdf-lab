@@ -459,3 +459,33 @@ are in git history (`README.md`, "History").
 - Resolution: _resolved 2026-11-14_ — user: "components/ui (Recommended)", option (b). `AGENTS.md`
   and `00-START-HERE.md` rule 5 now point at `components/ui`. Part 6.13 is done; 6.12 can start.
 
+
+## DEC-017 — Source terms: Reddit commercial use and YouTube 30-day retention
+
+- Date: 2026-11-20
+- Part: Phase 6 Part 6.3 (terms-of-service review, `docs/LAUNCH.md` section 2)
+- Expected: every source is used within its terms, or flagged here (ADAPTERS rule 2).
+- Found: (1) Reddit's Responsible Builder Policy and Data API Terms (revised 2026-07-20) require
+  approval before any API access and written approval for commercial use, which a paid plan is;
+  they bar keeping data beyond the approved use case and using content to train models. PDF Lab has
+  no production app id (#44) and no approval. (2) YouTube's API Developer Policies (III.E.4) require
+  stored data other than statistics to be refreshed or deleted after 30 days. `signals` keeps
+  YouTube comment text and titles with no purge. A takedown also has no blocklist, so a removed item
+  returns on the next scan. Sources: support.reddithelp.com Responsible Builder Policy;
+  redditinc.com/policies/data-api-terms; developers.google.com/youtube/terms/developer-policies.
+- Options: (a) launch with Reddit and YouTube switched off in production (unset their keys): no
+  terms risk, fewer sources, completeness panel says so; add a 30-day purge before turning YouTube
+  on, and Reddit once approved. (b) Request Reddit's written commercial approval first and launch
+  after it; slow, outcome unknown. (c) Launch as is: breaks both terms, risks losing the keys.
+  (d) Keep both for a free, non-commercial beta only and gate premium on approval.
+- Recommendation: (a), with a 30-day purge job for YouTube rows and a URL blocklist for takedowns
+  as follow-up issues. Reddit and YouTube are two of seven signal sources; the Deep pipeline already
+  degrades to fewer sources honestly.
+- Question for user: "Launch with Reddit and YouTube off until Reddit approves commercial use and
+  a 30-day YouTube purge exists?"
+- Resolution: _resolved 2026-11-20_ by the owner: PDF Lab is for personal, non-commercial use only.
+  Keep Reddit and YouTube. No paid plan launches; the billing stub stays test-only
+  (`BILLING_STUB_ENABLED` unset in production). Reddit stays on the approved OAuth access of DEC-006
+  for personal use (own app id still #44). YouTube's 30-day rule (III.E.4) applies to every API
+  client, commercial or not, so keeping YouTube needs a refresh-or-delete job: #77. The takedown
+  blocklist is #76. Both are follow-ups and do not block the tag.
