@@ -78,7 +78,7 @@ Not in the table: Supabase and Vercel plans, the NVIDIA and OpenRouter free pool
 | Source | Access | Finding |
 |---|---|---|
 | Reddit | OAuth Data API, read only | **Kept, personal non-commercial use (DEC-017).** Runs on the approved OAuth access of DEC-006. Reddit requires written approval for commercial use, so no paid plan may launch without it. Data is not used for model training. Own production app id is still #44. |
-| YouTube comments | Official Data API key | **Kept, with a follow-up (DEC-017).** Stored API data other than statistics must be refreshed or deleted after 30 days (Developer Policies III.E.4), commercial or not. PDF Lab keeps signals indefinitely, so the refresh-or-delete job is #77 and is not built yet. Until it ships, this line is not met. |
+| YouTube comments | Official Data API key | **Kept (DEC-017).** Stored API data other than statistics must be refreshed or deleted after 30 days (Developer Policies III.E.4), commercial or not. A daily cron (`/api/cron/youtube-retention`, 03:17 UTC, needs `CRON_SECRET`) refreshes or deletes YouTube signals older than 30 days and, in the same batch, deletes the evidence rows that quote them; an age-based sweep of YouTube evidence is the backstop (#77). |
 | Google Trends | Unofficial community client, no key | Google offers no Trends API and its terms do not grant automated access. Isolated in one module, throttled, cached 24 h, breakage follows the decision path (ADAPTERS rule 5). Risk accepted in the plan since Part 1.1; owner to re-confirm. |
 | Web search | Serper (licensed vendor, DEC-002) | Vendor carries the Google side. PDF Lab stores title, URL, snippet and date, and links back. |
 | Etsy, Gumroad, Amazon KDP | Serper `site:` searches (DEC-007) | PDF Lab never requests a marketplace page itself, so no marketplace terms are exercised directly; the data is what Google shows in results (title, price, rating counts, link). Revisit if a marketplace objects. |
@@ -121,7 +121,7 @@ The PRD text is not in the repo, so the stages follow the names in this issue an
 
 All DEC-001 to DEC-016 are resolved except DEC-013, which describes work that shipped (NVIDIA
 provider, throttle) and whose open model question became DEC-015; its remaining production step
-(`NVIDIA_API_KEY` in Vercel) is an environment setting. **DEC-017** (source terms) is resolved: personal non-commercial use, Reddit and YouTube kept, no paid plan. Follow-ups: #77 (30-day YouTube refresh-or-delete), #76 (takedown blocklist).
+(`NVIDIA_API_KEY` in Vercel) is an environment setting. **DEC-017** (source terms) is resolved: personal non-commercial use, Reddit and YouTube kept, no paid plan. Follow-ups, both built: #77 (30-day YouTube refresh-or-delete, daily cron) and #76 (takedown blocklist).
 
 Open issues that wait on the owner and block nothing in code: #33, #43 (calibration file), #38
 (Supabase redirect list), #44 (Reddit app id), #45 (Vercel auto-deploys), #54 (review action).
@@ -134,11 +134,11 @@ Open issues that wait on the owner and block nothing in code: #33, #43 (calibrat
 | Confidence shown | shown | confidence and counts on opportunities and the quality panel (`components/quality-panel`) |
 | Metrics events firing | firing in code; not against a live database | `lib/analytics` tests; migration 14 applied status unknown |
 | Cost per run measured and documented | documented, **estimated** | section 1; replace with ledger totals once Part 5.2 is merged and has rows |
-| Terms of service reviewed | reviewed; Reddit ok for personal use; **YouTube 30-day rule unmet until #77 ships** | section 2, DEC-017 |
+| Terms of service reviewed | reviewed; Reddit ok for personal use; YouTube 30-day rule met by the daily retention cron (#77) once `CRON_SECRET` is set in Vercel | section 2, DEC-017 |
 
 ## 6. Sign-off
 
-Signed means the owner has read sections 1 to 5 and accepts the open YouTube line (#77). An agent does not sign this.
+Signed means the owner has read sections 1 to 5. An agent does not sign this.
 
 - Owner: ______________________  Date: ____________
 - Tag after the merge on master: `git tag mvp-v1 && git push origin mvp-v1`
