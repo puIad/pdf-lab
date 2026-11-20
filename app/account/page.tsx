@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { resolveCaller, usageStore } from "@/lib/quotas/guard";
+import { canManageSettings } from "@/lib/settings/access";
 import { KIND_LABEL, quotaState, USAGE_KINDS, windowStart, LIMITS, type QuotaState } from "@/lib/quotas/quotas";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,11 @@ export default async function AccountPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {canManageSettings(caller) && (
+              <Link href="/settings" className="mb-3 block text-sm font-medium underline underline-offset-2">
+                Settings: extraction mode
+              </Link>
+            )}
             {caller.userId ? (
               <form action="/auth/signout" method="post">
                 <Button type="submit" variant="outline" size="sm">

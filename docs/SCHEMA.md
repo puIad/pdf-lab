@@ -214,6 +214,22 @@ create table watchlists (
 - Migrations: `supabase/migrations/20261116000010_watchlists.sql`,
   `20261116000011_atomic_limits.sql`.
 
+## App settings (Part 6.9, DEC-015)
+
+```sql
+create table app_settings (
+  key text primary key check (char_length(key) between 1 and 80),
+  value jsonb not null,
+  updated_at timestamptz not null default now()
+);
+```
+
+- Server-wide key/value settings. RLS on, no policy, no grant to `anon` or `authenticated`:
+  service-role only.
+- Key `extraction_mode`: `{"kind":"model","provider":"nvidia","model":"..."}` or `{"kind":"pasted"}`.
+  No row means no mode was chosen and the router keeps its tier defaults.
+- Migration: `supabase/migrations/20261120000013_app_settings.sql`.
+
 ## RLS (Supabase)
 
 - Public read: `markets`, `opportunities`, `competitors`, `evidence`, `sources` (anon can

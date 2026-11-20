@@ -127,6 +127,11 @@ export class AIRouter {
     return [...this.providers.keys()];
   }
 
+  /** Registered providers that have what they need to answer (key set, or local). */
+  configuredProviderNames(): string[] {
+    return [...this.providers.values()].filter((p) => p.isConfigured).map((p) => p.name);
+  }
+
   /** Resolve tier → provider+model WITHOUT network (config presence only). */
   resolveTier(tier: TaskTier): TierSelection {
     const pinned = this.env[TIER_ENV[tier].providerVar];
@@ -178,11 +183,14 @@ export class AIRouter {
     temperature?: number;
     maxTokens?: number;
     providerName?: string;
+    /** With `providerName`: this exact model, and no fallback to another provider (extraction mode, Part 6.9). */
+    model?: string;
   }): Promise<{ text: string; usage: CallUsage; model: string; provider: string; fallbackFrom?: string; latencyMs: number }> {
     const sel = input.providerName
-      ? { tier: input.tier, provider: input.providerName, model: defaultModelFor(input.providerName, input.tier, this.env) }
+      ? { tier: input.tier, provider: input.providerName, model: input.model || defaultModelFor(input.providerName, input.tier, this.env) }
       : this.resolveTier(input.tier);
-    const chain = [sel.provider, ...FALLBACK_ORDER.filter((n) => n !== sel.provider)];
+    const pinned = Boolean(input.providerName && input.model);
+    const chain = pinned ? [sel.provider] : [sel.provider, ...FALLBACK_ORDER.filter((n) => n !== sel.provider)];
     let lastError: unknown = null;
     for (const name of chain) {
       const provider = this.providers.get(name);
@@ -236,6 +244,7 @@ export class AIRouter {
     temperature?: number;
     maxTokens?: number;
     providerName?: string;
+    model?: string;
   }): Promise<GenerateObjectResult<T>> {
     const attempts: Array<{ text: string; usage: CallUsage; model: string; provider: string; fallbackFrom?: string }> = [];
     let usage = emptyUsage();
@@ -248,6 +257,7 @@ export class AIRouter {
         temperature: input.temperature,
         maxTokens: input.maxTokens,
         providerName: input.providerName,
+        model: input.model,
       });
       usage = addUsage(usage, res.usage);
       try {

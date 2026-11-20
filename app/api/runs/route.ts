@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { enforceQuota, resolveCaller } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { executeResearchRun } from "@/lib/runs/orchestrator";
+import { pastedModeResponse } from "@/lib/settings/pasted-gate";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +63,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "source_keys must be an array of strings" }, { status: 400 });
     }
     sourceKeys = body.source_keys as string[];
+  }
+
+  if (mode === "deep") {
+    const pasted = await pastedModeResponse();
+    if (pasted) return pasted;
   }
 
   try {
