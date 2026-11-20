@@ -4,6 +4,7 @@
 // niche, read from the run's own rows (`run_signals`) and always labelled as the niche's (QC Rule 2).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RunViewer } from "../runs/scope.ts";
 
 type Rel<T> = T | T[] | null | undefined;
 const one = <T>(v: Rel<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
@@ -15,7 +16,7 @@ export interface NicheTrend {
   count: number;
   /** Mean of the readings' average interest, 0..100. */
   avgInterest: number;
-  direction: "rising" | "falling" | "flat";
+  direction: "rising" | "falling" | "flat" | "mixed";
   windowDays: number | null;
   /** Google Trends points behind the readings. */
   points: number;
@@ -39,7 +40,8 @@ export function summarizeNicheTrend(runId: string, seed: string, rows: NicheRow[
   if (iot.length === 0) return null;
   const avg = iot.reduce((s, r) => s + (num(r.engagement!.avg_interest) as number), 0) / iot.length;
   const dirs = new Set(iot.map((r) => r.engagement!.direction));
-  const direction = dirs.size === 1 && (dirs.has("rising") || dirs.has("falling")) ? ([...dirs][0] as "rising" | "falling") : "flat";
+  const direction: NicheTrend["direction"] =
+    dirs.size > 1 ? "mixed" : dirs.has("rising") ? "rising" : dirs.has("falling") ? "falling" : "flat";
   return {
     runId,
     seed,
@@ -52,27 +54,36 @@ export function summarizeNicheTrend(runId: string, seed: string, rows: NicheRow[
   };
 }
 
-/** The niche trend of each run id given, read from its own `run_signals`. */
+/** The niche trend of each run given, read from its own `run_signals` in one query. Never throws. */
 export async function fetchNicheTrends(supabase: SupabaseClient, runs: Array<{ id: string; query: string }>): Promise<NicheTrend[]> {
-  const out: NicheTrend[] = [];
-  for (const { id: runId, query } of runs) {
-    const { data, error } = await supabase
-      .from("run_signals")
-      .select("signals ( url, engagement, sources ( type ) )")
-      .eq("run_id", runId);
-    if (error) throw new Error(`Failed to load the niche trend: ${error.message}`);
-    const rows = ((data ?? []) as unknown as Array<{ signals: Rel<NicheRow> }>).flatMap((l) => one(l.signals) ?? []);
-    const t = summarizeNicheTrend(runId, query, rows);
-    if (t) out.push(t);
+  if (runs.length === 0) return [];
+  const { data, error } = await supabase
+    .from("run_signals")
+    .select("run_id, signals ( url, engagement, sources ( type ) )")
+    .in("run_id", runs.map((r) => r.id));
+  if (error) {
+    console.error(`Could not load the niche trend: ${error.message}`);
+    return [];
   }
-  return out;
+  const byRun = new Map<string, NicheRow[]>();
+  for (const l of (data ?? []) as unknown as Array<{ run_id: string; signals: Rel<NicheRow> }>) {
+    const row = one(l.signals);
+    if (row) byRun.set(l.run_id, [...(byRun.get(l.run_id) ?? []), row]);
+  }
+  return runs.flatMap(({ id, query }) => summarizeNicheTrend(id, query, byRun.get(id) ?? []) ?? []);
 }
 
-/** The niche trend of one run by id (market and opportunity pages); null for a legacy row with no run. */
-export async function fetchNicheTrendOfRun(supabase: SupabaseClient, runId: string | null): Promise<NicheTrend | null> {
+/** Same rule as `listedRuns`: a seed is shown only to the run's owner; the server key and a dev server see all. */
+export function ownsRun(viewer: RunViewer | null, ownerId: string | null): boolean {
+  if (!viewer || viewer.plan === "anon") return false;
+  return !viewer.userId || viewer.userId === ownerId;
+}
+
+/** The niche trend of one run by id (market and opportunity pages); null for a legacy row, or when the viewer does not own the run. */
+export async function fetchNicheTrendOfRun(supabase: SupabaseClient, runId: string | null, viewer: RunViewer | null): Promise<NicheTrend | null> {
   if (!runId) return null;
-  const { data: run } = await supabase.from("research_runs").select("query").eq("id", runId).maybeSingle();
-  if (!run) return null;
+  const { data: run } = await supabase.from("research_runs").select("query, user_id").eq("id", runId).maybeSingle();
+  if (!run || !ownsRun(viewer, (run.user_id as string | null) ?? null)) return null;
   return (await fetchNicheTrends(supabase, [{ id: runId, query: String(run.query ?? "") }]))[0] ?? null;
 }
 

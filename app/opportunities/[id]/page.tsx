@@ -5,7 +5,9 @@
 
 import React from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { resolveCaller } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import {
   ArrowLeft,
@@ -89,7 +91,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   ]);
 
   const market = Array.isArray(opp.markets) ? opp.markets[0] : opp.markets;
-  const nicheTrend = await fetchNicheTrendOfRun(supabase, (market?.run_id as string | null | undefined) ?? null);
+  const nicheTrend = await fetchNicheTrendOfRun(supabase, (market?.run_id as string | null | undefined) ?? null, await resolveCaller(await headers()));
   const directEvidence = (evidenceRows ?? []) as EvidenceRow[];
   const marketRows = (marketEvidence ?? []) as EvidenceRow[];
 

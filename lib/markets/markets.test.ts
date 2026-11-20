@@ -325,3 +325,34 @@ describe("Explorer Table Filtering & Tab Sorting (PRD §40, §7)", () => {
     assert.ok(highPdfFit.every((m) => m.pdf_fit_score >= 60));
   });
 });
+
+describe("niche trend note visibility (issue #39 rule)", () => {
+  const mk = (viewer: { plan: string; userId: string | null } | null) => {
+    const runRows = [{ id: "r1", query: "secret seed", completed_at: null, started_at: "2026-01-01", user_id: "owner", markets: [{ id: "m1" }] }];
+    const sb = {
+      from: (table: string) => {
+        const data =
+          table === "research_runs"
+            ? runRows
+            : table === "markets"
+              ? [{ id: "m1", run_id: "r1", name: "M", trend: "stable", demand_score: 1, competition_score: 1, pdf_fit_score: 1, confidence: "low", created_at: "2026-01-01" }]
+              : table === "run_signals"
+                ? [{ run_id: "r1", signals: { url: "u", engagement: { avg_interest: 40, direction: "rising", points: 5, window_days: 90 }, sources: { type: "gtrends" } } }]
+                : [];
+        const b: Record<string, unknown> = { select: () => b, order: () => b, in: () => b, eq: () => b, then: (r: (v: unknown) => void) => r({ data, error: null }) };
+        return b;
+      },
+    } as unknown as SupabaseClient;
+    return fetchMarketsData(sb, "latest", viewer);
+  };
+  it("another user's run shows no note", async () => {
+    assert.deepEqual((await mk({ plan: "free", userId: "someone-else" })).nicheTrends, []);
+  });
+  it("an anon viewer sees no seed", async () => {
+    assert.deepEqual((await mk({ plan: "anon", userId: null })).nicheTrends, []);
+    assert.deepEqual((await mk(null)).nicheTrends, []);
+  });
+  it("the owner sees the note", async () => {
+    assert.equal((await mk({ plan: "free", userId: "owner" })).nicheTrends?.[0]?.seed, "secret seed");
+  });
+});

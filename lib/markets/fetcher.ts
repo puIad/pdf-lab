@@ -94,7 +94,7 @@ export async function fetchMarketsData(
   const marketIds = rawMarkets.map((m) => m.id as string);
   const nicheTrends = await fetchNicheTrends(
     supabase,
-    allRuns.filter((r) => rawMarkets.some((m) => m.run_id === r.id)),
+    runs.filter((r) => rawMarkets.some((m) => m.run_id === r.id)),
   );
 
   // 2. Fetch opportunities

@@ -37,7 +37,7 @@ Rows link to market pages. Filters (Phase 3): trend, intent, competition, PDF-fi
 (the classifier files a signal under a market only if it names a problem), the markets list, each
 market page and each opportunity's Why Now block show one labelled line: "Niche trend for <seed>:
 average interest, direction, N readings. Seed-level context, not a market's trend." Read from the
-run's own `run_signals` (`lib/trends/niche.ts`), never from a market. A market's trend label and
+run's own `run_signals` (`lib/trends/niche.ts`), never from a market. The seed is a person's search, so the note follows the run-listing rule (#39): only the run's owner sees it (the markets list uses the viewer-filtered runs; market and opportunity pages check `research_runs.user_id`); signed-out visitors see none. A market's trend label and
 QC Rule 2 line still count only that market's own dated signals.
 
 ## Market page (PRD §41–§42)

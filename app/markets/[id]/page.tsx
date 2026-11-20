@@ -69,7 +69,7 @@ export default async function MarketPage(props: MarketPageProps) {
   if (mErr || !market) {
     notFound();
   }
-  const nicheTrend = await fetchNicheTrendOfRun(supabase, market.run_id as string | null);
+  const nicheTrend = await fetchNicheTrendOfRun(supabase, market.run_id as string | null, await resolveCaller(await headers()));
 
   // 2. Fetch linked signals & analysis
   const { data: marketSignals } = await supabase
