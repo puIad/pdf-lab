@@ -18,6 +18,7 @@ import { isStoreUrl } from "../competition/map.ts";
 import { generate25Opportunities, ideaCandidates, OPPORTUNITY_TARGET, pickDistinctIdeas, type OpportunityMarketInput } from "../opportunities/index.ts";
 import { loadStoredIdeas } from "../ideas/stored.ts";
 import type { OrchestratorDeps, OrchestratorCompetitorItem } from "./orchestrator.ts";
+import { recordNewMarkets } from "../analytics/store.ts";
 import { parseMarketplaceProduct } from "../sources/marketplace-helper.ts";
 
 const EXPECTED_EMBEDDING_DIM = 1536;
@@ -270,6 +271,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         }
       }
 
+      await recordNewMarkets(supabase, runId, savedList);
       return savedList;
     },
 

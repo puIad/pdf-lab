@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { BriefUnavailable, loadBrief, parseBriefSource } from "@/lib/brief";
+import { creationEvent } from "@/lib/analytics/metrics";
+import { recordEventSafely } from "@/lib/analytics/store";
+import { resolveCaller } from "@/lib/quotas/guard";
 import { generateBriefDocx, generateBriefMarkdown } from "@/lib/export/brief";
 
 // POST /api/briefs/export { source, format: "md" | "docx", notes? } — Phase 3 Part 3.10 task 4.
@@ -25,7 +28,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'format must be "md" or "docx"' }, { status: 400 });
   }
   try {
-    const brief = await loadBrief(createServiceSupabaseClient(), parseBriefSource(body.source), body.notes);
+    const db = createServiceSupabaseClient();
+    const brief = await loadBrief(db, parseBriefSource(body.source), body.notes);
+    // Research-to-creation event (Part 6.2): a signed-in person took a brief out as a file.
+    const caller = await resolveCaller(req.headers).catch(() => null);
+    if (caller?.userId) {
+      const src = brief.source;
+      await recordEventSafely(db, creationEvent(caller.userId, src.kind === "opportunity" ? src.id : `${src.seed}: ${src.phrase}`));
+    }
     if (body.format === "md") {
       return new Response(generateBriefMarkdown(brief), {
         headers: {

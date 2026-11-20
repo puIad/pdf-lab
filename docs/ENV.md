@@ -31,6 +31,7 @@ in `.env.example` (placeholders only), in client bundles, or in chat.**
 | `SUPABASE_SERVICE_ROLE_KEY` | **Server-only — NEVER `NEXT_PUBLIC_`, never imported client-side** | `.env.local` locally; Vercel dashboard → Production + Preview only | Full DB bypass. In Vercel, store as **Sensitive** type (production + preview targets; development target is not allowed for sensitive vars). Leaking this = full DB compromise → rotate immediately (Supabase dashboard → Settings → API → generate new key, then update both places). |
 | `GEMINI_API_KEY` | Server-only | Not set yet (Phase 1 Part 1.3) | Placeholder in `.env.example` only. Set when AIRouter gains a Gemini provider. |
 | `OPENAI_API_KEY` (and any `OPENAI_*`) | Server-only | Not set yet (Phase 1 Part 1.3) | Same as above, for an OpenAI-compatible provider path. |
+| `NVIDIA_CHEAP_MODEL`, `NVIDIA_STRONG_MODEL` | Server-only | Optional | NVIDIA chat model per tier. Unset, both use `nvidia/nemotron-3.5-bolt-e4b` (the old default `openai/gpt-oss-20b` is end of life, DEC-015). |
 | `OPENROUTER_API_KEY` | Server-only | Not set yet (Phase 1 Part 1.3) | Same as above, for the OpenRouter provider path. |
 | Web-search API key (ONE of Brave / Serper / Tavily / Bing — DEC-002) | Server-only | Not set yet (Phase 1 Part 1.2) | Provider picked in Part 1.2; only the winner gets a key row here. |
 | `CRON_SECRET` | Server-only | Not set yet (Phase 4 Part 4.2) | Only if Vercel Cron / scheduler path is chosen in DEC-001. |
@@ -38,6 +39,7 @@ in `.env.example` (placeholders only), in client bundles, or in chat.**
 | `PDFLAB_UNOFFICIAL_AUTOCOMPLETE` | Server-only flag | `.env.local` ONLY. Never in Vercel. | `1` enables the local-only search-suggestion adapter (DEC-008, Part 3.5). Ignored when `NODE_ENV=production` or `VERCEL` is set; the source then reports `skipped`. |
 | `AUTOCOMPLETE_GEO` | Server-only, optional | `.env.local` | Country code for suggestions, default `us`. Amazon stays on the US marketplace. |
 | `WIKIMEDIA_USER_AGENT` | Server-only, optional | `.env.local` / Vercel | Overrides the default `PDF-Lab/0.1 (+<prod URL>)` sent to Wikimedia. Must name a contact URL; do not put a personal email here. |
+| `METRICS_ADMIN_EMAILS` | Server-only, optional | `.env.local` / Vercel | Comma-separated emails that may open `/admin/metrics` (Part 6.2). Unset: only a local dev server can. Anyone else gets a 404. |
 
 ## Local setup
 

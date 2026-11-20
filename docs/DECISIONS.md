@@ -424,6 +424,10 @@ are in git history (`README.md`, "History").
   beforehand, and also pasted replies option, switchable in settings". No single fixed model: the
   extraction mode is a setting. It is one of several chat models, each tested for a response before it
   can be chosen, or pasted replies (the `/deep` flow of Part 6.15). Built in Part 6.9's issue (#25).
+- Note 2026-11-20 (issue #67): NVIDIA now answers `openai/gpt-oss-20b` with HTTP 410, end of life
+  2026-11-18. The code default (`NVIDIA_DEFAULT_CHAT_MODEL`) is now `nvidia/nemotron-3.5-bolt-e4b`
+  (answered in 1.0 s live with `reasoning_effort: "low"`), so a call that falls back to the default
+  no longer fails. No code path sends `openai/gpt-oss-20b`.
 
 ## DEC-016 — Where the frontend megalibrary lives
 

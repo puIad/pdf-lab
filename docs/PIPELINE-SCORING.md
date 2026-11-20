@@ -55,7 +55,11 @@ Part 6.11 (`lib/scoring/scoring.ts`): the score is a rule-based index, not a mea
   the median reactions of a discussion (only the engagement keys named per source in
   `lib/sources/engagement.ts`), the highest Google Trends interest among the market's Trends rows,
   the share of question phrasings, and the number of source types (capped at 3). Weights 35 / 35 /
-  15 / 15. Engagement and Trends are left out when not observed, never counted as zero.
+  15 / 15. Engagement and Trends are left out when not observed, never counted as zero. The result
+  is scaled by min(1, linked signals / 5): shares and medians of one or two rows are not a market
+  (defect #60: one viral question post scored 67 against 63 for an 18-signal market; it now scores
+  at most 17: sources cap at 1/3 for one signal). A lone signal can still beat a large market whose own
+  engagement, questions and sources are weaker; the cap bounds it, it does not rank by size.
 - **ProblemFrequency** is the market's share of the run's clustered signals (1.0 at 25 %).
 - **BuyerIntent** is the mean over analysed signals only, reported with "n analysed of m". No
   analysed signal means intent is not observed and the score is 0.
