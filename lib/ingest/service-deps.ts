@@ -6,6 +6,7 @@
 // index.ts, not registry.ts: importing it is what registers the adapters in this process.
 import { listAdapters } from "../sources/index.ts";
 import { createServiceSupabaseClient } from "../db/client.ts";
+import { readBlockedKeys } from "../takedown/takedown.ts";
 import type { IngestDeps } from "./pipeline.ts";
 
 export function getServiceDeps(): IngestDeps {
@@ -36,6 +37,7 @@ export function getServiceDeps(): IngestDeps {
       }
       return null;
     },
+    blockedUrlKeys: (keys) => readBlockedKeys(supabase, keys),
     upsertSignals: async (rows) => {
       const { data, error } = await supabase
         .from("signals")

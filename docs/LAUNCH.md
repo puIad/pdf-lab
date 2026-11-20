@@ -99,16 +99,10 @@ Not in the table: Supabase and Vercel plans, the NVIDIA and OpenRouter free pool
   the profile, usage events, watchlist, metric events and research runs (SCHEMA.md, Sign-in and usage).
   Any table PR #64 adds with a `user_id` must also cascade; its migration is the place to check.
 - **Takedown of third-party content** (a seller, author or platform asks PDF Lab to remove a
-  stored item). Owner runbook, run in the Supabase SQL editor with the item's URL:
-
-  ```sql
-  delete from evidence    where url = :url;   -- no foreign key, so removed explicitly
-  delete from competitors where url = :url;
-  delete from signals     where url = :url;   -- cascades to signal_analysis, market_signals, run_signals
-  ```
-
-  Then answer the requester. Gap: nothing stops the next scan from collecting the item again; the
-  blocklist is #76.
+  stored item). Owner runbook: apply migration 17 (`takedowns`) once, then run
+  `node --env-file=.env.local scripts/takedown.ts <url> [reason]`. The script adds the URL to the
+  blocklist, then deletes its `signals`, `evidence` and `competitors` rows. Ingest skips blocked URLs (#76).
+  Then answer the requester.
 
 ## 3. Roadmap handoff (PRD §57)
 
