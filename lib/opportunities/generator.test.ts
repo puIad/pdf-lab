@@ -422,10 +422,12 @@ test("AI path: model wording, stored grounding, no defaults, no padding (Part 6.
         },
       ]),
     });
-    // 2 model candidates, then the pool's 3 minus the one sharing (audience, problem, format) with the first.
+    // 2 model candidates, then the pool's 3 minus the one sharing (audience, problem, format) with the
+    // first, minus the college-students one the model's "Fine wording" already states in another format (#70).
     assert.deepEqual(res.opportunities.map((o) => o.title).slice(0, 2), ["Grocery Budget Reset", "Fine wording"]);
-    assert.equal(res.opportunities.length, 4);
-    assert.equal(res.totalCandidatesGenerated, 4);
+    assert.equal(res.opportunities.length, 3);
+    assert.equal(res.totalCandidatesGenerated, 3);
+    assert.equal(res.mergedSimilar, 1);
     const [first, second] = res.opportunities;
     assert.equal(first.priceRange, "$4.99–$19"); // observed on the market, never the model's
     assert.equal(first.urgency, "high"); // from the young-couples signals
@@ -566,4 +568,24 @@ test("a quick idea goes to the market holding its own words, not to the one with
   assert.equal(marketFor("vegetarian meal prep", markets, "meal prep")?.id, "small");
   // A word in a market's name beats the same word in another market's snippet.
   assert.equal(marketFor("is meal prep healthy", markets, "meal prep")?.id, "healthy");
+});
+
+test("mergeSharedProblems folds one audience and problem across markets and formats (issue #70)", async () => {
+  const { mergeSharedProblems } = await import("./generator.ts");
+  const { isIdeaOnly } = await import("./from-ideas.ts");
+  const base = {
+    solution: "s", priceRange: null, sophistication: null, mechanism: null, outcome: null, urgency: null,
+    confidence: 0.5, evidence: [], matchingSignals: 1, marketSignals: null,
+  };
+  const a = { ...base, id: "a", marketId: "m1", title: "a", targetAudience: "People with computer problems", problem: "PDF for people with computer problems that will not boot", format: null, opportunityScore: 60 };
+  const b = { ...a, id: "b", marketId: "m2", problem: "Guide for people with computer problems that will not boot", format: "guide" as const, opportunityScore: 55 };
+  const c = { ...a, id: "c", marketId: "m2", targetAudience: "Gamers", problem: "Slow frame rate on old laptops", opportunityScore: 40 };
+  const { kept, merged } = mergeSharedProblems([a, b, c]);
+  assert.equal(merged, 1);
+  assert.deepEqual(kept.map((k) => k.id), ["a", "c"]);
+  assert.equal(kept[0].format, "guide");
+  assert.equal(isIdeaOnly([`${IDEA_CLAIM_PREFIX} "x"`]), true);
+  assert.equal(isIdeaOnly([`${IDEA_CLAIM_PREFIX} "x"`, "Reddit post"]), false);
+  assert.equal(isIdeaOnly([`[type: frequency | conf: 0.80] ${IDEA_CLAIM_PREFIX} "x"`]), true);
+  assert.equal(isIdeaOnly([]), false);
 });

@@ -12,7 +12,7 @@ import {
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
 import { commonWords, matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
-import { matchFormat } from "../ideas/ideas.ts";
+import { jaccard, matchFormat, tokens } from "../ideas/ideas.ts";
 import { IDEA_FORMAT_MAP } from "./from-ideas.ts";
 import {
   ALLOWED_FORMATS,
@@ -46,6 +46,41 @@ export interface GenerationResult {
   totalCandidatesGenerated: number;
   /** Candidates removed before selection because no evidence row had a source and a url or excerpt. */
   droppedUnsourced: number;
+  /** Candidates folded into another one that shares audience and problem, across markets and formats. */
+  mergedSimilar: number;
+}
+
+/** Problems sharing this much of their content words are one problem. */
+export const SAME_PROBLEM = 0.6;
+
+/**
+ * One opportunity per (audience, problem), across markets and formats (issue #70). Best score
+ * first; a later candidate with the same audience and a near-identical problem is folded into the
+ * kept one, which takes its format when it names none. An idea-only candidate has an audience of
+ * its own ("People searching ..."), so it only merges when the problem is the same text.
+ */
+export function mergeSharedProblems(candidates: GeneratedOpportunity[]): { kept: GeneratedOpportunity[]; merged: number } {
+  const kept: Array<{ c: GeneratedOpportunity; aud: string; toks: string[] }> = [];
+  let merged = 0;
+  const order = [...candidates].sort(
+    (a, b) => b.opportunityScore - a.opportunityScore || Number(!!b.format) - Number(!!a.format) || b.evidence.length - a.evidence.length,
+  );
+  for (const c of order) {
+    const aud = normalizeKey(c.targetAudience);
+    const toks = tokens(c.problem);
+    const twin = kept.find((k) => {
+      const sim = jaccard(k.toks, toks);
+      return sim >= SAME_PROBLEM && (k.aud === aud || sim === 1);
+    });
+    if (twin) {
+      if (!twin.c.format && c.format) twin.c = { ...twin.c, format: c.format };
+      merged++;
+      continue;
+    }
+    kept.push({ c, aud, toks });
+  }
+  const byId = new Map(kept.map((k) => [k.c.id, k.c]));
+  return { kept: candidates.filter((c) => byId.has(c.id)).map((c) => byId.get(c.id)!), merged };
 }
 
 function normalizeKey(str: string): string {
@@ -389,7 +424,9 @@ export async function generate25Opportunities(
   // A candidate without a sourced evidence row is dropped here, not saved (QC Rule 1, Part 6.8),
   // and no two different problems may cite the identical signal set.
   const sourced = deduped.filter((c) => sourcedEvidenceCount(c.id, c.evidence) > 0);
-  const candidatePool = distinctEvidenceSets(sourced, new Map(markets.map((m) => [m.id, m.signals.length])));
+  const { kept: candidatePool, merged: mergedSimilar } = mergeSharedProblems(
+    distinctEvidenceSets(sourced, new Map(markets.map((m) => [m.id, m.signals.length]))),
+  );
 
   // Step 2: Select a diversified set of at most targetCount
   const finalOpportunities = selectDiversifiedOpportunities(candidatePool, targetCount);
@@ -423,6 +460,7 @@ export async function generate25Opportunities(
     diversification,
     totalCandidatesGenerated: candidatePool.length,
     droppedUnsourced: deduped.length - sourced.length,
+    mergedSimilar,
   };
 }
 

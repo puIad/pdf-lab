@@ -346,7 +346,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         },
         evidence: opp.evidence,
       }));
-      return Object.assign(pairs, { droppedUnsourced: res.droppedUnsourced, ideasInNoMarket });
+      return Object.assign(pairs, { droppedUnsourced: res.droppedUnsourced, ideasInNoMarket, mergedSimilar: res.mergedSimilar });
     },
 
     saveOpportunities: async (opportunities, runId) => {

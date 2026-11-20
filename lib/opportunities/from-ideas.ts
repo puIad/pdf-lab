@@ -117,3 +117,14 @@ export function ideaCandidates(
     } satisfies GeneratedOpportunity;
   });
 }
+
+/** True when every evidence claim of an opportunity is a quick-idea phrase row: it rests on search suggestions alone. */
+export function isIdeaOnly(claims: string[]): boolean {
+  // A stored claim carries a "[type: ... | conf: ...]" prefix (parseEvidenceClaim).
+  return claims.length > 0 && claims.every((c) => c.replace(/^\[[^\]]*\]\s*/, "").startsWith(IDEA_CLAIM_PREFIX));
+}
+
+/** Report wording for an idea-only opportunity (issue #70). */
+export function ideaOnlyNote(phraseRows: number): string {
+  return `Rests on ${phraseRows === 1 ? "one search phrase" : `${phraseRows} search phrases`} and has no problem, buyer-intent or gap evidence beyond a search suggestion.`;
+}
