@@ -79,7 +79,6 @@ export function placeCompetitor(
   if (direct) return { relevant: true, marketId: direct };
   const seedStems = tokens(seed).map(stem);
   const all = tokens(listing.title);
-  // One seed word says nothing ("budgeting"): only a seed of two or more words, all in the title, counts.
   const holdsSeed = seedStems.length > 0 && seedStems.every((s) => all.some((t) => stem(t) === s));
   const words = all.filter((t) => !PRODUCT_WORDS.has(t) && !seedStems.includes(stem(t)));
   // A one-word seed ("budgeting") keeps the listing on the run only: only a seed of two or more words sends it to the main market.
