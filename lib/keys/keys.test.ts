@@ -190,7 +190,8 @@ describe("per-request routing and the ledger", () => {
     const keys = memoryKeys();
     const ledger = memoryLedger();
     await saveKey(keys, secret, { userId: USER, provider: "gemini", apiKey: GEMINI_KEY });
-    stubFetch(400);
+    const seen: string[] = [];
+    stubFetch(400, seen);
     const { router } = await createUserRouter({ userId: USER, keys, ledger, secret: () => secret, env: HOSTED_ENV });
     const r = await router.generateObject({ tier: "cheap", system: "s", user: "u", validate: ok });
     assert.equal(r.keySource, "hosted");
@@ -198,8 +199,13 @@ describe("per-request routing and the ledger", () => {
     assert.match(r.keyNotice ?? "", /hosted quota/);
     assert.ok(!(r.keyNotice ?? "").includes("TESTKEY"));
     assert.equal(keys.rows.get(`${USER}/gemini`)!.status, "revoked");
-    assert.equal(ledger.rows.length, 1); // the refused call used nothing; only the hosted answer is billed
-    assert.equal(ledger.rows[0].keySource, "hosted");
+    // A second call in the same request does not try the refused key again.
+    const before = seen.length;
+    await router.generateObject({ tier: "cheap", system: "s", user: "u", validate: ok });
+    assert.ok(seen.slice(before).every((s) => !s.includes("generativelanguage")));
+    assert.equal(ledger.rows.length, 2); // each call is billed once, both to the hosted quota
+    assert.ok(ledger.rows.every((r) => r.keySource === "hosted"));
+    // The refused call used nothing; only the hosted answers are billed.
     // The next request does not try the revoked key again.
     const again = await createUserRouter({ userId: USER, keys, ledger, secret: () => secret, env: HOSTED_ENV });
     assert.deepEqual(again.byokProviders, []);

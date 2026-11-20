@@ -184,6 +184,7 @@ export class AIRouter {
 
   private async keyRefused(name: string): Promise<string> {
     const kind = name.slice(BYOK_PREFIX.length);
+    this.byok.delete(name); // later calls in this request skip the refused key
     try {
       await this.opts.onKeyRefused?.(kind, `${kind} refused the key (HTTP 401/403)`);
     } catch (e) {
