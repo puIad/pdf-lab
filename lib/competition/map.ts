@@ -10,7 +10,7 @@ export const MIN_SHARED_WORDS = 2;
 const PRODUCT_WORDS = new Set(
   ("pdf printable print digital download instant editable template planner guide ebook book workbook checklist tracker sheet " +
     "spreadsheet journal notebook bundle kit pack page edition kindle store notion excel google canva free best seller " +
-    "complete simple ultimate beginner size letter a4 a5").split(" "),
+    "complete simple ultimate beginner size letter a4 a5 monthly weekly daily yearly annual").split(" "),
 );
 
 const stem = (t: string): string => t.replace(/(ing|s)$/, "");
@@ -65,10 +65,10 @@ export function marketForCompetitor(
 
 /**
  * Issue #72: what a run does with one listing. A listing is on topic when its title holds every
- * word of the seed, or shares a word with a market's name or signals. Anything else ("Noctua Wood
- * PC" for a PC troubleshooting seed) is dropped. An on-topic listing goes to the market it matches
- * best, or, when it overlaps none beyond the seed, to the market with the most signals (the
- * niche's main market) so it is not left on the run only.
+ * word of the seed, has no words beyond seed and product words, or matches a market (see
+ * marketForCompetitor). Anything else ("Noctua Wood PC" for a PC troubleshooting seed) is dropped.
+ * A listing holding the whole seed goes to the main market (most signals); one with nothing but
+ * seed and product words stays on the run only.
  */
 export function placeCompetitor(
   listing: { title: string; signalId?: string | null },
@@ -82,18 +82,8 @@ export function placeCompetitor(
   // One seed word says nothing ("budgeting"): only a seed of two or more words, all in the title, counts.
   const holdsSeed = seedStems.length >= 2 && seedStems.every((s) => all.some((t) => stem(t) === s));
   const words = all.filter((t) => !PRODUCT_WORDS.has(t) && !seedStems.includes(stem(t)));
-  let best: CompetitorMarket | null = null;
-  let bestShared = 0;
-  for (const m of markets) {
-    const hay = new Set(tokens([m.name, ...m.texts].join(" ")));
-    const shared = words.filter((t) => hay.has(t)).length;
-    if (shared > bestShared) {
-      best = m;
-      bestShared = shared;
-    }
-  }
-  if (best) return { relevant: true, marketId: best.id };
-  if (!holdsSeed) return { relevant: false, marketId: null };
+  // Nothing but seed and product words ("Monthly Budget Planner" for `budgeting`): on topic, kept on the run.
+  if (!holdsSeed) return words.length === 0 ? { relevant: true, marketId: null } : { relevant: false, marketId: null };
   const main = [...markets].sort((a, b) => b.signalIds.length - a.signalIds.length)[0];
   return { relevant: true, marketId: main?.id ?? null };
 }

@@ -95,6 +95,15 @@ describe("placeCompetitor (issue #72)", () => {
   it("sends a listing that holds the whole seed to the market with most signals", () => {
     assert.deepEqual(placeCompetitor({ title: "PC Troubleshooting Checklist | Printable PDF" }, markets, seed), { relevant: true, marketId: "m-slow" });
   });
+  it("keeps on-topic listings of a one-word seed and drops an off-topic one that shares one word", () => {
+    const debt: CompetitorMarket[] = [
+      { id: "m-debt", name: "Paying off debt", signalIds: ["s1"], texts: ["how do I get started paying off debt"] },
+    ];
+    for (const title of ["Budgeting Planner Printable PDF", "Monthly Budget Planner"]) {
+      assert.equal(placeCompetitor({ title }, debt, "budgeting").relevant, true, title);
+    }
+    assert.deepEqual(placeCompetitor({ title: "Getting Started with Kindle Create" }, debt, "budgeting"), { relevant: false, marketId: null });
+  });
 });
 
 describe("run work (issue #72)", () => {

@@ -86,13 +86,14 @@ Part 6.11 (`lib/scoring/scoring.ts`): the score is a rule-based index, not a mea
    Listings are placed per market by title overlap; a listing about something else is dropped and
    counted in `plan.work.listingsDropped` (issue #72).
 
+4. No "high demand" from AI opinion alone.
+5. Separate observed facts vs AI interpretation vs product suggestion — in schema
+   (`evidence` vs analysis fields vs `opportunities.solution`) AND in UI.
+
 **Run cost (issue #72).** Each run stores `plan.work` on `research_runs`: adapter calls, extraction
    model calls, tokens (null when none was metered, as in a pasted run), active milliseconds
    (the wait for a pasted reply excluded) and dropped listings. `GET /api/runs/<id>` returns it and
    the Deep page shows it. It does not depend on the usage ledger.
-4. No "high demand" from AI opinion alone.
-5. Separate observed facts vs AI interpretation vs product suggestion — in schema
-   (`evidence` vs analysis fields vs `opportunities.solution`) AND in UI.
 
 ## Confidence + completeness display (PRD §54–§55)
 

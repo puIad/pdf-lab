@@ -451,7 +451,7 @@ async function finishRun(
 
     if (compState.hasCompetitors) {
       // Each listing goes to the market it was clustered into or overlaps best; below the minimum
-      // overlap it stays on the run only (Part 6.7), never on the first market.
+      // overlap it is dropped unless it holds the whole seed (issue #72), never put on the first market.
       const mapTargets = marketCandidates.map((m) => ({
         id: m.id,
         name: m.name,
