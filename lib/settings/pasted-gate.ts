@@ -6,9 +6,7 @@ import { extractionPin, loadExtractionMode, pastedModeRefusal } from "./extracti
 
 /** Pasted-replies mode: a Deep run through the router would call a model, so answer with the /deep path instead. */
 export async function pastedModeResponse(): Promise<NextResponse | null> {
-  const mode = await loadExtractionMode(createServiceSupabaseClient()).catch(() => null);
-  const refusal = pastedModeRefusal(mode);
-  return refusal ? NextResponse.json(refusal, { status: 409 }) : null;
+  return (await extractionModeGate()).response;
 }
 
 /** For a route that extracts directly: the saved mode as a 409 (pasted) or the pin for the job (model). */

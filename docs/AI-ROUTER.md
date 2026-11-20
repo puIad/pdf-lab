@@ -52,8 +52,9 @@ model that answered a test, or pasted replies.
 - With a person's own keys (Part 5.2): a pinned model runs on its provider only. The person's key
   for that same provider (`byok-<provider>`) is tried first with the pinned model, then the hosted
   provider. Their keys for other providers are not used, because the owner chose this model.
-- Pasted mode: `POST /api/research` (Deep) and `POST /api/runs` (Deep) answer 409 with
-  `deepPath: "/deep"` and call no model. The Deep buttons already lead to `/deep`.
+- Pasted mode: `POST /api/research` (Deep), `POST /api/runs` (every mode: each one extracts) and
+  `POST /api/extract` (without `provider`) answer 409 with `deepPath: "/deep"` and call no model.
+  The Deep buttons already lead to `/deep`. `/api/extract` with `provider` set skips the saved mode.
 - No saved mode: unchanged, tier defaults and env models.
 - Who may change it: the server key, a dev server, or the account whose email is `OWNER_EMAIL`.
 
