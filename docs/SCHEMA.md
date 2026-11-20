@@ -313,3 +313,26 @@ create table app_settings (
 2. `(source_id, external_id)` unique on `signals` — dedup at the DB, not just in code.
 3. `signal_analysis.signal_id` unique — one extraction row per signal (re-runs UPDATE).
 4. Every score shown in UI joins to countable `evidence` rows (see `EVIDENCE-CONTRACT.md`).
+
+## Billing stub and cost per run (Part 5.3)
+
+```sql
+create table plan_changes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade not null,
+  from_plan text not null, to_plan text not null,           -- free | premium
+  source text not null check (source in ('stub')),
+  charged_cents integer not null default 0 check (charged_cents = 0),  -- a stub never charges
+  created_at timestamptz not null default now()
+);
+-- ledger_run_costs(p_since): per run_id (with research_runs.mode) calls, tokens, cost, unpriced calls.
+```
+
+- `plan_changes` is service-role only (RLS on, no policy). Written by `lib/billing/stub.ts` through
+  `POST /api/billing/stub`, which also sets `users.plan`. `ledger_run_costs` is executable by the
+  service role only and feeds `/admin/costs` and the account page's cost line.
+- `stub_change_plan(p_user, p_from, p_to)` sets `users.plan` and inserts the `plan_changes` row in one
+  transaction, so a failed insert rolls the plan flip back. It returns the new row's id. Service role
+  only (no grant to anon or authenticated), like `take_usage`. `apply` in `lib/billing/store.ts` calls it.
+- `create index on ai_usage_ledger (created_at)` lets that function's date filter avoid a full scan.
+- Migration: `supabase/migrations/20261120000016_billing_stub.sql`.

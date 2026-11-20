@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { loadMetrics } from "@/lib/analytics/store";
 import { WINDOW_DAYS, type Metrics } from "@/lib/analytics/metrics";
-import { resolveCaller } from "@/lib/quotas/guard";
+import { isMetricsAdmin, resolveCaller } from "@/lib/quotas/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +32,7 @@ function Stat({ title, value, note }: { title: string; value: string; note: stri
 
 export default async function MetricsPage() {
   const caller = await resolveCaller(await headers());
-  const admins = (process.env.METRICS_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const allowed = caller.plan === "local" || (caller.email !== null && admins.includes(caller.email.toLowerCase()));
-  if (!allowed) notFound();
+  if (!isMetricsAdmin(caller)) notFound();
 
   let m: Metrics | null = null;
   let loadError = "";

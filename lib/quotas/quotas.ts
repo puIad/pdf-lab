@@ -1,4 +1,6 @@
 // lib/quotas/quotas.ts — plans, limits and the quota decision (Phase 5 Part 5.1, PRD §49).
+
+import { COST_CEILING_USD } from "../usage/cost.ts";
 // Pure: the counting store is passed in, so the rules are tested without a database.
 
 export type Plan = "anon" | "free" | "premium";
@@ -11,9 +13,10 @@ export interface Limit {
   window: QuotaWindow;
 }
 
-// shortcut: anon and free follow phase-5 Part 5.1 (anon 1 to 3 searches a day; free about 5
-// explorations and 1 Deep run a month). The search and check caps and every premium number are
-// placeholders; set them from the usage ledger once it has data (Part 5.3, PRD §49).
+// Caps follow Part 5.1 for anon and the free Deep and idea-scan numbers (about 5 and 1 a month). Every
+// cap is checked against a monthly hosted-cost budget per plan (PLAN_BUDGET_USD, with the per-action
+// ceilings in lib/usage/cost.ts): see worstCaseMonthlyUsd and its test. The ceilings are design
+// bounds, not measurements, until the ledger holds real hosted Deep runs (docs/AI-ROUTER.md).
 export const LIMITS: Record<Plan, Record<UsageKind, Limit>> = {
   anon: {
     search: { max: 3, window: "day" },
@@ -22,21 +25,35 @@ export const LIMITS: Record<Plan, Record<UsageKind, Limit>> = {
     deep: { max: 0, window: "month" },
   },
   free: {
-    search: { max: 30, window: "day" },
+    search: { max: 20, window: "day" },
     exploration: { max: 5, window: "month" },
     check: { max: 20, window: "month" },
     deep: { max: 1, window: "month" },
   },
   premium: {
-    search: { max: 300, window: "day" },
+    search: { max: 200, window: "day" },
     exploration: { max: 100, window: "month" },
-    check: { max: 400, window: "month" },
-    deep: { max: 20, window: "month" },
+    check: { max: 300, window: "month" },
+    deep: { max: 12, window: "month" },
   },
 };
 
-// How many markets, seeds and ideas a watchlist holds in all (Part 4.1). Not a usage window: it
-// is the number of rows kept. shortcut: placeholders like the caps above, set in Part 5.3.
+/** The most the project may pay for one person's hosted use in a month, in USD. */
+export const PLAN_BUDGET_USD: Record<Plan, number> = { anon: 0.05, free: 1, premium: 12 };
+
+/** Cost if a person used every limit to the top for a 31-day month. */
+export function worstCaseMonthlyUsd(plan: Plan): number {
+  let total = 0;
+  for (const kind of USAGE_KINDS) {
+    const { max, window } = LIMITS[plan][kind];
+    total += max * (window === "day" ? 31 : 1) * COST_CEILING_USD[kind];
+  }
+  return Math.round(total * 1e6) / 1e6;
+}
+
+// How many markets, seeds and ideas a watchlist holds in all (Part 4.1). Not a usage window: it is
+// rows kept. A saved row is never re-scanned automatically, so a row costs storage and no model
+// call; the caps stay at 25 and 250 on that basis (reviewed in Part 5.3).
 export const WATCHLIST_LIMIT: Record<Plan, number> = { anon: 0, free: 25, premium: 250 };
 
 export const KIND_LABEL: Record<UsageKind, string> = {
@@ -135,7 +152,7 @@ export async function decide(
     return {
       ok: false,
       status: 429,
-      error: `${PLAN_LABEL[caller.plan]} limit reached: ${used} of ${max} ${KIND_LABEL[kind]} used this ${window}. Resets ${resetDate(quota.resetsAt)} (UTC).${caller.plan === "anon" ? " Sign in for more." : ""}`,
+      error: `${PLAN_LABEL[caller.plan]} limit reached: ${used} of ${max} ${KIND_LABEL[kind]} used this ${window}. Resets ${resetDate(quota.resetsAt)} (UTC).${caller.plan === "anon" ? " Sign in for more." : caller.plan === "free" ? ` Premium allows ${LIMITS.premium[kind].max} a ${LIMITS.premium[kind].window}: see your account.` : ""}`,
       quota,
     };
   }

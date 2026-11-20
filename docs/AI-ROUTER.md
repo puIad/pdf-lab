@@ -97,3 +97,20 @@ model that answered a test, or pasted replies.
 
 Cost-per-run is measured from Phase 1 (log tokens/calls per run) so Phase 5 pricing is
 data-driven (PRD §49-final).
+
+## Cost per run and plan limits (Part 5.3)
+
+- `ledger_run_costs` sums the ledger per run. `/admin/costs` (same access as `/admin/metrics`) shows
+  the median, p90 and max of Deep runs of the last 30 days beside the documented ceilings and lists
+  any run above its ceiling. With no rows it says "Not observed".
+- Documented per-action ceilings (`lib/usage/cost.ts`, USD): search 0.0005, idea scan 0.02, check
+  0.01, Deep run 0.25. They are design bounds, not measurements: when this part was built the ledger
+  held no hosted Deep run (hosted extraction has no chosen model, DEC-015). Replace them with the
+  measured p90 once at least 20 hosted Deep runs are in the ledger.
+- Plan limits (`lib/quotas/quotas.ts`) are held to a monthly hosted-cost budget (anon 0.05, free 1,
+  premium 12 USD): a test asserts every plan's worst case (all limits used, 31 days, at the ceilings)
+  stays inside it. The account page shows "a deep run costs about $X" from the measured median once 5
+  Deep runs exist, else the ceiling, labelled as a ceiling.
+- Stub billing: `BILLING_MODE` is the constant `stub`, `charge()` always throws, and `plan_changes.charged_cents`
+  is checked to be 0. `POST /api/billing/stub` is open on dev servers and, in production, only with
+  `BILLING_STUB_ENABLED=1`. Choosing Stripe or Paddle is a separate decision.
