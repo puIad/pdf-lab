@@ -1,30 +1,15 @@
 // app/api/settings/extraction/route.ts — the extraction mode (Part 6.9, DEC-015).
-// GET: the saved mode and the candidate models of the configured providers.
 // POST { mode }: saves it. A model mode is tested again here and refused unless it answers.
 
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { getRouter } from "@/lib/ai/index";
 import { candidateModels, checkModeForSave, parseExtractionMode } from "@/lib/ai/extraction-mode";
-import { loadExtractionMode, saveExtractionMode } from "@/lib/settings/extraction-mode";
+import { saveExtractionMode } from "@/lib/settings/extraction-mode";
 import { resolveCaller } from "@/lib/quotas/guard";
 import { canManageSettings } from "@/lib/settings/access";
 
 export const dynamic = "force-dynamic";
-
-export async function GET(req: Request) {
-  const caller = await resolveCaller(req.headers);
-  if (!canManageSettings(caller)) return NextResponse.json({ error: "Only the owner can read settings." }, { status: 403 });
-  const router = getRouter();
-  let mode = null;
-  let loadError: string | null = null;
-  try {
-    mode = await loadExtractionMode(createServiceSupabaseClient());
-  } catch (err) {
-    loadError = err instanceof Error ? err.message : String(err);
-  }
-  return NextResponse.json({ mode, loadError, candidates: candidateModels(router.configuredProviderNames()) });
-}
 
 export async function POST(req: Request) {
   const caller = await resolveCaller(req.headers);

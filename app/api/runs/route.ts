@@ -65,10 +65,9 @@ export async function POST(req: Request) {
     sourceKeys = body.source_keys as string[];
   }
 
-  if (mode === "deep") {
-    const pasted = await pastedModeResponse();
-    if (pasted) return pasted;
-  }
+  // Every mode runs extraction, so pasted replies gate them all (Part 6.9).
+  const pasted = await pastedModeResponse();
+  if (pasted) return pasted;
 
   try {
     const deps = createServerOrchestratorDeps();

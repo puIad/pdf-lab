@@ -53,11 +53,6 @@ export function parseExtractionMode(raw: unknown): ExtractionMode | null {
   return null;
 }
 
-export function describeMode(mode: ExtractionMode | null): string {
-  if (!mode) return "Not chosen";
-  return mode.kind === "pasted" ? "Pasted replies" : `${mode.model} on ${mode.provider}`;
-}
-
 export interface ModelTestResult {
   answered: boolean;
   ms: number;

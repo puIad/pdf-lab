@@ -1,6 +1,7 @@
 // lib/ai/extraction-mode.test.ts — the extraction mode: parsing, candidates, the response test.
 // Zero network: fake providers only.
 
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { AIRouter } from "./router.ts";
@@ -136,5 +137,15 @@ describe("pastedModeRefusal and canManageSettings", () => {
     assert.equal(canManageSettings(c("free", "other@x.io"), "me@x.io"), false);
     assert.equal(canManageSettings(c("free", "me@x.io"), undefined), false);
     assert.equal(canManageSettings(c("anon"), "me@x.io"), false);
+  });
+});
+
+describe("/api/runs gate", () => {
+  it("runs the pasted-mode gate for every mode, before any run starts", () => {
+    const src = readFileSync(new URL("../../app/api/runs/route.ts", import.meta.url), "utf8");
+    const gate = src.indexOf("await pastedModeResponse()");
+    assert.ok(gate > 0, "route calls the gate");
+    assert.ok(gate < src.indexOf("createServerOrchestratorDeps()"), "gate runs before the run is built");
+    assert.ok(!/if \(mode === "deep"\)[^}]*pastedModeResponse/.test(src), "gate is not limited to deep");
   });
 });
