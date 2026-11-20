@@ -125,6 +125,6 @@ export function isIdeaOnly(claims: string[]): boolean {
 }
 
 /** Report wording for an idea-only opportunity (issue #70). */
-export function ideaOnlyNote(phraseRows: number): string {
-  return `Rests on ${phraseRows === 1 ? "one search phrase" : `${phraseRows} search phrases`} and has no problem, buyer-intent or gap evidence beyond a search suggestion.`;
+export function ideaOnlyNote(): string {
+  return "Rests on one search phrase and has no problem, buyer-intent or gap evidence beyond a search suggestion.";
 }

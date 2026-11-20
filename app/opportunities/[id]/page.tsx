@@ -191,7 +191,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
             </div>
             <div>Direct Citations: <span className="font-bold text-foreground font-mono">{directEvidence.length} verified rows</span></div>
             {isIdeaOnly(directEvidence.map((e) => e.claim)) && (
-              <div className="basis-full font-medium text-amber-600">{ideaOnlyNote(directEvidence.length)}</div>
+              <div className="basis-full font-medium text-amber-600">{ideaOnlyNote()}</div>
             )}
             {opp.matching_signals != null && opp.market_signal_count != null && (
               <div>
