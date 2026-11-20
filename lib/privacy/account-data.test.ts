@@ -1,0 +1,29 @@
+// lib/privacy/account-data.test.ts — export shape and the delete confirmation.
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { buildExport, EXPORT_TABLES, isDeleteConfirmed } from "./account-data.ts";
+
+describe("account export", () => {
+  it("always carries every table, empty when the person has no rows", () => {
+    const e = buildExport(new Date("2026-11-20T10:00:00Z"), { email: "a@b.c", plan: "free", createdAt: null }, { watchlists: [{ kind: "seed", ref: "meal prep" }] });
+    assert.deepEqual(Object.keys(e.data).sort(), ["ai_usage_ledger", "metric_events", "plan_changes", "research_runs", "usage_events", "user_provider_keys", "watchlists"]);
+    assert.equal(e.data.watchlists.length, 1);
+    assert.deepEqual(e.data.usage_events, []);
+    assert.equal(e.exportedAt, "2026-11-20T10:00:00.000Z");
+  });
+  it("never exports the key ciphertext", () => {
+    for (const [table, columns] of Object.entries(EXPORT_TABLES)) {
+      assert.ok(!columns.split(",").map((c) => c.trim()).includes("ciphertext"), `${table} exports ciphertext`);
+    }
+    assert.equal(EXPORT_TABLES.user_provider_keys, "provider, last4, options, status, created_at, rotated_at");
+  });
+});
+
+describe("delete confirmation", () => {
+  it("accepts the phrase with any case and spacing", () => {
+    assert.equal(isDeleteConfirmed({ confirm: "  Delete   My Account " }), true);
+  });
+  it("refuses anything else", () => {
+    for (const body of [null, {}, { confirm: "yes" }, { confirm: 1 }, { confirm: "delete my account now" }]) assert.equal(isDeleteConfirmed(body), false);
+  });
+});
