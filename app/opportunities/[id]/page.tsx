@@ -22,6 +22,7 @@ import {
   Users,
   ExternalLink,
 } from "lucide-react";
+import { UsefulVote } from "@/components/metrics/useful-vote";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
@@ -171,6 +172,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {opp.title}
           </h1>
+          <UsefulVote opportunityId={opp.id} />
 
           <div className="flex flex-wrap items-center gap-6 pt-1 text-xs text-muted-foreground">
             <div>

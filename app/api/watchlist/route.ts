@@ -9,6 +9,8 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/db/client";
 import { resolveCaller } from "@/lib/quotas/guard";
 import { WATCHLIST_LIMIT } from "@/lib/quotas/quotas";
+import { savedEvent } from "@/lib/analytics/metrics";
+import { recordEventSafely } from "@/lib/analytics/store";
 import { parseWatch } from "@/lib/watchlist/watchlist";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +52,8 @@ export async function POST(req: Request) {
         { status: 429 },
       );
     }
+    // Usefulness event (Part 6.2): written on the click, never failing the save.
+    if (data.status === "added") await recordEventSafely(createServiceSupabaseClient(), savedEvent(me.userId, watch));
     return NextResponse.json({ watched: true, count: data.total, limit: me.limit });
   } catch (err) {
     return failed(err);

@@ -37,6 +37,7 @@ in `.env.example` (placeholders only), in client bundles, or in chat.**
 | `PDFLAB_UNOFFICIAL_AUTOCOMPLETE` | Server-only flag | `.env.local` ONLY. Never in Vercel. | `1` enables the local-only search-suggestion adapter (DEC-008, Part 3.5). Ignored when `NODE_ENV=production` or `VERCEL` is set; the source then reports `skipped`. |
 | `AUTOCOMPLETE_GEO` | Server-only, optional | `.env.local` | Country code for suggestions, default `us`. Amazon stays on the US marketplace. |
 | `WIKIMEDIA_USER_AGENT` | Server-only, optional | `.env.local` / Vercel | Overrides the default `PDF-Lab/0.1 (+<prod URL>)` sent to Wikimedia. Must name a contact URL; do not put a personal email here. |
+| `METRICS_ADMIN_EMAILS` | Server-only, optional | `.env.local` / Vercel | Comma-separated emails that may open `/admin/metrics` (Part 6.2). Unset: only a local dev server can. Anyone else gets a 404. |
 
 ## Local setup
 

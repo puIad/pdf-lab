@@ -16,6 +16,8 @@ import { createServiceSupabaseClient } from "@/lib/db/client";
 import { REGIONS } from "@/lib/ideas/seeds";
 import { resolveCaller } from "@/lib/quotas/guard";
 import { WATCHLIST_LIMIT } from "@/lib/quotas/quotas";
+import { returnEvent } from "@/lib/analytics/metrics";
+import { recordEventSafely } from "@/lib/analytics/store";
 import { listWatches } from "@/lib/watchlist/store";
 import type { WatchItem } from "@/lib/watchlist/watchlist";
 
@@ -81,6 +83,8 @@ export default async function WatchlistPage() {
   let items: WatchItem[] = [];
   let markets = new Map<string, StoredMarket>();
   let loadError: string | null = null;
+  // Retention event (Part 6.2): one per person per day.
+  if (caller.userId) await recordEventSafely(createServiceSupabaseClient(), returnEvent(caller.userId, new Date()));
   if (caller.userId) {
     try {
       items = await listWatches(caller.userId);
