@@ -272,7 +272,7 @@ async function collectSignals(
     message: classifyingMessage,
   });
   await deps.updateRunStatus(runId, "classifying");
-  await deps.recordRunWork?.(runId, { adapterCalls: ingestResult.sources.length }).catch(() => undefined);
+  await deps.recordRunWork?.(runId, { adapterCalls: ingestResult.sources.filter((s) => s.status !== "skipped").length }).catch(() => undefined);
   return { signals, ingestResult };
 }
 

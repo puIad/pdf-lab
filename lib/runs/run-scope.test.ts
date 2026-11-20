@@ -99,7 +99,7 @@ describe("placeCompetitor (issue #72)", () => {
     const debt: CompetitorMarket[] = [
       { id: "m-debt", name: "Paying off debt", signalIds: ["s1"], texts: ["how do I get started paying off debt"] },
     ];
-    for (const title of ["Budgeting Planner Printable PDF", "Monthly Budget Planner"]) {
+    for (const title of ["Budgeting Planner Printable PDF", "Monthly Budget Planner", "Budget Planner 2027"]) {
       assert.equal(placeCompetitor({ title }, debt, "budgeting").relevant, true, title);
     }
     assert.deepEqual(placeCompetitor({ title: "Getting Started with Kindle Create" }, debt, "budgeting"), { relevant: false, marketId: null });
@@ -295,10 +295,11 @@ describe("executeResearchRun writes run_id and maps competitors", () => {
     );
     assert.deepEqual(
       competitors.map((c) => [c.run_id, c.market_id]),
-      [["run-9", "market-1"], ["run-9", "market-2"]], // the teachers listing is off topic and not stored
+      // The teachers listing holds the one-word seed, so it stays on the run with no market.
+      [["run-9", "market-1"], ["run-9", "market-2"], ["run-9", null]],
     );
-    // Competition evidence follows the mapping; the off-topic listing is dropped, not given to the first market.
+    // Competition evidence follows the mapping; a listing without a market is not given to the first market.
     const compEvidence = evidence.filter((e) => e.entityType === "competition" && e.claim.startsWith("Observed competitor"));
-    assert.deepEqual(compEvidence.map((e) => e.entityId), ["market-1", "market-2"]);
+    assert.deepEqual(compEvidence.map((e) => e.entityId), ["market-1", "market-2", "run-9"]);
   });
 });

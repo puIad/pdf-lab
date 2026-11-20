@@ -364,7 +364,7 @@ export function DeepView({
                 {finished.run.work && (
                   <p className="text-xs text-muted-foreground" data-testid="run-work">
                     Cost of this run: {describeWork(finished.run.work)}.
-                    {finished.run.work.listingsDropped > 0 && ` ${finished.run.work.listingsDropped} unrelated marketplace listings were dropped.`}
+                    {finished.run.work.listingsDropped > 0 && ` ${finished.run.work.listingsDropped === 1 ? "1 unrelated marketplace listing was" : `${finished.run.work.listingsDropped} unrelated marketplace listings were`} dropped.`}
                   </p>
                 )}
                 <ReplyProblems counts={finished} />

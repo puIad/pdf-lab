@@ -80,12 +80,16 @@ export function placeCompetitor(
   const seedStems = tokens(seed).map(stem);
   const all = tokens(listing.title);
   // One seed word says nothing ("budgeting"): only a seed of two or more words, all in the title, counts.
-  const holdsSeed = seedStems.length >= 2 && seedStems.every((s) => all.some((t) => stem(t) === s));
+  const holdsSeed = seedStems.length > 0 && seedStems.every((s) => all.some((t) => stem(t) === s));
   const words = all.filter((t) => !PRODUCT_WORDS.has(t) && !seedStems.includes(stem(t)));
-  // Nothing but seed and product words ("Monthly Budget Planner" for `budgeting`): on topic, kept on the run.
-  if (!holdsSeed) return words.length === 0 ? { relevant: true, marketId: null } : { relevant: false, marketId: null };
-  const main = [...markets].sort((a, b) => b.signalIds.length - a.signalIds.length)[0];
-  return { relevant: true, marketId: main?.id ?? null };
+  // A one-word seed ("budgeting") keeps the listing on the run only: only a seed of two or more words sends it to the main market.
+  if (holdsSeed && seedStems.length >= 2) {
+    const main = [...markets].sort((a, b) => b.signalIds.length - a.signalIds.length)[0];
+    return { relevant: true, marketId: main?.id ?? null };
+  }
+  // Holding the seed, or nothing but seed and product words ("Monthly Budget Planner" for `budgeting`): on topic, kept on the run.
+  if (holdsSeed || words.length === 0) return { relevant: true, marketId: null };
+  return { relevant: false, marketId: null };
 }
 
 // Stores whose pages are products. A `web` result from any other host is a discussion, not a competitor.
