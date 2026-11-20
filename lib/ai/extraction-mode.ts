@@ -35,9 +35,6 @@ export function candidateModels(configuredProviders: string[], env: NodeJS.Proce
   return all.filter((c) => configuredProviders.includes(c.provider));
 }
 
-export function isModelMode(mode: ExtractionMode | null): mode is Extract<ExtractionMode, { kind: "model" }> {
-  return mode?.kind === "model";
-}
 
 /** Parses a stored or posted value; anything that is not a valid mode is `null`. */
 export function parseExtractionMode(raw: unknown): ExtractionMode | null {
@@ -69,9 +66,8 @@ export async function testModel(
   router: TestRouter,
   target: { provider: string; model: string },
   timeoutMs = TEST_TIMEOUT_MS,
-  nowFn: () => number = Date.now,
 ): Promise<ModelTestResult> {
-  const t0 = nowFn();
+  const t0 = Date.now();
   if (!router.configuredProviderNames().includes(target.provider)) {
     return { answered: false, ms: 0, error: `provider '${target.provider}' is not configured` };
   }
@@ -91,11 +87,11 @@ export async function testModel(
         timer = setTimeout(() => reject(new Error(`no answer in ${Math.round(timeoutMs / 1000)} s`)), timeoutMs);
       }),
     ]);
-    const ms = nowFn() - t0;
+    const ms = Date.now() - t0;
     const reply = res.text.trim();
     return reply ? { answered: true, ms, reply: reply.slice(0, 40) } : { answered: false, ms, error: "empty reply" };
   } catch (err) {
-    return { answered: false, ms: nowFn() - t0, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) };
+    return { answered: false, ms: Date.now() - t0, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) };
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -105,9 +101,8 @@ export async function testModel(
 export async function checkModeForSave(
   router: TestRouter,
   mode: ExtractionMode,
-  timeoutMs?: number,
 ): Promise<{ ok: true; test?: ModelTestResult } | { ok: false; test: ModelTestResult }> {
   if (mode.kind === "pasted") return { ok: true };
-  const test = await testModel(router, mode, timeoutMs);
+  const test = await testModel(router, mode);
   return test.answered ? { ok: true, test } : { ok: false, test };
 }

@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { AIRouter } from "./router.ts";
 import { candidateModels, checkModeForSave, parseExtractionMode, testModel } from "./extraction-mode.ts";
-import { pastedModeRefusal } from "../settings/extraction-mode.ts";
+import { extractionPin, pastedModeRefusal } from "../settings/extraction-mode.ts";
 import { canManageSettings } from "../settings/access.ts";
 import type { AIProvider, ChatRequest } from "./types.ts";
 
@@ -168,6 +168,22 @@ describe("pastedModeRefusal and canManageSettings", () => {
     assert.equal(canManageSettings(c("free", "other@x.io"), "me@x.io"), false);
     assert.equal(canManageSettings(c("free", "me@x.io"), undefined), false);
     assert.equal(canManageSettings(c("anon"), "me@x.io"), false);
+  });
+});
+
+describe("/api/extract follows the saved mode", () => {
+  it("pins a saved model and pins nothing otherwise", () => {
+    assert.deepEqual(extractionPin({ kind: "model", provider: "nvidia", model: "m" }), { providerName: "nvidia", model: "m" });
+    assert.deepEqual(extractionPin({ kind: "pasted" }), {});
+    assert.deepEqual(extractionPin(null), {});
+  });
+
+  it("gates and pins unless the caller names a provider", () => {
+    const src = readFileSync(new URL("../../app/api/extract/route.ts", import.meta.url), "utf8");
+    assert.match(src, /body\.provider === undefined \? await extractionModeGate\(\)/);
+    assert.match(src, /if \(mode\?\.response\) return mode\.response/);
+    assert.match(src, /\.\.\.mode\?\.pin/);
+    assert.ok(src.indexOf("extractionModeGate()") < src.indexOf("runExtractionJob({"), "gate runs before the job");
   });
 });
 

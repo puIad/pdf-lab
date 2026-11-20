@@ -20,6 +20,11 @@ export async function saveExtractionMode(db: SupabaseClient, mode: ExtractionMod
   if (error) throw new Error(`Could not save the extraction mode: ${error.message}`);
 }
 
+/** What `runExtractionJob` gets from the saved mode: the pinned provider and model, or nothing. */
+export function extractionPin(mode: ExtractionMode | null): { providerName?: string; model?: string } {
+  return mode?.kind === "model" ? { providerName: mode.provider, model: mode.model } : {};
+}
+
 /**
  * For a Deep entry point that runs extraction through the router: the answer when the saved mode
  * is pasted replies, so no model is called and the caller sends the user to /deep.

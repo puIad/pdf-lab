@@ -18,8 +18,7 @@ import { isStoreUrl } from "../competition/map.ts";
 import { generate25Opportunities, ideaCandidates, OPPORTUNITY_TARGET, pickDistinctIdeas, type OpportunityMarketInput } from "../opportunities/index.ts";
 import { loadStoredIdeas } from "../ideas/stored.ts";
 import type { OrchestratorDeps, OrchestratorCompetitorItem } from "./orchestrator.ts";
-import { loadExtractionMode } from "../settings/extraction-mode.ts";
-import { isModelMode } from "../ai/extraction-mode.ts";
+import { extractionPin, loadExtractionMode } from "../settings/extraction-mode.ts";
 import { recordNewMarkets } from "../analytics/store.ts";
 import { parseMarketplaceProduct } from "../sources/marketplace-helper.ts";
 
@@ -112,7 +111,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         signals: inputs,
         router,
         tier: "cheap",
-        ...(isModelMode(mode) ? { providerName: mode.provider, model: mode.model } : {}),
+        ...extractionPin(mode),
         batchSize: Number(process.env.EXTRACTION_BATCH_SIZE) || undefined,
       });
 
