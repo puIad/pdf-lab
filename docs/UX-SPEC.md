@@ -33,6 +33,13 @@ Sections render from `markets` + evidence counts; empty states say "no markets o
 Columns: Market | Demand | Trend | Competition | Opportunity (+ confidence on hover/click).
 Rows link to market pages. Filters (Phase 3): trend, intent, competition, PDF-fit.
 
+**Niche trend note** (issue #71): when the run's Google Trends reading of the seed reaches no market
+(the classifier files a signal under a market only if it names a problem), the markets list, each
+market page and each opportunity's Why Now block show one labelled line: "Niche trend for <seed>:
+average interest, direction, N readings. Seed-level context, not a market's trend." Read from the
+run's own `run_signals` (`lib/trends/niche.ts`), never from a market. A market's trend label and
+QC Rule 2 line still count only that market's own dated signals.
+
 ## Market page (PRD §41–§42)
 
 Header + bars (Trend/Demand/Buyer-intent/Competition/PDF-fit, each with confidence) →

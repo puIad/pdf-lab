@@ -1,4 +1,5 @@
 // lib/markets/types.ts — Market data models and filter types for Market Explorer per PRD §7, §40.
+import type { NicheTrend } from "../trends/niche.ts";
 
 export type MarketTrend =
   | "emerging"
@@ -61,4 +62,6 @@ export interface FetchMarketsResult {
   scope: string;
   /** Markets stored before run scoping (`run_id` null). */
   legacyCount: number;
+  /** Each run's own seed-level Google Trends reading, apart from any market (issue #71). */
+  nicheTrends?: NicheTrend[];
 }
