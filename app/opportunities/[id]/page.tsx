@@ -92,7 +92,8 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   ]);
 
   const market = Array.isArray(opp.markets) ? opp.markets[0] : opp.markets;
-  const nicheTrend = await fetchNicheTrendOfRun(supabase, (market?.run_id as string | null | undefined) ?? null, await resolveCaller(await headers()));
+  const caller = await resolveCaller(await headers()).catch(() => null);
+  const nicheTrend = await fetchNicheTrendOfRun(supabase, (market?.run_id as string | null | undefined) ?? null, caller);
   const directEvidence = (evidenceRows ?? []) as EvidenceRow[];
   const marketRows = (marketEvidence ?? []) as EvidenceRow[];
 

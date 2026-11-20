@@ -70,7 +70,8 @@ export default async function MarketPage(props: MarketPageProps) {
   if (mErr || !market) {
     notFound();
   }
-  const nicheTrend = await fetchNicheTrendOfRun(supabase, market.run_id as string | null, await resolveCaller(await headers()));
+  const caller = await resolveCaller(await headers()).catch(() => null);
+  const nicheTrend = await fetchNicheTrendOfRun(supabase, market.run_id as string | null, caller);
 
   // 2. Fetch linked signals & analysis
   const { data: marketSignals } = await supabase
@@ -184,9 +185,7 @@ export default async function MarketPage(props: MarketPageProps) {
   const completeness = calculateCompleteness(counts);
 
   // 7. Is this market on the visitor's watchlist (Part 4.1)? Signed out, or unknown: shown as not saved.
-  const saved = await resolveCaller(await headers())
-    .then((caller) => watchKeys(caller.userId))
-    .catch((): string[] => []);
+  const saved = await (caller ? watchKeys(caller.userId) : Promise.resolve<string[]>([])).catch((): string[] => []);
   const watched = saved.includes(watchKey("market", market.id));
 
   return (
