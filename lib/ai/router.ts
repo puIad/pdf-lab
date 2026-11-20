@@ -19,16 +19,19 @@ import type {
   AIProvider,
   CallUsage,
   CostLogEntry,
+  KeySource,
+  MeteredCall,
   ProviderHealth,
   TaskTier,
 } from "./types.ts";
-import { addUsage, emptyUsage } from "./types.ts";
+import { addUsage, emptyUsage, isAuthFailure } from "./types.ts";
 import { OLLAMA_DEFAULT_MODEL } from "./providers/ollama.ts";
 import {
   OPENROUTER_DEFAULT_CHEAP_MODEL,
   OPENROUTER_DEFAULT_EMBED_MODEL,
 } from "./providers/openrouter.ts";
 import { NVIDIA_DEFAULT_CHAT_MODEL } from "./providers/openai-compatible.ts";
+import { GEMINI_DEFAULT_MODEL } from "./providers/gemini.ts";
 
 export interface TierSelection {
   tier: TaskTier;
@@ -44,6 +47,10 @@ export interface GenerateObjectResult<T> {
   provider: string;
   fallbackFrom?: string;
   attempts: number;
+  /** Who paid for the final call. */
+  keySource: KeySource;
+  /** Set when the person's own key was refused and another provider answered instead. */
+  keyNotice?: string;
 }
 
 const TIER_ENV: Record<TaskTier, { providerVar: string; modelVar: string }> = {
@@ -62,7 +69,23 @@ const TIER_DEFAULT_PROVIDER: Record<TaskTier, string> = {
 // without it (e.g. on Vercel) the chain falls through to openrouter as before.
 const FALLBACK_ORDER = ["ollama", "nvidia", "openrouter", "openai-compatible"];
 
-function defaultModelFor(provider: string, tier: TaskTier, env: NodeJS.ProcessEnv): string {
+/** Registry prefix of a provider that runs on the person's own key. */
+export const BYOK_PREFIX = "byok-";
+
+function defaultModelFor(registered: string, tier: TaskTier, env: NodeJS.ProcessEnv): string {
+  const provider = registered.startsWith(BYOK_PREFIX) ? registered.slice(BYOK_PREFIX.length) : registered;
+  if (registered.startsWith(BYOK_PREFIX)) {
+    // The person's own key: the tier env pins belong to the hosted setup, so they do not apply.
+    if (provider === "gemini") return tier === "embed" ? "" : GEMINI_DEFAULT_MODEL;
+    if (tier === "embed") {
+      if (provider === "openrouter") return OPENROUTER_DEFAULT_EMBED_MODEL;
+      if (provider === "openai-compatible") return "text-embedding-3-small";
+      return "";
+    }
+    if (provider === "openrouter") return OPENROUTER_DEFAULT_CHEAP_MODEL;
+    if (provider === "openai-compatible") return tier === "cheap" ? "gpt-4o-mini" : "gpt-4o";
+    return ""; // bedrock: a model id is required, so the stored options always carry one
+  }
   const override = env[TIER_ENV[tier].modelVar];
   if (override) return override;
   if (tier === "embed") {
@@ -90,6 +113,10 @@ function defaultModelFor(provider: string, tier: TaskTier, env: NodeJS.ProcessEn
 
 export interface AIRouterOptions {
   nowFn?: () => number;
+  /** Called after every successful provider call: the usage ledger. A failure here never fails the call. */
+  onCall?: (call: MeteredCall) => void | Promise<void>;
+  /** Called when a person's own key is refused (HTTP 401/403); the vault marks it revoked. */
+  onKeyRefused?: (provider: string, detail: string) => void | Promise<void>;
 }
 
 /** Strip markdown fences / leading prose so JSON.parse sees the object. */
@@ -108,12 +135,67 @@ export class AIRouter {
   private readonly providers = new Map<string, AIProvider>();
   private readonly env: NodeJS.ProcessEnv;
   private readonly nowFn: () => number;
+  private readonly opts: AIRouterOptions;
+  /** Providers that run on the person's own key, with the person's model choice. */
+  private readonly byok = new Map<string, { model?: string }>();
   /** Fallback health per provider, cached 60 s so each call does not add a request (rate limits). */
   private readonly health = new Map<string, { ok: boolean; at: number }>();
 
   constructor(env: NodeJS.ProcessEnv = process.env, opts: AIRouterOptions = {}) {
     this.env = env;
     this.nowFn = opts.nowFn ?? Date.now;
+    this.opts = opts;
+  }
+
+  /**
+   * Registers a provider that runs on the person's own key (its name starts with `byok-`). It is
+   * tried before every hosted provider and its calls are labelled `byok` in the ledger. `model`
+   * overrides the per-tier chat default.
+   */
+  registerByok(provider: AIProvider, model?: string): void {
+    if (!provider.name.startsWith(BYOK_PREFIX)) throw new Error(`BYOK provider name must start with '${BYOK_PREFIX}'`);
+    this.register(provider);
+    this.byok.set(provider.name, { model });
+  }
+
+  private keySourceOf(name: string): KeySource {
+    return this.byok.has(name) ? "byok" : "hosted";
+  }
+
+  private modelFor(name: string, tier: TaskTier): string {
+    return (tier !== "embed" && this.byok.get(name)?.model) || defaultModelFor(name, tier, this.env);
+  }
+
+  /** Providers on the person's key that can serve the tier. */
+  private byokChain(tier: TaskTier): string[] {
+    return [...this.byok.keys()].filter((n) => {
+      const p = this.providers.get(n);
+      return !!p && p.isConfigured && (tier !== "embed" || typeof p.embed === "function");
+    });
+  }
+
+  private async meter(call: MeteredCall): Promise<void> {
+    try {
+      await this.opts.onCall?.(call);
+    } catch (err) {
+      console.error("usage ledger write failed:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  private async keyRefused(name: string): Promise<string> {
+    const kind = name.slice(BYOK_PREFIX.length);
+    this.byok.delete(name); // later calls in this request skip the refused key
+    try {
+      await this.opts.onKeyRefused?.(kind, `${kind} refused the key (HTTP 401/403)`);
+    } catch (e) {
+      console.error("could not mark key revoked:", e instanceof Error ? e.message : e);
+    }
+    return `Your ${kind} key was refused by the provider (revoked or expired), so the hosted quota answered instead. Replace the key in your account.`;
+  }
+
+  /** The selected provider, then the person's other keys, then the hosted order. */
+  private chainFor(first: string, tier: TaskTier): string[] {
+    return [...new Set([first, ...this.byokChain(tier), ...FALLBACK_ORDER.filter((n) => n !== first)])];
   }
 
   register(provider: AIProvider): void {
@@ -129,6 +211,8 @@ export class AIRouter {
 
   /** Resolve tier → provider+model WITHOUT network (config presence only). */
   resolveTier(tier: TaskTier): TierSelection {
+    const mine = this.byokChain(tier)[0];
+    if (mine) return { tier, provider: mine, model: this.modelFor(mine, tier) };
     const pinned = this.env[TIER_ENV[tier].providerVar];
     const first = pinned || TIER_DEFAULT_PROVIDER[tier];
     const chain = [first, ...FALLBACK_ORDER.filter((n) => n !== first)];
@@ -178,17 +262,18 @@ export class AIRouter {
     temperature?: number;
     maxTokens?: number;
     providerName?: string;
-  }): Promise<{ text: string; usage: CallUsage; model: string; provider: string; fallbackFrom?: string; latencyMs: number }> {
+  }): Promise<{ text: string; usage: CallUsage; model: string; provider: string; fallbackFrom?: string; latencyMs: number; keySource: KeySource; keyNotice?: string }> {
     const sel = input.providerName
-      ? { tier: input.tier, provider: input.providerName, model: defaultModelFor(input.providerName, input.tier, this.env) }
+      ? { tier: input.tier, provider: input.providerName, model: this.modelFor(input.providerName, input.tier) }
       : this.resolveTier(input.tier);
-    const chain = [sel.provider, ...FALLBACK_ORDER.filter((n) => n !== sel.provider)];
+    const chain = this.chainFor(sel.provider, input.tier);
     let lastError: unknown = null;
+    let keyNotice: string | undefined;
     for (const name of chain) {
       const provider = this.providers.get(name);
       if (!provider || !provider.isConfigured) continue;
-      // Skip providers that are provisioned but provably down (fast fail).
-      if (name !== sel.provider) {
+      // Skip hosted providers that are provisioned but provably down (fast fail).
+      if (name !== sel.provider && !this.byok.has(name)) {
         let h = this.health.get(name);
         if (!h || this.nowFn() - h.at > 60_000) {
           const r = await provider.healthCheck().catch(() => ({ ok: false as const }));
@@ -200,26 +285,31 @@ export class AIRouter {
       const t0 = this.nowFn();
       try {
         const res = await provider.chatComplete({
-          model: sel.provider === name ? sel.model : defaultModelFor(name, input.tier, this.env),
+          model: sel.provider === name ? sel.model : this.modelFor(name, input.tier),
           system: input.system,
           user: input.user,
           temperature: input.temperature,
           maxTokens: input.maxTokens,
         });
+        const latencyMs = this.nowFn() - t0;
+        await this.meter({ provider: name, model: res.model, tier: input.tier, keySource: this.keySourceOf(name), usage: res.usage, latencyMs });
         return {
           text: res.content,
           usage: res.usage,
           model: res.model,
           provider: name,
           fallbackFrom: name === sel.provider ? sel.fallbackFrom : sel.provider,
-          latencyMs: this.nowFn() - t0,
+          latencyMs,
+          keySource: this.keySourceOf(name),
+          keyNotice,
         };
       } catch (err) {
         lastError = err;
+        if (this.byok.has(name) && isAuthFailure(err)) keyNotice = await this.keyRefused(name);
       }
     }
     throw new Error(
-      `all AI providers failed for tier '${input.tier}': ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+      `all AI providers failed for tier '${input.tier}': ${lastError instanceof Error ? lastError.message : String(lastError)}${keyNotice ? ` (${keyNotice})` : ""}`,
     );
   }
 
@@ -240,6 +330,7 @@ export class AIRouter {
     const attempts: Array<{ text: string; usage: CallUsage; model: string; provider: string; fallbackFrom?: string }> = [];
     let usage = emptyUsage();
     let lastError: unknown = null;
+    let keyNotice: string | undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
       const res = await this.generateText({
         tier: input.tier,
@@ -250,6 +341,7 @@ export class AIRouter {
         providerName: input.providerName,
       });
       usage = addUsage(usage, res.usage);
+      keyNotice = res.keyNotice ?? keyNotice;
       try {
         const parsed: unknown = JSON.parse(extractJsonSlice(res.text));
         const object = input.validate(parsed);
@@ -260,6 +352,8 @@ export class AIRouter {
           provider: res.provider,
           fallbackFrom: res.fallbackFrom,
           attempts: attempt + 1,
+          keySource: res.keySource,
+          keyNotice,
         };
       } catch (err) {
         lastError = err;
@@ -283,6 +377,8 @@ export class AIRouter {
     fallbackFrom?: string;
     usage: CallUsage;
     latencyMs: number;
+    keySource: KeySource;
+    keyNotice?: string;
   }> {
     if (!input.texts || input.texts.length === 0) {
       return {
@@ -291,44 +387,51 @@ export class AIRouter {
         provider: input.providerName || "none",
         usage: emptyUsage(),
         latencyMs: 0,
+        keySource: "hosted",
       };
     }
     const sel = input.providerName
       ? {
           tier: "embed" as const,
           provider: input.providerName,
-          model: input.model || defaultModelFor(input.providerName, "embed", this.env),
+          model: input.model || this.modelFor(input.providerName, "embed"),
         }
       : this.resolveTier("embed");
-    const chain = [sel.provider, ...FALLBACK_ORDER.filter((n) => n !== sel.provider)];
+    const chain = this.chainFor(sel.provider, "embed");
     let lastError: unknown = null;
+    let keyNotice: string | undefined;
     for (const name of chain) {
       const provider = this.providers.get(name);
       if (!provider || !provider.isConfigured || typeof provider.embed !== "function") continue;
-      if (name !== sel.provider) {
+      if (name !== sel.provider && !this.byok.has(name)) {
         const h = await provider.healthCheck().catch(() => ({ ok: false as const }));
         if (!h.ok) continue;
       }
       const t0 = this.nowFn();
       try {
         const res = await provider.embed({
-          model: input.model || (sel.provider === name ? sel.model : defaultModelFor(name, "embed", this.env)),
+          model: input.model || (sel.provider === name ? sel.model : this.modelFor(name, "embed")),
           texts: input.texts,
         });
+        const latencyMs = this.nowFn() - t0;
+        await this.meter({ provider: name, model: res.model, tier: "embed", keySource: this.keySourceOf(name), usage: res.usage, latencyMs });
         return {
           embeddings: res.embeddings,
           model: res.model,
           provider: name,
           fallbackFrom: name === sel.provider ? sel.fallbackFrom : sel.provider,
           usage: res.usage,
-          latencyMs: this.nowFn() - t0,
+          latencyMs,
+          keySource: this.keySourceOf(name),
+          keyNotice,
         };
       } catch (err) {
         lastError = err;
+        if (this.byok.has(name) && isAuthFailure(err)) keyNotice = await this.keyRefused(name);
       }
     }
     throw new Error(
-      `all AI providers failed for tier 'embed': ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+      `all AI providers failed for tier 'embed': ${lastError instanceof Error ? lastError.message : String(lastError)}${keyNotice ? ` (${keyNotice})` : ""}`,
     );
   }
 

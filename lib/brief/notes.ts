@@ -82,5 +82,7 @@ export async function writeBriefNote(router: AIRouter, brief: Brief, key: string
     citeIds: res.object.citeIds.filter((id) => known.has(id)),
     provider: res.provider,
     model: res.model,
+    keySource: res.keySource,
+    ...(res.keyNotice ? { keyNotice: res.keyNotice } : {}),
   };
 }

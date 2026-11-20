@@ -214,6 +214,46 @@ create table watchlists (
 - Migrations: `supabase/migrations/20261116000010_watchlists.sql`,
   `20261116000011_atomic_limits.sql`.
 
+## BYOK keys and the AI usage ledger (Part 5.2)
+
+```sql
+create table user_provider_keys (
+  user_id uuid references users(id) on delete cascade not null,
+  provider text not null check (provider in ('gemini', 'openai-compatible', 'bedrock', 'openrouter')),
+  ciphertext text not null,        -- AES-256-GCM, bound to (user_id, provider); see lib/keys/crypto.ts
+  last4 text not null,             -- the only part of a key ever shown
+  options jsonb not null default '{}',  -- non-secret: baseUrl, region, model
+  status text not null default 'active' check (status in ('active', 'revoked')),
+  status_detail text,
+  created_at timestamptz not null default now(),
+  rotated_at timestamptz,
+  primary key (user_id, provider)
+);
+create table ai_usage_ledger (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade,      -- null: a server-key call
+  run_id uuid references research_runs(id) on delete set null,
+  provider text not null, model text not null,
+  tier text not null check (tier in ('cheap', 'strong', 'embed')),
+  key_source text not null check (key_source in ('byok', 'hosted')),   -- who paid
+  prompt_tokens integer not null default 0, completion_tokens integer not null default 0,
+  total_tokens integer not null default 0,
+  estimated_cost_usd numeric(12, 6) not null default 0,
+  cost_basis text not null check (cost_basis in ('reported', 'table', 'unpriced')),
+  created_at timestamptz not null default now()
+);
+```
+
+- `user_provider_keys`: service-role only (RLS on, all grants revoked, no policy). Not even the owner
+  reads a row through the API; `GET /api/keys` returns the masked view. Saving over a row is a
+  rotation (new ciphertext, `rotated_at` set, status active again). A provider that answers a key
+  with HTTP 401 or 403 sets `status = 'revoked'`; the key is then skipped until replaced.
+- `ai_usage_ledger`: one row per model call (embeddings included), written by the router's
+  `onCall` hook. The owner may select their own rows; only the service role writes. `cost_basis` says
+  where the number came from: `reported` by the provider, `table` (token counts times the rate table in
+  `lib/usage/ledger.ts`), or `unpriced` (tokens counted, cost 0).
+- Migration: `supabase/migrations/20261120000013_byok_keys_ledger.sql`.
+
 ## Success metrics (Part 6.2, PRD §58 to §59)
 
 ```sql
@@ -247,7 +287,7 @@ create table metric_events (
 
 - Public read: `markets`, `opportunities`, `competitors`, `evidence`, `sources` (anon can
   browse explorer within free-tier limits enforced app-side).
-- Private: `users` (owner only), `watchlists` (owner only, Part 4.1), `research_runs` + `signals`/`signal_analysis`/
+- Private: `user_provider_keys` (service role only, Part 5.2), `ai_usage_ledger` (owner reads), `users` (owner only), `watchlists` (owner only, Part 4.1), `research_runs` + `signals`/`signal_analysis`/
   `market_signals`/`run_signals` (owner's runs + linked rows, or service-role only in MVP; tighten in Phase 5).
 - Enforce with policies + tests in Phase 0 Part 0.2; service-role key NEVER ships to client.
 

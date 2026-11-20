@@ -5,6 +5,7 @@ import { createServiceSupabaseClient } from "../db/client.ts";
 import { runIngest } from "../ingest/pipeline.ts";
 import { getServiceDeps as createServerIngestDeps } from "../ingest/service-deps.ts";
 import { getRouter, runExtractionJob } from "../ai/index.ts";
+import type { UserRouter } from "../keys/user-router.ts";
 import { clusterSignals } from "../cluster/clusterer.ts";
 import { summarizeCluster } from "../cluster/summarizer.ts";
 import { groupByMarket } from "./pasted.ts";
@@ -29,11 +30,13 @@ export interface ServerDepsOptions {
    * observed pool only.
    */
   marketLabels?: Map<string, string>;
+  /** The router for this person (Part 5.2): their own keys first, every call in the ledger. Default: hosted, unmetered. */
+  userRouter?: UserRouter;
 }
 
 export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): OrchestratorDeps {
   const supabase = createServiceSupabaseClient();
-  const router = getRouter();
+  const router = options.userRouter?.router ?? getRouter();
   const { marketLabels } = options;
 
   return {
@@ -55,6 +58,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         throw new Error(`Failed to create research_run: ${error?.message}`);
       }
 
+      if (options.userRouter) options.userRouter.context.runId = data.id; // the run's model calls are filed under it
       return { id: data.id, started_at: data.started_at };
     },
 

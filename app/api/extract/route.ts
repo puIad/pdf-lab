@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { enforceQuota } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { getRouter, runExtractionJob } from "@/lib/ai/index";
+import { runExtractionJob } from "@/lib/ai/index";
+import { routerForUser } from "@/lib/keys/server";
 import type { ExtractionInput } from "@/lib/ai/index";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { buildSearchFilter } from "@/lib/db/search";
@@ -154,7 +155,7 @@ export async function POST(req: Request) {
   try {
     job = await runExtractionJob({
       signals: inputs,
-      router: getRouter(),
+      router: (await routerForUser(null)).router,
       tier: "cheap",
       providerName: body.provider as string | undefined,
     });

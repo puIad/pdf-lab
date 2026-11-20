@@ -7,6 +7,7 @@ import { enforceQuota, resolveCaller } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { executeResearchRun } from "@/lib/runs/orchestrator";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
+import { routerForUser } from "@/lib/keys/server";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const deps = createServerOrchestratorDeps();
+    const deps = createServerOrchestratorDeps({ userRouter: await routerForUser(null) });
     const result = await executeResearchRun(
       {
         query: body.query.trim(),

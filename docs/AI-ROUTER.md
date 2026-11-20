@@ -48,5 +48,33 @@ new file + registry line, zero caller changes.
   never logged, never sent to client.
 - **Mode 3 — Hosted premium:** project pays, higher limits (Phase 5).
 
+### BYOK routing and the usage ledger (Part 5.2)
+
+- `lib/keys/vault.ts` stores a person's Gemini, OpenAI-compatible, Bedrock or OpenRouter key
+  (`PUT /api/keys`, rotate by saving again, `DELETE /api/keys?provider=`). Keys are AES-256-GCM
+  encrypted with `KEY_VAULT_SECRET`, bound to the user and provider, never logged, never returned.
+  `GET /api/keys` shows the last 4 characters and the status.
+- `routerForUser(userId)` (`lib/keys/server.ts`) builds the router for one request: the person's
+  active keys are registered as `byok-<provider>` and tried before every hosted provider, so Mode 2
+  wins when a key is present; the hosted providers stay as the fallback. Gemini and Bedrock have no
+  1536-dim embedding model here, so embeddings use an OpenAI-compatible or OpenRouter key, else hosted.
+- Every result carries `keySource` (`byok` or `hosted`): the label of who paid. When a key is refused
+  (HTTP 401/403) the call falls back to the hosted quota, the result carries `keyNotice` ("Your gemini
+  key was refused ... the hosted quota answered instead"), and the key is marked `revoked`. A 429 or
+  5xx from the person's own key also falls back, labelled `hosted`.
+- Every successful call writes an `ai_usage_ledger` row (tokens, cost estimate, `key_source`, `run_id`).
+  `GET /api/usage` totals the caller's month, or one run with `?run=<id>`, split by who paid. Part 5.3
+  prices plans from these rows.
+- Cross-checking a BYOK run against the provider's dashboard: take the run's `GET /api/usage?run=<id>`
+  totals (`byKeySource.byok`) and compare the token sums with the usage page of the same key and
+  window: Google AI Studio usage (Gemini), the OpenAI usage dashboard, OpenRouter Activity, or
+  CloudWatch Bedrock invocation metrics. Provider-reported token counts are stored as received, so the
+  two should agree to the call; a hosted-fallback call appears only in our ledger. The cost column is
+  an estimate (`cost_basis`), the token counts are the figures to reconcile.
+- Not built here (no UI yet): a key-entry form on `/account`. The endpoints above are the contract.
+- Only the Deep run in one request, brief notes and the pipeline endpoints call the router with a
+  person attached; a signed-in person's pasted Deep run (DEC-015) makes no router call, so it has no
+  BYOK spend.
+
 Cost-per-run is measured from Phase 1 (log tokens/calls per run) so Phase 5 pricing is
 data-driven (PRD §49-final).
