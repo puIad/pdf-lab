@@ -121,3 +121,40 @@ Part 6.11 (`lib/scoring/scoring.ts`): the score is a rule-based index, not a mea
 - A market page's panel and the Markdown export list QC Rules 1 to 5 as results on the market's
   stored rows (`marketQcRules` in `lib/report/observed.ts`): what was counted, and whether the rule
   holds, is broken, or has nothing to check. Never a fixed statement that a rule is enforced.
+
+## Scheduled monitoring (Phase 4 Part 4.2, DEC-001, DEC-010)
+
+Vercel Cron calls `GET /api/cron/monitor` once a day (`vercel.json`, 04:47 UTC; `Authorization: Bearer
+$CRON_SECRET`, 401 without it). Verified 2026-11-20 against vercel.com/docs/cron-jobs/usage-and-pricing:
+Hobby allows 100 cron jobs per project, each at most once a day, fired anywhere in the hour (up to 59
+minutes late); an expression that runs more often fails the deployment. One daily call fits, so there is
+no mismatch with DEC-001. Each call works the jobs that are due, oldest success first:
+
+- **Tracked seeds** (`watchlists.kind = 'seed'`, one job per seed and region): the same quick-ideas scan as
+  `POST /api/ideas`, stored as a dated `seed_snapshots` row. The diff against the snapshots before it
+  adds two trend bases to a phrase, each carrying its dates (QC Rule 2): `new` (in no earlier snapshot;
+  `firstSeen` and `previousScan`) and `history` (in the latest earlier snapshot, demand moved 10 points or
+  more; both dated readings). The first snapshot of a seed is the baseline: nothing in it is called new.
+  Watchlist rows show "N new this week", counted from first-seen dates in the last 7 days.
+- **Watched markets** (`kind = 'market'`, one job per seed of the market's run): a `monitor` run, as a
+  Vercel Workflow (`workflows/monitor-run.ts`): collect the seed's sources, extract only signals that have no
+  stored analysis, then build the change report (`change_reports`) against the newest earlier completed run
+  of the seed (a Deep or monitor run). No clustering and no new markets. A monitor run never replaces a
+  Deep run (`lib/runs/scope.ts` lists `deep` runs only).
+- **Change report** (PRD §44): counts of discussions, analysed discussions, strong or very strong buyer
+  intent, discussions naming a problem, and competitors (marketplace listings), each from the run's
+  `run_signals`. For every count `delta = added - removed`, where added and removed are signals in only
+  one of the two runs, so a delta can be checked against stored rows (`reconciles()`). New discussions
+  without an analysis (no model key, or extraction failed) are counted and named, never guessed.
+- A watched market follows its seed: the page shows the same-named market of the seed's newest Deep run,
+  or "not in the newest run" (`lib/monitor/follow.ts`).
+
+**Missed-run backoff** (`afterRun` in `lib/monitor/diff.ts`, state in `monitor_jobs`):
+
+| Situation | What happens |
+|---|---|
+| Job ran fine | Due again 20 h later, so a daily call that fires up to 59 min late is never skipped or doubled. |
+| The cron did not fire (outage, paused deployment) | Nothing is replayed. The job is still due, so the next call runs it once; the snapshot dates show the gap. |
+| A call has more due jobs than its budget (10 seed scans, 5 market runs, 240 s) | Oldest success first; the rest stay due for the next call. |
+| A scan stored no phrase signals, or a run failed | Failure 1 retries at the next daily call, then after 2, 4 and at most 7 days. A success resets it. |
+| `?force=1` | Ignores due times and backoff, for a manual re-run (needs the same bearer secret). |

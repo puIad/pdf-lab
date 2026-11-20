@@ -336,3 +336,24 @@ create table plan_changes (
   only (no grant to anon or authenticated), like `take_usage`. `apply` in `lib/billing/store.ts` calls it.
 - `create index on ai_usage_ledger (created_at)` lets that function's date filter avoid a full scan.
 - Migration: `supabase/migrations/20261120000016_billing_stub.sql`.
+
+## Scheduled monitoring (Part 4.2)
+
+```sql
+create table seed_snapshots (id uuid primary key default gen_random_uuid(), seed text not null, region text not null,
+  scanned_at timestamptz not null default now(), phrases jsonb not null default '[]', unique (seed, region, scanned_at));
+create table change_reports (id uuid primary key default gen_random_uuid(), seed text not null,
+  run_id uuid references research_runs(id) on delete cascade not null unique,
+  baseline_run_id uuid references research_runs(id) on delete set null,
+  created_at timestamptz not null default now(), report jsonb not null);
+create table monitor_jobs (key text primary key, last_ok_at timestamptz, failures int not null default 0,
+  next_due_at timestamptz, last_error text);
+```
+
+- `seed_snapshots.phrases` is `[{phrase, demand, opportunity, trend}]`, lowercased seed. `change_reports.report`
+  is the `ChangeReport` of `lib/monitor/types.ts`. `monitor_jobs.key` is `seed|<region>|<seed>` or `market|<seed>`.
+- Service role only (RLS on, no grants to `anon` or `authenticated`). People see only the rows of their own
+  watchlist, through `lib/monitor/view.ts` and `GET /api/monitor`.
+- Monitor runs are `research_runs` with `mode = 'monitor'` and their `run_signals`.
+- Migration: `supabase/migrations/20261120000019_monitoring.sql`. It must be applied before the cron
+  route can store anything; until then the watchlist page shows its rows without changes.
