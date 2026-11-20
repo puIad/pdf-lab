@@ -207,10 +207,10 @@ describe("score honesty (Part 6.11)", () => {
   });
 
   it("a single viral signal cannot outscore a market with many signals (#60)", () => {
-    const lone = demandFromSignals([reddit(0, 5000)]).demand; // a question-less viral post
+    const lone = demandFromSignals([{ ...reddit(0, 5000), title: "budget thread" }]).demand; // a viral post that is not a question
     const loneQuestion = demandFromSignals([{ ...reddit(0, 5000), title: "how do I budget?" }]).demand;
     const many = demandFromSignals(ranked(18)).demand;
-    assert.ok(loneQuestion <= 20, `lone signal demand ${loneQuestion}`);
+    assert.ok(loneQuestion <= 17, `lone signal demand ${loneQuestion}`);
     assert.ok(lone < many && loneQuestion < many, `lone ${lone}/${loneQuestion} vs 18 signals ${many}`);
   });
 
