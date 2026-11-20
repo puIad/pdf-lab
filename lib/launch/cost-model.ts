@@ -71,9 +71,9 @@ export const CEILING: ProjectionAssumptions = { activeShare: 1, premiumShare: 0.
 export const EXPECTED: ProjectionAssumptions = { activeShare: 0.3, premiumShare: 0.05, limitUse: 0.4 };
 
 /** Monthly dollars the project pays for `users` signed-up people. Premium people use the hosted AI. */
-export function projectMonthly(users: number, a: ProjectionAssumptions, freeMode: KeyMode = "free"): number {
+export function projectMonthly(users: number, a: ProjectionAssumptions): number {
   const active = users * a.activeShare;
   const premium = active * a.premiumShare;
   const free = active - premium;
-  return (free * monthlyCostAtLimit("free", freeMode) + premium * monthlyCostAtLimit("premium", "premium")) * a.limitUse;
+  return (free * monthlyCostAtLimit("free", "free") + premium * monthlyCostAtLimit("premium", "premium")) * a.limitUse;
 }
