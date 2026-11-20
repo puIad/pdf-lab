@@ -54,6 +54,8 @@ const DEMAND_WEIGHTS = { engagement: 35, trends: 35, questions: 15, sources: 15 
 const FULL_FREQUENCY_SHARE = 0.25;
 /** Median engagement at which the engagement component is 1 (log scale). */
 const FULL_ENGAGEMENT = 1000;
+/** A market needs this many signals for its demand to count in full; fewer scale it down linearly. */
+const FULL_SUPPORT_SIGNALS = 5;
 
 const QUESTION = /\?|^(how|what|why|when|where|who|which|can|is|are|does|do|should|will|would|could)\b/i;
 
@@ -86,7 +88,9 @@ function trendsInterest(s: SignalScoringItem): number | null {
  * Demand 0..100 from four observed quantities that do not depend on how many rows were fetched:
  * the median engagement of a discussion, the highest Trends interest, the share of question
  * phrasings, and how many source types saw the market. Engagement and Trends are skipped when not
- * observed (the weights renormalize), never counted as zero.
+ * observed (the weights renormalize), never counted as zero. Shares and medians of one or two rows
+ * are not a market, so demand is scaled by min(1, signals / 5): a lone viral question cannot outrank
+ * a market with many linked signals (defect #60).
  */
 export function demandFromSignals(signals: SignalScoringItem[]): { demand: number; basis: DemandBasis } {
   const engagement = signals.map(discussionEngagement).filter((v): v is number => v !== null);
@@ -108,7 +112,8 @@ export function demandFromSignals(signals: SignalScoringItem[]): { demand: numbe
   }
   if (basis.trendsInterest !== null) parts.push([DEMAND_WEIGHTS.trends, basis.trendsInterest / 100]);
   const weight = parts.reduce((n, [w]) => n + w, 0);
-  const demand = Math.round((parts.reduce((n, [w, v]) => n + w * v, 0) / weight) * 100);
+  const support = Math.min(1, signals.length / FULL_SUPPORT_SIGNALS);
+  const demand = Math.round((parts.reduce((n, [w, v]) => n + w * v, 0) / weight) * support * 100);
   return { demand, basis };
 }
 
