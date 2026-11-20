@@ -228,7 +228,7 @@ create table app_settings (
   service-role only.
 - Key `extraction_mode`: `{"kind":"model","provider":"nvidia","model":"..."}` or `{"kind":"pasted"}`.
   No row means no mode was chosen and the router keeps its tier defaults.
-- Migration: `supabase/migrations/20261120000013_app_settings.sql`.
+- Migration: `supabase/migrations/20261120000015_app_settings.sql`.
 
 ## RLS (Supabase)
 

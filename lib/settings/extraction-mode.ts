@@ -1,5 +1,5 @@
 // lib/settings/extraction-mode.ts — where the extraction mode is stored (table app_settings,
-// migration 13). Server-only: the service-role client reads and writes it.
+// migration 15). Server-only: the service-role client reads and writes it.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseExtractionMode, type ExtractionMode } from "../ai/extraction-mode.ts";
