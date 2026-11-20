@@ -33,7 +33,7 @@ function fakeSupabase(tables: Record<string, Record<string, string | null>[]>) {
       return {
         upsert: async (row: unknown) => (blocklist.push(row), { error: null }),
         select: () => ({
-          or: () => ({ range: async () => ({ data: tables[table].slice(), error: null }) }),
+          or: () => ({ order: () => ({ range: async () => ({ data: tables[table].slice(), error: null }) }) }),
         }),
         delete: () => ({
           in: async (_c: string, ids: string[]) => {

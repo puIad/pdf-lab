@@ -81,6 +81,7 @@ export async function addTakedown(supabase: SupabaseClient, url: string, reason?
         .from(table)
         .select(["id", ...columns].join(", "))
         .or(filter)
+        .order("id")
         .range(from, from + 999);
       if (selErr) throw new Error(`${table} lookup failed: ${selErr.message}`);
       const rows = (data ?? []) as unknown as Record<string, string | null>[];
