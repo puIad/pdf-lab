@@ -3,6 +3,12 @@
 Scores shown are EVIDENCE-DERIVED (PRD §7 note). Any number without backing rows is a bug.
 Frontend rule: build from the primitives in `components/ui` (DEC-016).
 
+## Settings (Part 6.9)
+
+`/settings`, owner only (linked from `/account`): the extraction mode. One row per candidate chat
+model with a Test button (answered or not answering, seconds) and "Use this model", enabled only
+after a passing test; a "Pasted replies" row. The mode in use is badged.
+
 ## Navigation and home (Part 6.12)
 
 - One header on every page: Ideas (`/`), Markets (`/markets`), Research (`/research`), Radar

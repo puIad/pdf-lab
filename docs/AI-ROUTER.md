@@ -39,6 +39,25 @@ new file + registry line, zero caller changes.
   both known limits: NVIDIA 40 requests a minute (DEC-013) and OpenRouter's 50 free calls a day
   (DEC-012). `signal_analysis.prompt_version` records the prompt (`extract-v2-batch`).
 
+## Extraction mode (Part 6.9, DEC-015)
+
+The extraction mode is a setting (`/settings`, table `app_settings`), not an env var: one chat
+model that answered a test, or pasted replies.
+
+- `/settings` lists candidate chat models per configured provider (`candidateModels`). **Test**
+  sends one 32-token chat call and shows whether it answered and in how long. A model that did not
+  answer cannot be selected, and `POST /api/settings/extraction` runs the test again before saving.
+- A model mode pins `providerName` + `model` on `generateText` / `generateObject`: that exact
+  model, no fallback to another provider. `runExtractionJob` gets them from the saved mode.
+- With a person's own keys (Part 5.2): a pinned model runs on its provider only. The person's key
+  for that same provider (`byok-<provider>`) is tried first with the pinned model, then the hosted
+  provider. Their keys for other providers are not used, because the owner chose this model.
+- Pasted mode: `POST /api/research` (Deep), `POST /api/runs` (every mode: each one extracts) and
+  `POST /api/extract` (without `provider`) answer 409 with `deepPath: "/deep"` and call no model.
+  The Deep buttons already lead to `/deep`. `/api/extract` with `provider` set skips the saved mode.
+- No saved mode: unchanged, tier defaults and env models.
+- Who may change it: the server key, a dev server, or the account whose email is `OWNER_EMAIL`.
+
 ## Hosting modes (PRD §34)
 
 - **Mode 1 — Free:** free web sources + free AI quotas + local/open models + restricted depth.

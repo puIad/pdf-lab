@@ -198,6 +198,17 @@ export class AIRouter {
     return [...new Set([first, ...this.byokChain(tier), ...FALLBACK_ORDER.filter((n) => n !== first)])];
   }
 
+  /**
+   * A pinned model runs on its own provider only. The person's key for that same provider
+   * (`byok-<provider>`) is tried first, with the pinned model; their keys for other providers are not,
+   * because the owner chose this model.
+   */
+  private pinnedChain(provider: string): string[] {
+    const mine = BYOK_PREFIX + provider;
+    const usable = this.byok.has(mine) && this.providers.get(mine)?.isConfigured;
+    return usable ? [mine, provider] : [provider];
+  }
+
   register(provider: AIProvider): void {
     if (this.providers.has(provider.name)) {
       throw new Error(`AIProvider already registered for '${provider.name}'`);
@@ -207,6 +218,11 @@ export class AIRouter {
 
   providerNames(): string[] {
     return [...this.providers.keys()];
+  }
+
+  /** Registered providers that have what they need to answer (key set, or local). */
+  configuredProviderNames(): string[] {
+    return [...this.providers.values()].filter((p) => p.isConfigured).map((p) => p.name);
   }
 
   /** Resolve tier → provider+model WITHOUT network (config presence only). */
@@ -262,11 +278,14 @@ export class AIRouter {
     temperature?: number;
     maxTokens?: number;
     providerName?: string;
+    /** With `providerName`: this exact model (extraction mode, Part 6.9). Tried on that provider only, plus the person's own key for it. */
+    model?: string;
   }): Promise<{ text: string; usage: CallUsage; model: string; provider: string; fallbackFrom?: string; latencyMs: number; keySource: KeySource; keyNotice?: string }> {
+    const pinned = Boolean(input.providerName && input.model);
     const sel = input.providerName
-      ? { tier: input.tier, provider: input.providerName, model: this.modelFor(input.providerName, input.tier) }
+      ? { tier: input.tier, provider: input.providerName, model: input.model || this.modelFor(input.providerName, input.tier) }
       : this.resolveTier(input.tier);
-    const chain = this.chainFor(sel.provider, input.tier);
+    const chain = pinned ? this.pinnedChain(sel.provider) : this.chainFor(sel.provider, input.tier);
     let lastError: unknown = null;
     let keyNotice: string | undefined;
     for (const name of chain) {
@@ -285,7 +304,7 @@ export class AIRouter {
       const t0 = this.nowFn();
       try {
         const res = await provider.chatComplete({
-          model: sel.provider === name ? sel.model : this.modelFor(name, input.tier),
+          model: pinned || sel.provider === name ? sel.model : this.modelFor(name, input.tier),
           system: input.system,
           user: input.user,
           temperature: input.temperature,
@@ -326,6 +345,7 @@ export class AIRouter {
     temperature?: number;
     maxTokens?: number;
     providerName?: string;
+    model?: string;
   }): Promise<GenerateObjectResult<T>> {
     const attempts: Array<{ text: string; usage: CallUsage; model: string; provider: string; fallbackFrom?: string }> = [];
     let usage = emptyUsage();
@@ -339,6 +359,7 @@ export class AIRouter {
         temperature: input.temperature,
         maxTokens: input.maxTokens,
         providerName: input.providerName,
+        model: input.model,
       });
       usage = addUsage(usage, res.usage);
       keyNotice = res.keyNotice ?? keyNotice;
