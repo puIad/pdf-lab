@@ -13,7 +13,7 @@ import {
 } from "../evidence/qc.ts";
 import { commonWords, matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
 import { jaccard, matchFormat, tokens } from "../ideas/ideas.ts";
-import { IDEA_FORMAT_MAP } from "./from-ideas.ts";
+import { IDEA_FORMAT_MAP, isIdeaOnly } from "./from-ideas.ts";
 import {
   ALLOWED_FORMATS,
   OPPORTUNITY_PROMPT_VERSION,
@@ -70,7 +70,9 @@ export function mergeSharedProblems(candidates: GeneratedOpportunity[]): { kept:
     const toks = tokens(c.problem);
     const twin = kept.find((k) => {
       const sim = jaccard(k.toks, toks);
-      return sim >= SAME_PROBLEM && (k.aud === aud || sim === 1);
+      if (sim < SAME_PROBLEM) return false;
+      const ideaOnly = [k.c, c].some((x) => isIdeaOnly(x.evidence.map((e) => e.claim)));
+      return k.aud === aud || (sim === 1 && ideaOnly);
     });
     if (twin) {
       if (!twin.c.format && c.format) twin.c = { ...twin.c, format: c.format };

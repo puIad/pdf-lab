@@ -584,6 +584,9 @@ test("mergeSharedProblems folds one audience and problem across markets and form
   assert.equal(merged, 1);
   assert.deepEqual(kept.map((k) => k.id), ["a", "c"]);
   assert.equal(kept[0].format, "guide");
+  // Two audiences with the same problem text stay two opportunities (only idea-only candidates merge on text).
+  const d = { ...a, id: "d", marketId: "m3", targetAudience: "Students", problem: a.problem, opportunityScore: 50 };
+  assert.deepEqual(mergeSharedProblems([a, d]).kept.map((k) => k.id), ["a", "d"]);
   assert.equal(isIdeaOnly([`${IDEA_CLAIM_PREFIX} "x"`]), true);
   assert.equal(isIdeaOnly([`${IDEA_CLAIM_PREFIX} "x"`, "Reddit post"]), false);
   assert.equal(isIdeaOnly([`[type: frequency | conf: 0.80] ${IDEA_CLAIM_PREFIX} "x"`]), true);
