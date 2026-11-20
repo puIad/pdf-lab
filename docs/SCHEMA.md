@@ -214,6 +214,35 @@ create table watchlists (
 - Migrations: `supabase/migrations/20261116000010_watchlists.sql`,
   `20261116000011_atomic_limits.sql`.
 
+## Success metrics (Part 6.2, PRD §58 to §59)
+
+```sql
+create table metric_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade not null,
+  kind text not null check (kind in ('saved', 'useful_vote', 'new_market', 'research_to_creation', 'monitor_return')),
+  subject_type text not null,  -- market | seed | idea | opportunity | brief
+  subject_ref text not null,
+  value smallint,              -- useful_vote only: 1 useful, 0 not useful
+  dedupe_key text unique,      -- one row per fact (a vote, a day's return, a first save); null may repeat
+  created_at timestamptz not null default now()
+);
+```
+
+- Service-role only, RLS on, no policy (like `usage_events`). Written by `lib/analytics/store.ts`;
+  a failed write is logged and never fails the action it measures.
+- Writers: `saved` in `POST /api/watchlist` when a row is added (first save only); `useful_vote` in
+  `POST /api/metrics/vote` (a second vote replaces the first); `new_market` after a Deep run saves
+  markets, for each whose exact name no earlier market has; `research_to_creation` in
+  `POST /api/briefs/export` (signed in); `monitor_return` when a signed-in person opens
+  `/watchlist`, one per day (re-scan monitoring is Part 4.2, so an open is the return signal until then).
+- Claim-evidence coverage is computed, not stored: opportunities of the window with at least one
+  evidence row naming a source and a url or excerpt, over all of them.
+- North star, shown at `/admin/metrics`: validated opportunities (completed Deep run, sourced
+  evidence, `completed_at` in the last 30 days) divided by active signed-in users (a `usage_events`
+  or `metric_events` row in the window). No active user shows "Not observed". Searches are not in it.
+- Migration: `supabase/migrations/20261120000014_metric_events.sql`.
+
 ## RLS (Supabase)
 
 - Public read: `markets`, `opportunities`, `competitors`, `evidence`, `sources` (anon can
