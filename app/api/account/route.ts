@@ -4,7 +4,7 @@
 // events, watchlist, metric events and research runs (docs/SCHEMA.md, Sign-in and usage).
 
 import { NextResponse } from "next/server";
-import { createServiceSupabaseClient } from "@/lib/db/client";
+import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/db/client";
 import { resolveCaller } from "@/lib/quotas/guard";
 import { buildExport, EXPORT_TABLES, isDeleteConfirmed, type ExportTable } from "@/lib/privacy/account-data";
 
@@ -49,7 +49,13 @@ export async function DELETE(req: Request) {
     const caller = await resolveCaller(req.headers);
     if (!caller.userId) return signIn();
     const { error } = await createServiceSupabaseClient().auth.admin.deleteUser(caller.userId);
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Already deleted (a repeat request): a clean 404, not a server error.
+      if (error.status === 404) return NextResponse.json({ error: "This account was already deleted." }, { status: 404 });
+      throw new Error(error.message);
+    }
+    // The session cookies still verify locally until they expire, so clear them in this response.
+    await (await createServerSupabaseClient()).auth.signOut({ scope: "local" });
     return NextResponse.json({ deleted: true });
   } catch (err) {
     return failed(err);

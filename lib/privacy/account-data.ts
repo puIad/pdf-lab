@@ -9,6 +9,10 @@ export const EXPORT_TABLES = {
   watchlists: "kind, ref, region, seed, created_at",
   metric_events: "kind, subject_type, subject_ref, value, created_at",
   research_runs: "id, query, mode, status, started_at, completed_at",
+  ai_usage_ledger: "run_id, provider, model, tier, key_source, total_tokens, estimated_cost_usd, created_at",
+  plan_changes: "from_plan, to_plan, source, charged_cents, created_at",
+  // Key metadata only. Never `ciphertext`: the export must not carry key material, even encrypted.
+  user_provider_keys: "provider, last4, options, status, created_at, rotated_at",
 } as const;
 
 export type ExportTable = keyof typeof EXPORT_TABLES;
