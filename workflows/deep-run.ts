@@ -28,7 +28,9 @@ async function finish(input: DeepRunInput, failures: number, calls: number) {
   const { finishDeepStep } = await import("../lib/runs/deep-steps.ts");
   return finishDeepStep(input, failures, calls);
 }
-finish.maxRetries = 1;
+// Not retried: finish saves markets and opportunities with plain inserts, so a retry after a crash
+// would save a second copy. A crash goes to markFailed instead.
+finish.maxRetries = 0;
 
 
 async function markFailed(runId: string, message: string) {
