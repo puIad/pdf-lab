@@ -27,6 +27,7 @@ export const ANONYMOUS_AUTHOR = "anonymous";
 export const DEFAULT_AUTHOR_SALT = "pdf-lab-youtube-v1";
 export const MIN_INTERVAL_MS = 1000;
 export const CACHE_TTL_MS = 10 * 60 * 1000; // 10 min cache
+const REFRESH_BATCH = 50; // comments.list accepts up to 50 ids
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
 export interface YouTubeAdapterConfig {
@@ -193,6 +194,55 @@ export class YouTubeAdapter implements SourceAdapter {
     } catch (err) {
       throw new Error(`YouTube API request failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  /**
+   * Re-fetch stored comments by their `externalId` (`yt_comment_<id>`), for the 30-day
+   * refresh-or-delete rule (YouTube API Developer Policies III.E.4, DEC-017). Ids the API
+   * no longer returns are `gone`. A failed request throws and the caller treats the whole
+   * batch as not refreshed. Only fields `comments.list` returns are present: reply count is not.
+   */
+  async refresh(externalIds: string[]): Promise<{ refreshed: RawSignal[]; gone: string[] }> {
+    if (!this.config.apiKey) throw missingKeyError();
+    const refreshed: RawSignal[] = [];
+    const gone: string[] = [];
+    for (let i = 0; i < externalIds.length; i += REFRESH_BATCH) {
+      const batch = externalIds.slice(i, i + REFRESH_BATCH);
+      await this.throttle();
+      const url = new URL(`${YOUTUBE_API_BASE}/comments`);
+      url.searchParams.set("part", "snippet");
+      url.searchParams.set("id", batch.map((id) => id.replace(/^yt_comment_/, "")).join(","));
+      url.searchParams.set("textFormat", "plainText");
+      url.searchParams.set("key", this.config.apiKey);
+      const res = await this.config.fetchFn(url.toString());
+      if (!res.ok) throw new Error(`YouTube comments refresh failed with status ${res.status}`);
+      const data = (await res.json()) as { items?: YouTubeCommentItem[] };
+      const found = new Map<string, YouTubeCommentItem>();
+      for (const it of data.items ?? []) if (it.id) found.set(`yt_comment_${it.id}`, it);
+      const fetchedAt = new Date(this.config.nowFn()).toISOString();
+      for (const externalId of batch) {
+        const it = found.get(externalId);
+        const text = it?.snippet?.textOriginal;
+        if (!it || !text) {
+          gone.push(externalId);
+          continue;
+        }
+        refreshed.push({
+          source: this.key,
+          externalId,
+          fetchedAt,
+          payload: {
+            commentId: it.id,
+            videoId: it.snippet?.videoId,
+            text,
+            author: it.snippet?.authorDisplayName,
+            likeCount: it.snippet?.likeCount || 0,
+            publishedAt: it.snippet?.publishedAt,
+          },
+        });
+      }
+    }
+    return { refreshed, gone };
   }
 
   normalize(raw: RawSignal): MarketSignal {
