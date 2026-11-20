@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isStoreUrl, marketForCompetitor, placeCompetitor, type CompetitorMarket } from "../competition/map.ts";
 import { describeWork, mergeWork } from "./work.ts";
 import { loadRunSignals, recordRunSignals } from "./run-signals.ts";
-import { isCurrent, listCompletedRuns, listedRuns } from "./scope.ts";
+import { isCurrent, listCompletedRuns, listedRuns, normalizeSeed, seedKey } from "./scope.ts";
 import { fetchMarketsData, parseMarketScope } from "../markets/fetcher.ts";
 import { executeResearchRun, type OrchestratorDeps, type StoredSignalForRun } from "./orchestrator.ts";
 
@@ -170,6 +170,17 @@ describe("run scope for readers", () => {
     const latest = new Set(list.filter((r) => r.latest).map((r) => r.id));
     assert.equal(isCurrent(null, latest), true);
     assert.equal(isCurrent(runs[2].id, latest), false);
+  });
+
+  it("a seed typed with a double space is the same seed, and its followed market is found", async () => {
+    assert.equal(seedKey("meal  prep"), seedKey("meal prep"));
+    assert.equal(normalizeSeed("  Meal   Prep "), "meal prep");
+    const spaced = { id: "55555555-5555-4555-8555-555555555555", query: "meal  prep", completed_at: "2026-11-15T10:00:00Z", markets: has };
+    const list = await listCompletedRuns(fakeSupabase({ ...tables, research_runs: [spaced, runs[1]] }).client);
+    assert.deepEqual(list.map((r) => r.latest), [true, false]);
+    // The monitor looks up a followed seed by normalizeSeed(watch query) against seedKey(run query).
+    const followed = list.find((r) => r.latest && seedKey(r.query) === normalizeSeed("meal prep"));
+    assert.equal(followed?.id, spaced.id);
   });
 
   it("lists a run's seed only to its owner; all on a dev server, none signed out (issue #39)", async () => {

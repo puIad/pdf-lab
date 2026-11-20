@@ -70,7 +70,7 @@ export async function POST(req: Request) {
 
   try {
     // The run row exists when this returns; a workflow does the rest (issue #24). Poll GET /api/runs/<id>.
-    const { runId } = await startModelRun({ query: body.query.trim(), mode, limit, sourceKeys });
+    const { runId } = await startModelRun({ query: body.query.trim().replace(/\s+/g, " "), mode, limit, sourceKeys });
     return NextResponse.json({ runId, status: "queued", poll: `/api/runs/${runId}` }, { status: 202 });
   } catch (err) {
     return NextResponse.json(

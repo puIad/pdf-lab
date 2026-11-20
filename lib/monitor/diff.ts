@@ -3,6 +3,7 @@
 
 import { discussionsOnly } from "../runs/orchestrator.ts";
 import { isListing } from "../sources/demand-only.ts";
+import { normalizeSeed } from "../runs/scope.ts";
 import type { StoredSignalForRun } from "../runs/orchestrator.ts";
 import type { ChangeReport, Counts, CountKey, Job, NewItem, PhraseChange, SeedSnapshot, SnapshotPhrase } from "./types.ts";
 
@@ -95,7 +96,7 @@ export function reconciles(r: ChangeReport): boolean {
 
 // ---- seed snapshots (DEC-010): the `new` and `history` trend bases -------------------------------
 
-export const normalizeSeed = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, " ");
+export { normalizeSeed };
 
 /**
  * What changed in `current` against the snapshots before it (oldest first).

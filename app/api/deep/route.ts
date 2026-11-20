@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   if (guard.denied) return guard.denied;
 
   try {
-    const topic = seed.trim();
+    const topic = seed.trim().replace(/\s+/g, " ");
     const run = await startPastedRun({ query: topic, seed: topic, mode: "deep", limit: (limit as number | undefined) ?? 25, userId: guard.caller.userId }, createServerOrchestratorDeps());
     if (run.status !== "awaiting_reply") {
       await refund(guard); // nothing collected: the month's Deep run is not used up
