@@ -192,7 +192,7 @@ describe("/api/runs gate", () => {
     const src = readFileSync(new URL("../../app/api/runs/route.ts", import.meta.url), "utf8");
     const gate = src.indexOf("await pastedModeResponse()");
     assert.ok(gate > 0, "route calls the gate");
-    assert.ok(gate < src.indexOf("createServerOrchestratorDeps("), "gate runs before the run is built");
+    assert.ok(gate < src.indexOf("startModelRun("), "gate runs before the run is built");
     assert.ok(!/if \(mode === "deep"\)[^}]*pastedModeResponse/.test(src), "gate is not limited to deep");
   });
 });

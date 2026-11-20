@@ -1,14 +1,12 @@
 // app/api/runs/route.ts — Phase 1 Part 1.5 research runs API.
-// POST: Executes full 10-state research run with evidence store and QC enforcement.
+// POST: starts a full 10-state research run as a background workflow and returns its id (202).
 // GET: Lists recent research runs.
 
 import { NextResponse } from "next/server";
 import { enforceQuota, resolveCaller } from "@/lib/quotas/guard";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { executeResearchRun } from "@/lib/runs/orchestrator";
+import { startModelRun } from "@/lib/runs/start-deep";
 import { pastedModeResponse } from "@/lib/settings/pasted-gate";
-import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
-import { routerForUser } from "@/lib/keys/server";
 
 export const dynamic = "force-dynamic";
 
@@ -71,22 +69,12 @@ export async function POST(req: Request) {
   if (pasted) return pasted;
 
   try {
-    const deps = createServerOrchestratorDeps({ userRouter: await routerForUser(null) });
-    const result = await executeResearchRun(
-      {
-        query: body.query.trim(),
-        mode,
-        limit,
-        sourceKeys,
-      },
-      deps,
-    );
-
-    const httpStatus = result.status === "completed" ? 200 : 502;
-    return NextResponse.json(result, { status: httpStatus });
+    // The run row exists when this returns; a workflow does the rest (issue #24). Poll GET /api/runs/<id>.
+    const { runId } = await startModelRun({ query: body.query.trim(), mode, limit, sourceKeys });
+    return NextResponse.json({ runId, status: "queued", poll: `/api/runs/${runId}` }, { status: 202 });
   } catch (err) {
     return NextResponse.json(
-      { error: `Failed to execute research run: ${err instanceof Error ? err.message : String(err)}` },
+      { error: `Failed to start the research run: ${err instanceof Error ? err.message : String(err)}` },
       { status: 500 },
     );
   }

@@ -37,6 +37,7 @@ import {
 import type { EvidenceCitation, MarketOverview } from "@/lib/search/types";
 import type { TopicTrendAnalysis } from "@/lib/trends/types";
 import type { RunSummary } from "@/lib/runs/types";
+import { isFinalStatus, useRunPoll } from "@/lib/runs/use-run-poll";
 import type { ValidationVerdict } from "@/lib/planner/verdict";
 import { VerdictPanel } from "@/components/research/verdict-panel";
 
@@ -58,6 +59,8 @@ type ResearchResult =
 
 interface ResearchResponse {
   runId?: string;
+  /** "queued": a Deep run started in the background (202); follow it with <DeepProgress>. */
+  status?: string;
   plan?: ResearchPlan;
   result?: ResearchResult;
   error?: string;
@@ -438,6 +441,42 @@ function DeepResult({ run }: { run: RunSummary }) {
   );
 }
 
+/** A Deep run that runs in the background (issue #24): polls the run until it is completed or failed. */
+function DeepProgress({ runId }: { runId: string }) {
+  const { data, refused } = useRunPoll(runId);
+  if (refused) return <p className="text-sm text-destructive" role="alert">{refused}</p>;
+  if (!data || !isFinalStatus(data.run.status)) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+        <LoaderCircle className="size-4 animate-spin" />
+        Deep run {data ? data.run.status.replaceAll("_", " ") : "starting"}. It runs in the background: you can close this tab and open{" "}
+        <Link href={`/markets?run=${runId}`} className="underline underline-offset-2">its markets</Link> later.
+      </div>
+    );
+  }
+  const c = data.completeness;
+  const run: RunSummary = {
+    runId,
+    query: data.run.query,
+    mode: data.run.mode,
+    status: data.run.status as RunSummary["status"],
+    startedAt: data.run.startedAt,
+    completedAt: data.run.completedAt,
+    error: data.error,
+    trace: data.lifecycle.trace,
+    completeness: c,
+    counts: {
+      sources: c.sourcesCovered,
+      signalsCollected: c.signalsCollected,
+      signalsAnalyzed: c.signalsAnalyzed,
+      marketsCreated: c.marketsIdentified,
+      opportunitiesCreated: c.opportunitiesGenerated,
+      evidenceCount: c.evidenceCount,
+    },
+  };
+  return <DeepResult run={run} />;
+}
+
 export function ResearchView({ initialPrompt, recentRuns }: { initialPrompt: string; recentRuns: RecentRun[] }) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [forcedMode, setForcedMode] = useState<ResearchMode | null>(null);
@@ -466,6 +505,7 @@ export function ResearchView({ initialPrompt, recentRuns }: { initialPrompt: str
       const data = (await res.json()) as ResearchResponse;
       if (res.status === 401) setNeedsKey(true);
       setResponse(res.ok ? data : { ...data, error: data.error ?? `Request failed (${res.status})` });
+      if (res.status === 202) return; // a background Deep run: <DeepProgress> follows it
       if (res.ok && data.runId && data.plan) {
         setRuns((prev) =>
           [
@@ -603,14 +643,25 @@ export function ResearchView({ initialPrompt, recentRuns }: { initialPrompt: str
             </div>
           )}
 
+          {response?.status === "queued" && response.runId && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Deep run</CardTitle>
+                <CardDescription className="font-mono text-[11px]">run {response.runId}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DeepProgress key={response.runId} runId={response.runId} />
+              </CardContent>
+            </Card>
+          )}
+
           {needsKey && (
             <div className="flex gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <KeyRound className="mt-0.5 size-4 shrink-0" />
               <div className="space-y-1">
                 <p className="font-medium">Deep runs start on the Deep research page.</p>
                 <p className="text-xs text-muted-foreground">
-                  A Deep run from this box calls the model for minutes inside one request, so it only runs through the
-                  API with the internal key. On the{" "}
+                  A Deep run from this box needs a signed-in account with a Deep run left on its plan. On the{" "}
                   <Link href="/deep" className="font-medium text-foreground underline underline-offset-2">
                     Deep research page
                   </Link>{" "}

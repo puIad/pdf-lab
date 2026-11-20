@@ -1,18 +1,19 @@
 // app/api/deep/[runId]/route.ts — second half of a pasted Deep run (Part 6.15, DEC-015).
 // GET: the run's state and, while it waits for a reply, its prompt again (same numbering).
 // POST { reply }: validates the pasted model reply item by item, stores the valid analyses, then
-// clusters by the reply's market names, scores and reports. No model is called here.
+// hands clustering by the reply's market names, scoring and the report to a background workflow (202).
+// No model is called here.
 
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { finishPastedRun, MIN_ANALYZED_SHARE } from "@/lib/runs/orchestrator";
-import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
+import { MIN_ANALYZED_SHARE } from "@/lib/runs/orchestrator";
+import { startFinishRun } from "@/lib/runs/start-deep";
 import { marketKey, NO_MARKET, parsePastedReply, PASTE_PROMPT_VERSION } from "@/lib/runs/pasted";
 import { loadPastedRun, pastedRunState } from "@/lib/runs/pasted-run";
 import { ownsRun, resolveCaller } from "@/lib/quotas/guard";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // database writes only
+export const maxDuration = 60; // database writes and the workflow start; the report is built by the workflow
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_REPLY_CHARS = 400_000;
@@ -82,6 +83,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ runId: string 
       );
     }
 
+    // Claim the run before storing anything: of two replies sent together, only one wins.
+    const { data: claimed, error: claimErr } = await supabase
+      .from("research_runs")
+      .update({ status: "clustering" })
+      .eq("id", run.id)
+      .eq("status", "classifying")
+      .select("id");
+    if (claimErr) throw new Error(`Failed to claim the run: ${claimErr.message}`);
+    if (!claimed || claimed.length === 0) {
+      return NextResponse.json({ error: "This run already has a reply. Open its progress instead." }, { status: 409 });
+    }
+
     const rows = [...items.entries()].map(([n, item]) => ({
       signal_id: signals[n - 1].id,
       audience: item.audience,
@@ -93,15 +106,25 @@ export async function POST(req: Request, ctx: { params: Promise<{ runId: string 
       prompt_version: PASTE_PROMPT_VERSION,
     }));
     const { error: upsertErr } = await supabase.from("signal_analysis").upsert(rows, { onConflict: "signal_id", ignoreDuplicates: true });
-    if (upsertErr) throw new Error(`Failed to save the analyses: ${upsertErr.message}`);
+    if (upsertErr) {
+      await supabase.from("research_runs").update({ status: "classifying" }).eq("id", run.id); // nothing stored: the reply can be sent again
+      throw new Error(`Failed to save the analyses: ${upsertErr.message}`);
+    }
 
-    const marketLabels = new Map([...items.entries()].map(([n, item]) => [signals[n - 1].id, item.market]));
-    const summary = await finishPastedRun(
-      { runId: run.id, query: run.query, mode: run.mode, startedAt: run.started_at, seed: run.query },
-      createServerOrchestratorDeps({ marketLabels }),
-      problems.length + missing.length,
-    );
-    return NextResponse.json({ run: summary, ...counts }, { status: summary.status === "completed" ? 200 : 502 });
+    // Clustering, scoring and the report take longer than a request may: a workflow does them
+    // (issue #24). The page polls GET /api/runs/<id>.
+    const marketLabels = [...items.entries()].map(([n, item]): [string, string] => [signals[n - 1].id, item.market]);
+    await startFinishRun({
+      runId: run.id,
+      query: run.query,
+      seed: run.query,
+      mode: run.mode,
+      startedAt: run.started_at,
+      userId: run.user_id,
+      marketLabels,
+      replyFailures: problems.length + missing.length,
+    });
+    return NextResponse.json({ runId: run.id, status: "clustering", poll: `/api/runs/${run.id}`, ...counts }, { status: 202 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
