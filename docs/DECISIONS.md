@@ -447,3 +447,23 @@ are in git history (`README.md`, "History").
 - Resolution: _resolved 2026-11-14_ — user: "components/ui (Recommended)", option (b). `AGENTS.md`
   and `00-START-HERE.md` rule 5 now point at `components/ui`. Part 6.13 is done; 6.12 can start.
 
+
+## DEC-017 — Part 6.10 acceptance cannot be produced: no deployed site, no live database
+
+- Date: 2026-11-20
+- Part: Phase 6 Part 6.10 (issue #24); blocks Part 4.2 (#26) and Part 4.3 (#27)
+- Expected: a Deep run started from the deployed site completes and survives a closed tab, and a
+  forced step timeout leaves no rows after the failure time (issue #24, acceptance).
+- Found: the Vercel project is not connected to the repo (issue #45, needs-user), so there is no
+  deployment to start a run from. The cloud fallback session has no Supabase, OpenRouter or NVIDIA
+  credentials, so no run row, trace or write timestamp can be produced there. Installing Vercel
+  Workflow also needs its plan limits checked against the current Vercel docs (issue #24 text),
+  which a change to the Vercel project settings may reopen.
+- Options: (a) the owner connects the Vercel project (#45) and the local loop does Part 6.10 with
+  live credentials; (b) build the Workflow code now and ship it unverified, with the acceptance
+  left open; (c) reorder the plan so a part that can be verified without a deployment goes first.
+- Recommendation: (a). Acceptance for 6.10 is evidence from a deployment, and 4.2 and 4.3 depend
+  on it, so shipping unverified code would break the evidence-first rule.
+- Question for user: "Connect the Vercel project to the repo (issue #45) so Part 6.10 can be
+  verified on a deployment, or do you want it built first and verified later?"
+- Resolution: _open_
