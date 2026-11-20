@@ -74,12 +74,13 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
       }
     },
 
-    ingest: async ({ runId, query, limit, sourceKeys }) => {
+    ingest: async ({ runId, query, limit, sourceKeys, signal }) => {
       const ingestDeps = createServerIngestDeps();
       const collected = new Map<string, string[]>();
       const res = await runIngest({ query, limit, sourceKeys }, ingestDeps, (key, signals) =>
         collected.set(key, signals.map((s) => s.source_id)),
-      );
+      signal);
+      signal?.throwIfAborted();
       await recordRunSignals(supabase, runId, collected);
       return {
         collected: res.totals.collected,
@@ -95,7 +96,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
 
     getSignals: (runId) => loadRunSignals(supabase, runId),
 
-    extract: async (signals) => {
+    extract: async (signals, signal) => {
       const inputs = signals.map((s) => ({
         id: s.id,
         title: s.title,
@@ -114,7 +115,9 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         tier: "cheap",
         ...extractionPin(mode),
         batchSize: Number(process.env.EXTRACTION_BATCH_SIZE) || undefined,
+        signal,
       });
+      signal?.throwIfAborted(); // a timed-out extraction stores nothing after the timeout
 
       if (job.successes.length > 0) {
         const { error } = await supabase.from("signal_analysis").upsert(
@@ -460,6 +463,12 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
     },
 
     fetchCompleteness: (runId) => fetchRunCompleteness(supabase, runId),
+
+    recordRunError: async (runId, message) => {
+      const { data } = await supabase.from("research_runs").select("plan").eq("id", runId).single();
+      const plan = (data?.plan && typeof data.plan === "object" ? data.plan : {}) as Record<string, unknown>;
+      await supabase.from("research_runs").update({ plan: { ...plan, error: message } }).eq("id", runId);
+    },
 
     recordRunWork: async (runId, patch) => {
       const { data } = await supabase.from("research_runs").select("plan").eq("id", runId).single();

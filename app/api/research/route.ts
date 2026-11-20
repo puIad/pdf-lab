@@ -1,7 +1,8 @@
 // app/api/research/route.ts — Phase 3 Part 3.4 natural-language research + modes (PRD §26–§28).
 // POST { prompt, mode?, user_id? } → planner turns the prompt into a structured query, the mode
 // picks the pipeline depth, and the run is persisted with its mode, rule-set version and plan.
-// `pdf-lab <niche>` (or mode "deep") runs the full 10-state pipeline and needs the internal key.
+// `pdf-lab <niche>` (or mode "deep") starts the full 10-state pipeline as a background workflow
+// (202 with the run id; poll GET /api/runs/<id>) and counts as one Deep run of the caller's plan.
 // The other modes are counted as one search against the caller's plan (Part 5.1).
 
 import { NextResponse } from "next/server";
@@ -9,10 +10,8 @@ import { createServiceSupabaseClient } from "@/lib/db/client";
 import { generateMarketOverview } from "@/lib/search";
 import { fetchMarketsData } from "@/lib/markets/fetcher";
 import { detectTopicTrend, type SignalRecord } from "@/lib/trends";
-import { executeResearchRun } from "@/lib/runs/orchestrator";
+import { startModelRun } from "@/lib/runs/start-deep";
 import { pastedModeResponse } from "@/lib/settings/pasted-gate";
-import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
-import { routerForUser } from "@/lib/keys/server";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { OPPORTUNITY_PROMPT_VERSION } from "@/lib/opportunities";
 import { isDemandOnly } from "@/lib/sources/demand-only";
@@ -82,20 +81,16 @@ export async function POST(req: Request) {
   const plan = planResearch(body.prompt, body.mode as ResearchMode | undefined);
   const text = searchTextOf(plan.query);
 
-  // Part 5.1. A Deep run in one request calls the model for minutes and does not fit a function
-  // (DEC-001), so it stays on the server key; signed-in users run Deep through /deep. Every other
-  // mode reads stored rows and is counted as one search.
-  const guard = await enforceQuota(req.headers, plan.mode === "deep" ? "internal" : "search");
-  if (guard.denied) {
-    return plan.mode === "deep"
-      ? NextResponse.json({ error: "A one-request Deep run needs the internal API key. Use the Deep research page instead.", plan }, { status: 401 })
-      : guard.denied;
-  }
+  // Part 5.1. A Deep run is a background workflow (issue #24, DEC-001) and counts as one Deep run
+  // of the caller's plan. Every other mode reads stored rows and is counted as one search.
+  const guard = await enforceQuota(req.headers, plan.mode === "deep" ? "deep" : "search");
+  if (guard.denied) return guard.denied;
   // The run belongs to the signed-in caller. Only the server key may name another owner.
   const userId = guard.caller.userId ?? (guard.caller.plan === "internal" ? ((body.user_id as string | undefined) ?? null) : null);
 
   if (plan.mode === "deep") {
     if (!text) {
+      await refund(guard);
       return NextResponse.json({ error: "Deep research needs a niche, e.g. `pdf-lab pc troubleshooting`", plan }, { status: 400 });
     }
     const pasted = await pastedModeResponse();
@@ -103,8 +98,8 @@ export async function POST(req: Request) {
       await refund(guard);
       return pasted;
     }
-    const result = await executeResearchRun(
-      {
+    try {
+      const { runId } = await startModelRun({
         query: text,
         // The planner's search text drops format words and "for …" spans; ideas are stored under the typed seed.
         seed: seedOf(body.prompt),
@@ -116,13 +111,13 @@ export async function POST(req: Request) {
           ...plan,
           pipelinePromptVersions: { extraction: EXTRACTION_PROMPT_VERSION, opportunity: OPPORTUNITY_PROMPT_VERSION },
         },
-      },
-      createServerOrchestratorDeps({ userRouter: await routerForUser(userId) }),
-    );
-    return NextResponse.json(
-      { runId: result.runId, plan, result: { mode: "deep", run: result } },
-      { status: result.status === "completed" ? 200 : 502 },
-    );
+      });
+      // Started, not finished: the workflow runs in the background. Poll GET /api/runs/<id>.
+      return NextResponse.json({ runId, plan, status: "queued", poll: `/api/runs/${runId}`, quota: guard.quota }, { status: 202 });
+    } catch (err) {
+      await refund(guard);
+      return NextResponse.json({ error: `Failed to start the Deep run: ${err instanceof Error ? err.message : String(err)}`, plan }, { status: 500 });
+    }
   }
 
   const supabase = createServiceSupabaseClient();

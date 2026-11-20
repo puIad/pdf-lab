@@ -1,5 +1,11 @@
 // lib/runs/types.ts — Normative research run lifecycle types per docs/PIPELINE-SCORING.md & PRD §38, §55.
 
+/**
+ * Signals per extraction step of a background Deep run. Lives here because the workflow bundle
+ * imports it and must not pull in server code. A slice must finish inside one step timeout.
+ */
+export const EXTRACT_SLICE = 20;
+
 export const LIFECYCLE_STATES = [
   "queued",
   "collecting",

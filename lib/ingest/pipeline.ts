@@ -87,6 +87,7 @@ async function ingestOne(
   deps: IngestDeps,
   sink?: SignalSink,
   geo?: string,
+  signal?: AbortSignal,
 ): Promise<IngestSourceResult> {
   const base = {
     key: adapter.key,
@@ -97,7 +98,9 @@ async function ingestOne(
     duplicates: 0,
   };
   try {
+    signal?.throwIfAborted();
     const raw = await adapter.collect({ query, limit, ...(geo ? { geo } : {}) });
+    signal?.throwIfAborted(); // a timed-out ingest writes nothing after the timeout
     const normalized: MarketSignal[] = [];
     for (const item of raw) normalized.push(adapter.normalize(item));
     const sourceUuid = await deps.resolveSourceId(adapter.key);
@@ -138,6 +141,7 @@ export async function runIngest(
   input: { query: string; limit?: number; sourceKeys?: string[]; geo?: string },
   deps: IngestDeps,
   sink?: SignalSink,
+  signal?: AbortSignal,
 ): Promise<IngestSummary> {
   const query = (input.query ?? "").trim();
   if (!query) throw new Error("ingest requires a non-empty query");
@@ -156,8 +160,10 @@ export async function runIngest(
   // instead of bursting all adapters at once.
   const sources: IngestSourceResult[] = [];
   for (const adapter of adapters) {
-    sources.push(await ingestOne(adapter, query, limit, resolved, sink, input.geo));
+    signal?.throwIfAborted();
+    sources.push(await ingestOne(adapter, query, limit, resolved, sink, input.geo, signal));
   }
+  signal?.throwIfAborted();
   const totals = sources.reduce(
     (acc, s) => ({
       collected: acc.collected + s.collected,
