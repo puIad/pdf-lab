@@ -25,6 +25,10 @@ export interface BriefAiNote {
   citeIds: string[];
   provider: string;
   model: string;
+  /** Which key paid for the note: the person's own or the hosted quota (Part 5.2). */
+  keySource?: "byok" | "hosted";
+  /** Set when the person's own key was refused and the hosted quota answered. */
+  keyNotice?: string;
 }
 
 export interface BriefSection {

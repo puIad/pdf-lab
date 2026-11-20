@@ -39,6 +39,25 @@ new file + registry line, zero caller changes.
   both known limits: NVIDIA 40 requests a minute (DEC-013) and OpenRouter's 50 free calls a day
   (DEC-012). `signal_analysis.prompt_version` records the prompt (`extract-v2-batch`).
 
+## Extraction mode (Part 6.9, DEC-015)
+
+The extraction mode is a setting (`/settings`, table `app_settings`), not an env var: one chat
+model that answered a test, or pasted replies.
+
+- `/settings` lists candidate chat models per configured provider (`candidateModels`). **Test**
+  sends one 32-token chat call and shows whether it answered and in how long. A model that did not
+  answer cannot be selected, and `POST /api/settings/extraction` runs the test again before saving.
+- A model mode pins `providerName` + `model` on `generateText` / `generateObject`: that exact
+  model, no fallback to another provider. `runExtractionJob` gets them from the saved mode.
+- With a person's own keys (Part 5.2): a pinned model runs on its provider only. The person's key
+  for that same provider (`byok-<provider>`) is tried first with the pinned model, then the hosted
+  provider. Their keys for other providers are not used, because the owner chose this model.
+- Pasted mode: `POST /api/research` (Deep), `POST /api/runs` (every mode: each one extracts) and
+  `POST /api/extract` (without `provider`) answer 409 with `deepPath: "/deep"` and call no model.
+  The Deep buttons already lead to `/deep`. `/api/extract` with `provider` set skips the saved mode.
+- No saved mode: unchanged, tier defaults and env models.
+- Who may change it: the server key, a dev server, or the account whose email is `OWNER_EMAIL`.
+
 ## Hosting modes (PRD §34)
 
 - **Mode 1 — Free:** free web sources + free AI quotas + local/open models + restricted depth.
@@ -48,5 +67,50 @@ new file + registry line, zero caller changes.
   never logged, never sent to client.
 - **Mode 3 — Hosted premium:** project pays, higher limits (Phase 5).
 
+### BYOK routing and the usage ledger (Part 5.2)
+
+- `lib/keys/vault.ts` stores a person's Gemini, OpenAI-compatible, Bedrock or OpenRouter key
+  (`PUT /api/keys`, rotate by saving again, `DELETE /api/keys?provider=`). Keys are AES-256-GCM
+  encrypted with `KEY_VAULT_SECRET`, bound to the user and provider, never logged, never returned.
+  `GET /api/keys` shows the last 4 characters and the status.
+- `routerForUser(userId)` (`lib/keys/server.ts`) builds the router for one request: the person's
+  active keys are registered as `byok-<provider>` and tried before every hosted provider, so Mode 2
+  wins when a key is present; the hosted providers stay as the fallback. Gemini and Bedrock have no
+  1536-dim embedding model here, so embeddings use an OpenAI-compatible or OpenRouter key, else hosted.
+- Every result carries `keySource` (`byok` or `hosted`): the label of who paid. When a key is refused
+  (HTTP 401/403) the call falls back to the hosted quota, the result carries `keyNotice` ("Your gemini
+  key was refused ... the hosted quota answered instead"), and the key is marked `revoked`. A 429 or
+  5xx from the person's own key also falls back, labelled `hosted`.
+- Every successful call writes an `ai_usage_ledger` row (tokens, cost estimate, `key_source`, `run_id`).
+  `GET /api/usage` totals the caller's month, or one run with `?run=<id>`, split by who paid. Part 5.3
+  prices plans from these rows.
+- Cross-checking a BYOK run against the provider's dashboard: take the run's `GET /api/usage?run=<id>`
+  totals (`byKeySource.byok`) and compare the token sums with the usage page of the same key and
+  window: Google AI Studio usage (Gemini), the OpenAI usage dashboard, OpenRouter Activity, or
+  CloudWatch Bedrock invocation metrics. Provider-reported token counts are stored as received, so the
+  two should agree to the call; a hosted-fallback call appears only in our ledger. The cost column is
+  an estimate (`cost_basis`), the token counts are the figures to reconcile.
+- Not built here (no UI yet): a key-entry form on `/account`. The endpoints above are the contract.
+- Only the Deep run in one request, brief notes and the pipeline endpoints call the router with a
+  person attached; a signed-in person's pasted Deep run (DEC-015) makes no router call, so it has no
+  BYOK spend.
+
 Cost-per-run is measured from Phase 1 (log tokens/calls per run) so Phase 5 pricing is
 data-driven (PRD §49-final).
+
+## Cost per run and plan limits (Part 5.3)
+
+- `ledger_run_costs` sums the ledger per run. `/admin/costs` (same access as `/admin/metrics`) shows
+  the median, p90 and max of Deep runs of the last 30 days beside the documented ceilings and lists
+  any run above its ceiling. With no rows it says "Not observed".
+- Documented per-action ceilings (`lib/usage/cost.ts`, USD): search 0.0005, idea scan 0.02, check
+  0.01, Deep run 0.25. They are design bounds, not measurements: when this part was built the ledger
+  held no hosted Deep run (hosted extraction has no chosen model, DEC-015). Replace them with the
+  measured p90 once at least 20 hosted Deep runs are in the ledger.
+- Plan limits (`lib/quotas/quotas.ts`) are held to a monthly hosted-cost budget (anon 0.05, free 1,
+  premium 12 USD): a test asserts every plan's worst case (all limits used, 31 days, at the ceilings)
+  stays inside it. The account page shows "a deep run costs about $X" from the measured median once 5
+  Deep runs exist, else the ceiling, labelled as a ceiling.
+- Stub billing: `BILLING_MODE` is the constant `stub`, `charge()` always throws, and `plan_changes.charged_cents`
+  is checked to be 0. `POST /api/billing/stub` is open on dev servers and, in production, only with
+  `BILLING_STUB_ENABLED=1`. Choosing Stripe or Paddle is a separate decision.

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { getRouter } from "@/lib/ai/index";
+import { routerForUser } from "@/lib/keys/server";
 import { BriefUnavailable, DESCRIPTION_KEY, loadBrief, parseBriefSource } from "@/lib/brief";
 import { writeBriefNote } from "@/lib/brief/notes";
 import { enforceQuota, refund } from "@/lib/quotas/guard";
@@ -27,7 +27,8 @@ export async function POST(req: Request) {
   if (guard.denied) return guard.denied;
   try {
     const brief = await loadBrief(createServiceSupabaseClient(), parseBriefSource(body.source));
-    const note = await writeBriefNote(getRouter(), brief, body.key);
+    const { router } = await routerForUser(guard.caller.userId);
+    const note = await writeBriefNote(router, brief, body.key);
     return NextResponse.json({ key: body.key, note });
   } catch (err) {
     await refund(guard); // no note written: it does not count

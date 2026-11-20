@@ -4,7 +4,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isStoreUrl, marketForCompetitor, type CompetitorMarket } from "../competition/map.ts";
+import { isStoreUrl, marketForCompetitor, placeCompetitor, type CompetitorMarket } from "../competition/map.ts";
+import { describeWork, mergeWork } from "./work.ts";
 import { loadRunSignals, recordRunSignals } from "./run-signals.ts";
 import { isCurrent, listCompletedRuns, listedRuns } from "./scope.ts";
 import { fetchMarketsData, parseMarketScope } from "../markets/fetcher.ts";
@@ -75,6 +76,44 @@ describe("isStoreUrl", () => {
     assert.equal(isStoreUrl("https://notetsy.com.example.org/guide"), false);
     assert.equal(isStoreUrl(null), false);
     assert.equal(isStoreUrl("not a url"), false);
+  });
+});
+
+describe("placeCompetitor (issue #72)", () => {
+  const markets: CompetitorMarket[] = [
+    { id: "m-slow", name: "Slow computer fixes", signalIds: ["s1", "s2"], texts: ["my laptop is slow and freezing"] },
+    { id: "m-boot", name: "Windows will not boot", signalIds: ["s3"], texts: ["blue screen on startup"] },
+  ];
+  const seed = "pc troubleshooting";
+  it("drops a listing about something else", () => {
+    assert.deepEqual(placeCompetitor({ title: "Noctua Wood PC - DIGITAL FILE" }, markets, seed), { relevant: false, marketId: null });
+    assert.equal(placeCompetitor({ title: "Shorts Studio: 76 video styles" }, markets, seed).relevant, false);
+  });
+  it("attaches an on-topic listing to the market it shares words with", () => {
+    assert.deepEqual(placeCompetitor({ title: "Computer Repair: Fix a Slow Laptop PDF" }, markets, seed), { relevant: true, marketId: "m-slow" });
+  });
+  it("sends a listing that holds the whole seed to the market with most signals", () => {
+    assert.deepEqual(placeCompetitor({ title: "PC Troubleshooting Checklist | Printable PDF" }, markets, seed), { relevant: true, marketId: "m-slow" });
+  });
+  it("keeps on-topic listings of a one-word seed and drops an off-topic one that shares one word", () => {
+    const debt: CompetitorMarket[] = [
+      { id: "m-debt", name: "Paying off debt", signalIds: ["s1"], texts: ["how do I get started paying off debt"] },
+    ];
+    for (const title of ["Budgeting Planner Printable PDF", "Monthly Budget Planner", "Budget Planner 2027"]) {
+      assert.equal(placeCompetitor({ title }, debt, "budgeting").relevant, true, title);
+    }
+    assert.deepEqual(placeCompetitor({ title: "Getting Started with Kindle Create" }, debt, "budgeting"), { relevant: false, marketId: null });
+  });
+});
+
+describe("run work (issue #72)", () => {
+  it("sums durations across the two halves of a pasted run and keeps the rest", () => {
+    const first = mergeWork(null, { adapterCalls: 3, activeMs: 29000 });
+    const done = mergeWork(first, { activeMs: 5500, extractionCalls: 0, listingsDropped: 4 });
+    assert.deepEqual(done, { adapterCalls: 3, extractionCalls: 0, tokens: null, activeMs: 34500, listingsDropped: 4 });
+  });
+  it("says tokens were not observed instead of printing zero", () => {
+    assert.match(describeWork(mergeWork(null, { adapterCalls: 3, activeMs: 34500 })), /3 adapter calls, 0 extraction model calls, tokens not observed.*34\.5 s/);
   });
 });
 
@@ -256,9 +295,10 @@ describe("executeResearchRun writes run_id and maps competitors", () => {
     );
     assert.deepEqual(
       competitors.map((c) => [c.run_id, c.market_id]),
+      // The teachers listing holds the one-word seed, so it stays on the run with no market.
       [["run-9", "market-1"], ["run-9", "market-2"], ["run-9", null]],
     );
-    // Competition evidence follows the mapping; the unmapped listing hangs off the run, not the first market.
+    // Competition evidence follows the mapping; a listing without a market is not given to the first market.
     const compEvidence = evidence.filter((e) => e.entityType === "competition" && e.claim.startsWith("Observed competitor"));
     assert.deepEqual(compEvidence.map((e) => e.entityId), ["market-1", "market-2", "run-9"]);
   });

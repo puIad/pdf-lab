@@ -49,6 +49,23 @@ export interface ResearchRunRecord {
   completed_at: string | null;
 }
 
+/**
+ * What one run cost to produce, read from the run itself (issue #72). `tokens` is null when no
+ * model call of ours was metered: a pasted Deep run is analysed by the user's own model call.
+ */
+export interface RunWork {
+  /** Marketplace and discussion adapters queried. */
+  adapterCalls: number;
+  /** Model calls PDF Lab made for extraction (0 for a pasted run). */
+  extractionCalls: number;
+  /** Tokens of the run's metered model calls; null = none metered. */
+  tokens: number | null;
+  /** Time PDF Lab worked on the run, in ms; the wait for a pasted reply is not in it. */
+  activeMs: number;
+  /** Listings collected but dropped as off topic. */
+  listingsDropped: number;
+}
+
 export interface RunSummary {
   runId: string;
   query: string;
@@ -59,6 +76,8 @@ export interface RunSummary {
   error?: string | null;
   trace: LifecycleTraceStep[];
   completeness: ResearchCompleteness;
+  /** Present on a completed run. */
+  work?: RunWork;
   counts: {
     sources: number;
     signalsCollected: number;

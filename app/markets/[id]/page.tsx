@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { resolveCaller } from "@/lib/quotas/guard";
 import { watchKeys } from "@/lib/watchlist/store";
+import { isIdeaOnly } from "@/lib/opportunities/from-ideas";
 import { watchKey } from "@/lib/watchlist/watchlist";
 import { WatchToggle } from "@/components/watchlist/watch-toggle";
 import {
@@ -34,6 +35,8 @@ import { calculateLandscape, listingFormat, mineReviewsAndGaps, type CompetitorP
 import { parsePrice } from "@/lib/sources/marketplace-helper";
 import { QualityPanel } from "@/components/quality-panel";
 import { calculateCompleteness } from "@/lib/runs/completeness";
+import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
+import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
 import {
   marketCompletenessCounts,
   marketQcRules,
@@ -60,13 +63,15 @@ export default async function MarketPage(props: MarketPageProps) {
   // 1. Fetch market details
   const { data: market, error: mErr } = await supabase
     .from("markets")
-    .select("id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at")
+    .select("id, run_id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at")
     .eq("id", id)
     .single();
 
   if (mErr || !market) {
     notFound();
   }
+  const caller = await resolveCaller(await headers()).catch(() => null);
+  const nicheTrend = await fetchNicheTrendOfRun(supabase, market.run_id as string | null, caller);
 
   // 2. Fetch linked signals & analysis
   const { data: marketSignals } = await supabase
@@ -160,8 +165,12 @@ export default async function MarketPage(props: MarketPageProps) {
   const oppIds = oppList.map((o) => o.id);
   const { data: oppEvidenceData } = await supabase
     .from("evidence")
-    .select("id, entity_type, entity_id, source_id, url, excerpt")
+    .select("id, entity_type, entity_id, source_id, url, excerpt, claim")
     .in("entity_id", [id, ...oppIds]);
+  const claimsByOpp = new Map<string, string[]>();
+  for (const e of (oppEvidenceData ?? []) as Array<{ entity_id: string; claim: string | null }>) {
+    claimsByOpp.set(e.entity_id, [...(claimsByOpp.get(e.entity_id) ?? []), e.claim ?? ""]);
+  }
 
   const allEvidence = (oppEvidenceData ?? []) as QcEvidenceRow[];
   // QC lines R1 to R5 are results on these rows, and they score the panel's 15% rules slot (#52).
@@ -176,9 +185,7 @@ export default async function MarketPage(props: MarketPageProps) {
   const completeness = calculateCompleteness(counts);
 
   // 7. Is this market on the visitor's watchlist (Part 4.1)? Signed out, or unknown: shown as not saved.
-  const saved = await resolveCaller(await headers())
-    .then((caller) => watchKeys(caller.userId))
-    .catch((): string[] => []);
+  const saved = await (caller ? watchKeys(caller.userId) : Promise.resolve<string[]>([])).catch((): string[] => []);
   const watched = saved.includes(watchKey("market", market.id));
 
   return (
@@ -236,6 +243,8 @@ export default async function MarketPage(props: MarketPageProps) {
             </Badge>
             <WatchToggle watch={{ kind: "market", ref: market.id }} initialWatched={watched} on="Watching" off="Watch market" size="xs" />
           </div>
+
+          {nicheTrend && <NicheTrendNote trend={nicheTrend} />}
 
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             {market.name}
@@ -738,6 +747,9 @@ export default async function MarketPage(props: MarketPageProps) {
                         <span className="text-[11px] text-muted-foreground line-clamp-1">
                           {opp.problem}
                         </span>
+                        {isIdeaOnly(claimsByOpp.get(opp.id) ?? []) && (
+                          <span className="block text-[11px] text-amber-600">Search phrase only: no problem evidence</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {opp.target_audience}

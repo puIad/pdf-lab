@@ -52,8 +52,8 @@ describe("cost per action", () => {
   it("monthly cost at the limit sums every kind over a 30 day month", () => {
     // free: 5 scans x 1 + 20 checks x 3 + 1 deep x 4 = 69 calls
     assert.ok(Math.abs(monthlyCostAtLimit("free", "free") - 0.069) < 1e-9);
-    // premium: 100 x 1 + 400 x 3 + 20 x 4 = 1380 calls, plus 20 hosted Deep runs at $0.01
-    assert.ok(Math.abs(monthlyCostAtLimit("premium", "premium") - 1.58) < 1e-9);
+    // premium: 100 x 1 + 300 x 3 + 12 x 4 = 1048 calls, plus 12 hosted Deep runs at $0.01
+    assert.ok(Math.abs(monthlyCostAtLimit("premium", "premium") - 1.168) < 1e-9);
   });
 });
 
@@ -65,6 +65,6 @@ describe("projection", () => {
   });
 
   it("the ceiling at 100 users is 95 free plus 5 premium people", () => {
-    assert.ok(Math.abs(projectMonthly(100, CEILING) - (95 * 0.069 + 5 * 1.58)) < 1e-9);
+    assert.ok(Math.abs(projectMonthly(100, CEILING) - (95 * 0.069 + 5 * 1.168)) < 1e-9);
   });
 });

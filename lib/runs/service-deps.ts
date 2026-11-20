@@ -5,6 +5,7 @@ import { createServiceSupabaseClient } from "../db/client.ts";
 import { runIngest } from "../ingest/pipeline.ts";
 import { getServiceDeps as createServerIngestDeps } from "../ingest/service-deps.ts";
 import { getRouter, runExtractionJob } from "../ai/index.ts";
+import type { UserRouter } from "../keys/user-router.ts";
 import { clusterSignals } from "../cluster/clusterer.ts";
 import { summarizeCluster } from "../cluster/summarizer.ts";
 import { groupByMarket } from "./pasted.ts";
@@ -12,11 +13,13 @@ import type { ClusterSignal } from "../cluster/types.ts";
 import { writeEvidence } from "../evidence/writer.ts";
 import { createServerEvidenceDeps } from "../evidence/service-deps.ts";
 import { fetchRunCompleteness } from "./completeness.ts";
+import { mergeWork, workOfPlan } from "./work.ts";
 import { loadRunSignals, recordRunSignals } from "./run-signals.ts";
 import { isStoreUrl } from "../competition/map.ts";
 import { generate25Opportunities, ideaCandidates, OPPORTUNITY_TARGET, pickDistinctIdeas, type OpportunityMarketInput } from "../opportunities/index.ts";
 import { loadStoredIdeas } from "../ideas/stored.ts";
 import type { OrchestratorDeps, OrchestratorCompetitorItem } from "./orchestrator.ts";
+import { extractionPin, loadExtractionMode } from "../settings/extraction-mode.ts";
 import { recordNewMarkets } from "../analytics/store.ts";
 import { parseMarketplaceProduct } from "../sources/marketplace-helper.ts";
 
@@ -29,11 +32,13 @@ export interface ServerDepsOptions {
    * observed pool only.
    */
   marketLabels?: Map<string, string>;
+  /** The router for this person (Part 5.2): their own keys first, every call in the ledger. Default: hosted, unmetered. */
+  userRouter?: UserRouter;
 }
 
 export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): OrchestratorDeps {
   const supabase = createServiceSupabaseClient();
-  const router = getRouter();
+  const router = options.userRouter?.router ?? getRouter();
   const { marketLabels } = options;
 
   return {
@@ -55,6 +60,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         throw new Error(`Failed to create research_run: ${error?.message}`);
       }
 
+      if (options.userRouter) options.userRouter.context.runId = data.id; // the run's model calls are filed under it
       return { id: data.id, started_at: data.started_at };
     },
 
@@ -97,10 +103,16 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         url: s.url,
       }));
 
+      // The saved extraction mode (Part 6.9): a model mode pins that exact model; no mode keeps the tier defaults.
+      const mode = await loadExtractionMode(supabase).catch((err) => {
+        console.error("extraction mode unreadable, using tier defaults:", err instanceof Error ? err.message : err);
+        return null;
+      });
       const job = await runExtractionJob({
         signals: inputs,
         router,
         tier: "cheap",
+        ...extractionPin(mode),
         batchSize: Number(process.env.EXTRACTION_BATCH_SIZE) || undefined,
       });
 
@@ -335,7 +347,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         },
         evidence: opp.evidence,
       }));
-      return Object.assign(pairs, { droppedUnsourced: res.droppedUnsourced, ideasInNoMarket });
+      return Object.assign(pairs, { droppedUnsourced: res.droppedUnsourced, ideasInNoMarket, mergedSimilar: res.mergedSimilar });
     },
 
     saveOpportunities: async (opportunities, runId) => {
@@ -448,5 +460,17 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
     },
 
     fetchCompleteness: (runId) => fetchRunCompleteness(supabase, runId),
+
+    recordRunWork: async (runId, patch) => {
+      const { data } = await supabase.from("research_runs").select("plan").eq("id", runId).single();
+      const plan = (data?.plan && typeof data.plan === "object" ? data.plan : {}) as Record<string, unknown>;
+      const work = mergeWork(workOfPlan(plan), patch);
+      // Tokens come from the ledger when its table exists and has rows for this run; otherwise unobserved.
+      const { data: rows, error: ledgerErr } = await supabase.from("ai_usage_ledger").select("total_tokens").eq("run_id", runId);
+      if (!ledgerErr && rows && rows.length > 0) work.tokens = rows.reduce((n, r) => n + Number(r.total_tokens ?? 0), 0);
+      const { error } = await supabase.from("research_runs").update({ plan: { ...plan, work } }).eq("id", runId);
+      if (error) console.error("Failed to store the run's work figures:", error.message);
+      return work;
+    },
   };
 }

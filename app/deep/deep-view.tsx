@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { describeWork } from "@/lib/runs/work";
+import type { RunWork } from "@/lib/runs/types";
 
 const MODEL_URL = "https://gemini.google.com/app";
 
@@ -47,6 +49,7 @@ interface FinishedRun extends ReplyCounts {
     error?: string | null;
     counts: { marketsCreated: number; opportunitiesCreated: number; evidenceCount: number; signalsAnalyzed: number; signalsCollected: number };
     trace: Array<{ state: string; message?: string; counts?: Record<string, number> }>;
+    work?: RunWork;
   };
 }
 
@@ -358,6 +361,12 @@ export function DeepView({
                     </div>
                   ))}
                 </div>
+                {finished.run.work && (
+                  <p className="text-xs text-muted-foreground" data-testid="run-work">
+                    Cost of this run: {describeWork(finished.run.work)}.
+                    {finished.run.work.listingsDropped > 0 && ` ${finished.run.work.listingsDropped === 1 ? "1 unrelated marketplace listing was" : `${finished.run.work.listingsDropped} unrelated marketplace listings were`} dropped.`}
+                  </p>
+                )}
                 <ReplyProblems counts={finished} />
                 {(finished.noMarket ?? 0) > 0 && (
                   <p className="text-xs text-muted-foreground">

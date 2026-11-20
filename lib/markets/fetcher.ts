@@ -9,6 +9,7 @@ import type {
   TopOpportunity,
   BuyerIntentLevel,
 } from "./types.ts";
+import { fetchNicheTrends } from "../trends/niche.ts";
 import { isCurrent, listCompletedRuns, listedRuns, type RunViewer } from "../runs/scope.ts";
 
 /**
@@ -91,6 +92,10 @@ export async function fetchMarketsData(
   }
 
   const marketIds = rawMarkets.map((m) => m.id as string);
+  const nicheTrends = await fetchNicheTrends(
+    supabase,
+    runs.filter((r) => rawMarkets.some((m) => m.run_id === r.id)),
+  );
 
   // 2. Fetch opportunities
   const { data: oppsData } = await supabase
@@ -238,5 +243,6 @@ export async function fetchMarketsData(
     runs,
     scope,
     legacyCount,
+    nicheTrends,
   };
 }

@@ -3,7 +3,7 @@
 // QUEUED -> COLLECTING -> NORMALIZING -> CLASSIFYING -> CLUSTERING -> TREND_ANALYSIS
 //   -> COMPETITION_ANALYSIS -> OPPORTUNITY_GENERATION -> REPORT_GENERATION -> COMPLETED
 
-import type { LifecycleState, LifecycleTraceStep, ResearchCompleteness, RunSummary } from "./types.ts";
+import type { LifecycleState, LifecycleTraceStep, ResearchCompleteness, RunSummary, RunWork } from "./types.ts";
 import { LifecycleTracker } from "./lifecycle.ts";
 import type { EvidenceInput, EvidenceRow } from "../evidence/types.ts";
 import {
@@ -15,7 +15,7 @@ import {
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
 import { listingFormat, mineReviewsAndGaps, type CompetitorProduct } from "../competition/index.ts";
-import { marketForCompetitor } from "../competition/map.ts";
+import { placeCompetitor } from "../competition/map.ts";
 import { isDemandOnly, isListing } from "../sources/demand-only.ts";
 import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
 import { evidenceSignalType, observedPriceRange } from "../opportunities/generator.ts";
@@ -178,7 +178,7 @@ export interface OrchestratorDeps {
   generateOpportunities: (markets: OrchestratorMarketItem[], seed: string) => Promise<Array<{
     opportunity: OrchestratorOpportunityItem;
     evidence: EvidenceInput[];
-  }> & { droppedUnsourced?: number; ideasInNoMarket?: number }>;
+  }> & { droppedUnsourced?: number; ideasInNoMarket?: number; mergedSimilar?: number }>;
   saveOpportunities: (items: OrchestratorOpportunityItem[], runId: string) => Promise<Array<{ id: string; title: string }>>;
   observeCompetition: (signals: StoredSignalForRun[]) => Promise<OrchestratorCompetitorItem[]>;
   saveCompetitors?: (competitors: Array<{
@@ -193,6 +193,11 @@ export interface OrchestratorDeps {
     review_count?: number | null;
   }>) => Promise<Array<{ id: string }>>;
   fetchCompleteness: (runId: string) => Promise<ResearchCompleteness>;
+  /**
+   * Adds to the run's stored work figures (`activeMs` and `listingsDropped` are summed, the rest
+   * replace) and returns the merged whole. Optional: a run without it reports its own numbers.
+   */
+  recordRunWork?: (runId: string, patch: Partial<RunWork>) => Promise<RunWork>;
 }
 
 /** What every phase of one run needs to know about it. */
@@ -267,8 +272,11 @@ async function collectSignals(
     message: classifyingMessage,
   });
   await deps.updateRunStatus(runId, "classifying");
+  await deps.recordRunWork?.(runId, { adapterCalls: ingestResult.sources.filter((s) => s.status !== "skipped").length }).catch(() => undefined);
   return { signals, ingestResult };
 }
+
+const activeMsOf = (tracker: LifecycleTracker) => tracker.getTrace().reduce((n, s) => n + (s.durationMs ?? 0), 0);
 
 /** Marks the run failed and builds its summary. */
 async function failRun(
@@ -335,6 +343,7 @@ async function finishRun(
   const allCreatedEvidence: EvidenceRow[] = [];
 
   try {
+    let droppedOffTopic = 0;
     const runSignals = await deps.getSignals(runId);
     const freshSignals = discussionsOnly(runSignals);
 
@@ -442,7 +451,7 @@ async function finishRun(
 
     if (compState.hasCompetitors) {
       // Each listing goes to the market it was clustered into or overlaps best; below the minimum
-      // overlap it stays on the run only (Part 6.7), never on the first market.
+      // overlap it is dropped unless it holds the whole seed (issue #72), never put on the first market.
       const mapTargets = marketCandidates.map((m) => ({
         id: m.id,
         name: m.name,
@@ -450,10 +459,9 @@ async function finishRun(
         texts: m.signals.map((s) => s.analysis?.problem || s.title || ""),
       }));
       const seedText = frame.seed;
-      const assigned = observedCompetitors.map((c) => ({
-        competitor: c,
-        marketId: marketForCompetitor(c, mapTargets, seedText),
-      }));
+      const placed = observedCompetitors.map((c) => ({ competitor: c, ...placeCompetitor(c, mapTargets, seedText) }));
+      const assigned = placed.filter((p) => p.relevant);
+      droppedOffTopic = placed.length - assigned.length;
 
       if (deps.saveCompetitors) {
         await deps.saveCompetitors(
@@ -589,11 +597,13 @@ async function finishRun(
         opportunitiesFromIdeas: fromIdeas,
         opportunitiesDroppedUnsourced: droppedUnsourced,
         ideasInNoMarket: generatedPairs.ideasInNoMarket ?? 0,
+        opportunitiesMergedSimilar: generatedPairs.mergedSimilar ?? 0,
         evidenceCreated: totalEvidenceCreated,
       },
       message:
         `Saved ${savedOppsCount} of ${OPPORTUNITY_TARGET} target opportunities` +
         (savedOppsCount < OPPORTUNITY_TARGET ? ", limited by evidence" : "") +
+        (generatedPairs.mergedSimilar ? `; ${generatedPairs.mergedSimilar} merged into another with the same audience and problem` : "") +
         (generatedPairs.ideasInNoMarket ? `; ${generatedPairs.ideasInNoMarket} quick ideas fit no market and were left out` : "") +
         `; assembling research completeness panel and reconciling database counts`,
     });
@@ -609,6 +619,9 @@ async function finishRun(
     }
 
     const completedAt = new Date().toISOString();
+    const own = { activeMs: activeMsOf(tracker), extractionCalls: extraction.calls ?? 0, listingsDropped: droppedOffTopic };
+    const stored = await deps.recordRunWork?.(runId, own).catch(() => undefined);
+    const work: RunWork = stored ?? { adapterCalls: 0, tokens: null, ...own };
     tracker.transition("completed", {
       counts: {
         completeness: completeness.completenessPercentage,
@@ -627,6 +640,7 @@ async function finishRun(
       completedAt,
       trace: tracker.getTrace(),
       completeness,
+      work,
       counts: {
         sources: completeness.sourcesCovered,
         signalsCollected: completeness.signalsCollected,
@@ -685,6 +699,7 @@ export async function startPastedRun(options: ResearchRunOptions, deps: Orchestr
   try {
     const { signals, ingestResult } = await collectSignals(frame, options, deps, tracker, "Waiting for the pasted model reply");
     if (signals.length === 0) throw new Error("No discussion signal was collected for this seed; there is nothing to analyse.");
+    await deps.recordRunWork?.(frame.runId, { activeMs: activeMsOf(tracker) }).catch(() => undefined);
     return { status: "awaiting_reply", frame, signals, sources: ingestResult.sources, trace: tracker.getTrace() };
   } catch (err) {
     return failRun(frame, deps, tracker, err, 0);

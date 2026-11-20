@@ -24,6 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { NicheTrendNote } from "./niche-trend-note";
+import type { NicheTrend } from "@/lib/trends/niche";
 import { ExplorerTable } from "./explorer-table";
 import type { MarketRowData, MarketRun, MarketStats, MarketTab } from "./types";
 
@@ -34,6 +36,8 @@ interface DashboardShellProps {
   runs?: MarketRun[];
   scope?: string;
   legacyCount?: number;
+  /** Seed-level Google Trends readings of the runs shown (issue #71). */
+  nicheTrends?: NicheTrend[];
 }
 
 export function DashboardShell({
@@ -42,6 +46,7 @@ export function DashboardShell({
   runs = [],
   scope = "latest",
   legacyCount = 0,
+  nicheTrends = [],
 }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -248,6 +253,10 @@ export function DashboardShell({
           </Button>
         </Link>
       </div>
+
+      {nicheTrends.map((t) => (
+        <NicheTrendNote key={t.runId} trend={t} />
+      ))}
 
       {/* 2. Stat Summary Overview */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
