@@ -7,26 +7,31 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+async function send(url: string, init: RequestInit): Promise<void> {
+  const res = await fetch(url, init);
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(data.error ?? "Could not save.");
+}
+
+const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
 export function WatchAlertSettings({ watchId, initialThreshold, initialMuted, defaultThreshold, unit }: { watchId: string; initialThreshold: number | null; initialMuted: boolean; defaultThreshold: number; unit: string }) {
   const router = useRouter();
   const [muted, setMuted] = useState(initialMuted);
   const [threshold, setThreshold] = useState(String(initialThreshold ?? defaultThreshold));
-  const [busy, setBusy] = useState(false);
+  const [savedThreshold, setSavedThreshold] = useState(initialThreshold ?? defaultThreshold);
   const [problem, setProblem] = useState<string | null>(null);
 
-  async function save(body: { muted?: boolean; threshold?: number | null }) {
-    setBusy(true);
+  // The server upserts only the fields sent, so a threshold save and a Mute click can run at once.
+  async function save(body: { muted?: boolean; threshold?: number }) {
     setProblem(null);
     try {
-      const res = await fetch("/api/alerts/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ watchId, ...body }) });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Could not save.");
+      await send("/api/alerts/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ watchId, ...body }) });
       if (body.muted !== undefined) setMuted(body.muted);
+      if (body.threshold !== undefined) setSavedThreshold(body.threshold);
       router.refresh();
     } catch (err) {
-      setProblem(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
+      setProblem(message(err));
     }
   }
 
@@ -42,15 +47,15 @@ export function WatchAlertSettings({ watchId, initialThreshold, initialMuted, de
           onChange={(e) => setThreshold(e.target.value)}
           onBlur={() => {
             const n = Number(threshold);
-            if (Number.isInteger(n) && n >= 1 && n <= 100) void save({ threshold: n });
-            else setProblem("Use a whole number from 1 to 100.");
+            if (!Number.isInteger(n) || n < 1 || n > 100) setProblem("Use a whole number from 1 to 100.");
+            else if (n !== savedThreshold) void save({ threshold: n });
           }}
           className="h-7 w-16"
           aria-label={`Alert threshold, ${unit}`}
         />
         {unit}
       </label>
-      <Button size="xs" variant={muted ? "default" : "outline"} disabled={busy} aria-pressed={muted} onClick={() => save({ muted: !muted })}>
+      <Button size="xs" variant={muted ? "default" : "outline"} aria-pressed={muted} onClick={() => save({ muted: !muted })}>
         {muted ? "Unmute" : "Mute"}
       </Button>
       {problem ? (
@@ -65,19 +70,33 @@ export function WatchAlertSettings({ watchId, initialThreshold, initialMuted, de
 export function MarkAllRead({ unread }: { unread: number }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   return (
-    <Button
-      size="xs"
-      variant="outline"
-      disabled={busy || unread === 0}
-      onClick={async () => {
-        setBusy(true);
-        await fetch("/api/alerts", { method: "POST" });
-        setBusy(false);
-        router.refresh();
-      }}
-    >
-      Mark all read
-    </Button>
+    <span className="inline-flex flex-col items-end gap-1">
+      <Button
+        size="xs"
+        variant="outline"
+        disabled={busy || unread === 0}
+        onClick={async () => {
+          setBusy(true);
+          setProblem(null);
+          try {
+            await send("/api/alerts", { method: "POST" });
+            router.refresh();
+          } catch (err) {
+            setProblem(message(err));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        Mark all read
+      </Button>
+      {problem ? (
+        <span className="text-xs text-destructive" role="alert">
+          {problem}
+        </span>
+      ) : null}
+    </span>
   );
 }

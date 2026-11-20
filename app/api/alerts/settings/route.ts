@@ -25,17 +25,24 @@ export async function PATCH(req: Request) {
     const { data: watch, error: wErr } = await db.from("watchlists").select("id").eq("id", parsed.watchId).eq("user_id", caller.userId).in("kind", ["seed", "market"]).maybeSingle();
     if (wErr) throw new Error(wErr.message);
     if (!watch) return NextResponse.json({ error: "No such seed or market on your watchlist." }, { status: 404 });
-    const { data: old } = await db.from("alert_settings").select("threshold, muted").eq("watch_id", parsed.watchId).maybeSingle();
-    const row = {
-      watch_id: parsed.watchId,
-      user_id: caller.userId,
-      threshold: "threshold" in parsed ? parsed.threshold : (old?.threshold ?? null),
-      muted: parsed.muted ?? old?.muted ?? false,
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await db.from("alert_settings").upsert(row, { onConflict: "watch_id" });
+    // Upsert only the fields sent: the other column keeps its value (a new row takes the defaults),
+    // so a threshold change can never unmute a watch, and two requests at once cannot undo each other.
+    const { data: row, error } = await db
+      .from("alert_settings")
+      .upsert(
+        {
+          watch_id: parsed.watchId,
+          user_id: caller.userId,
+          updated_at: new Date().toISOString(),
+          ...("threshold" in parsed && { threshold: parsed.threshold }),
+          ...(parsed.muted !== undefined && { muted: parsed.muted }),
+        },
+        { onConflict: "watch_id" },
+      )
+      .select("threshold, muted")
+      .single();
     if (error) throw new Error(error.message);
-    return NextResponse.json({ watchId: row.watch_id, threshold: row.threshold, muted: row.muted });
+    return NextResponse.json({ watchId: parsed.watchId, threshold: row.threshold, muted: row.muted });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }

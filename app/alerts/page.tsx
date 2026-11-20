@@ -103,6 +103,7 @@ function DigestCard({ digest }: { digest: Digest }) {
 export default async function AlertsPage() {
   const caller = await resolveCaller(await headers());
   let alerts: AlertRow[] = [];
+  let unread = 0;
   let settings: Record<string, SettingRow> = {};
   let digest: Digest | null = null;
   let watches: Awaited<ReturnType<typeof listWatches>> = [];
@@ -117,13 +118,12 @@ export default async function AlertsPage() {
         for (const m of data ?? []) marketNames.set(m.id as string, m.name as string);
       }
       // Migration 20 (alerts) and 19 (monitoring) come first: before they are applied, say so.
-      ({ alerts, settings } = await loadAlerts(caller.userId));
+      ({ alerts, unread, settings } = await loadAlerts(caller.userId));
       digest = await loadDigest(watches);
     } catch (err) {
       loadError = err instanceof Error ? err.message : String(err);
     }
   }
-  const unread = alerts.filter((a) => !a.read_at).length;
 
   return (
     <main className="flex-1 bg-background text-foreground">

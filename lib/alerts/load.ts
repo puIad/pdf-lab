@@ -1,4 +1,4 @@
-// lib/alerts/load.ts: what the alerts page and GET /api/alerts show one person (Part 4.3). Server-only.
+// lib/alerts/load.ts: what the alerts page shows one person (Part 4.3). Server-only.
 // Alerts and settings are read as the caller (owner-only RLS); the digest reads the private
 // monitoring tables for the caller's own watches only.
 
@@ -25,15 +25,18 @@ export interface SettingRow {
   muted: boolean;
 }
 
-export async function loadAlerts(userId: string): Promise<{ alerts: AlertRow[]; settings: Record<string, SettingRow> }> {
+// The feed shows the newest 100 alerts; `unread` is counted over all of them.
+export async function loadAlerts(userId: string): Promise<{ alerts: AlertRow[]; unread: number; settings: Record<string, SettingRow> }> {
   const db = await createServerSupabaseClient();
-  const [a, s] = await Promise.all([
+  const [a, u, s] = await Promise.all([
     db.from("alerts").select("id, watch_id, kind, seed, region, title, detail, created_at, read_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(100),
+    db.from("alerts").select("id", { count: "exact", head: true }).eq("user_id", userId).is("read_at", null),
     db.from("alert_settings").select("watch_id, threshold, muted").eq("user_id", userId),
   ]);
   if (a.error) throw new Error(a.error.message);
+  if (u.error) throw new Error(u.error.message);
   if (s.error) throw new Error(s.error.message);
-  return { alerts: (a.data ?? []) as AlertRow[], settings: Object.fromEntries(((s.data ?? []) as SettingRow[]).map((r) => [r.watch_id, r])) };
+  return { alerts: (a.data ?? []) as AlertRow[], unread: u.count ?? 0, settings: Object.fromEntries(((s.data ?? []) as SettingRow[]).map((r) => [r.watch_id, r])) };
 }
 
 export async function loadDigest(watches: WatchItem[], now: Date = new Date()): Promise<Digest> {
