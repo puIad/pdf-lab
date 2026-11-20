@@ -10,6 +10,7 @@ import { createRunFrame } from "../runs/orchestrator.ts";
 import { createServerOrchestratorDeps } from "../runs/service-deps.ts";
 import type { DeepRunInput } from "../runs/deep-steps.ts";
 import type { MarketSignal } from "../sources/types.ts";
+import { supabaseAlertStore } from "../alerts/supabase-store.ts";
 import type { CronDeps } from "./cron.ts";
 
 /** The same scan POST /api/ideas runs, returning the signals it stored. */
@@ -27,4 +28,4 @@ export async function startMarketRunLive(seed: string): Promise<string> {
   return frame.runId;
 }
 
-export const liveCronDeps = (store: CronDeps["store"], force = false): CronDeps => ({ store, scan: scanSeedLive, startMarketRun: startMarketRunLive, force });
+export const liveCronDeps = (store: CronDeps["store"], force = false): CronDeps => ({ store, alerts: supabaseAlertStore(), scan: scanSeedLive, startMarketRun: startMarketRunLive, force });

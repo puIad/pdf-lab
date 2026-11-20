@@ -118,6 +118,15 @@ export default async function WatchlistPage() {
             {caller.userId
               ? `${items.length} of ${WATCHLIST_LIMIT[plan]} saved on the ${plan} plan. Seeds and markets are re-checked once a day.`
               : "Markets, seeds and ideas you save, kept with your account."}
+            {caller.userId ? (
+              <>
+                {" "}
+                <Link href="/alerts" className="underline underline-offset-2">
+                  Alerts and weekly digest
+                </Link>
+                .
+              </>
+            ) : null}
           </p>
         </div>
 

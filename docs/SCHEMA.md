@@ -388,3 +388,27 @@ create table monitor_jobs (key text primary key, last_ok_at timestamptz, failure
 - Monitor runs are `research_runs` with `mode = 'monitor'` and their `run_signals`.
 - Migration: `supabase/migrations/20261120000019_monitoring.sql`. It must be applied before the cron
   route can store anything; until then the watchlist page shows its rows without changes.
+
+## In-app alerts (Part 4.3)
+
+```sql
+create table alert_settings (watch_id uuid primary key references watchlists(id) on delete cascade,
+  user_id uuid references users(id) on delete cascade not null, threshold int check (threshold between 1 and 100),
+  muted boolean not null default false, updated_at timestamptz not null default now());
+create table alerts (id uuid primary key default gen_random_uuid(), user_id uuid references users(id) on delete cascade not null,
+  watch_id uuid references watchlists(id) on delete cascade not null, kind text not null check (kind in ('opportunity','market_change')),
+  seed text not null, region text not null default '', title text not null, detail jsonb not null default '{}',
+  dedupe text not null, created_at timestamptz not null default now(), read_at timestamptz, unique (user_id, dedupe));
+```
+
+- Owner-read RLS on both; every write is the service role (the monitor cron and `/api/alerts*`).
+- `opportunity` alerts: written by the daily cron after a seed snapshot when a phrase reaches the watch's
+  threshold (default 70, opportunity score) after being below it, or absent, in the scan before. The first
+  scan of a seed is a baseline and alerts nothing. `market_change` alerts: written when a monitor run's change
+  report (with a baseline) has at least `threshold` (default 3) new buyer-intent signals. A muted watch writes none.
+- `detail` carries the dated evidence (both scan dates, scores, or the report run and baseline date).
+- The weekly digest is computed on read, not stored: the sum over tracked seeds of the phrases first seen in
+  a snapshot of the last 7 days (`newThisWeek`), plus the stored `added` counts of the last 7 days' change reports.
+- Email and browser alerts stay off (`ALERT_CHANNELS` in `lib/alerts/alerts.ts`, PRD §50): no sending code exists.
+- Migration: `supabase/migrations/20261120000020_alerts.sql`. Before it is applied the cron still scans (alert
+  writes are caught and logged) and `/alerts` shows a read error.

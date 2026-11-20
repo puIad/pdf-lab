@@ -6,6 +6,7 @@
 import { buildIdeas } from "../ideas/ideas.ts";
 import type { MarketSignal } from "../sources/types.ts";
 import { afterRun, diffSnapshots, isDue, marketJobKey, normalizeSeed, seedJobKey, toSnapshotPhrases } from "./diff.ts";
+import { seedAlerts, type AlertStore } from "../alerts/alerts.ts";
 import type { MonitorStore, PhraseChange } from "./types.ts";
 
 export const MAX_SEED_SCANS = 10;
@@ -18,6 +19,8 @@ export interface CronDeps {
   scan(seed: string, region: string): Promise<MarketSignal[]>;
   /** Starts the background re-run of a market's seed; returns the run id. */
   startMarketRun(seed: string): Promise<string>;
+  /** Part 4.3: where threshold crossings become in-app alerts. Optional; a failure here never fails a scan. */
+  alerts?: AlertStore;
   now?: () => Date;
   force?: boolean;
   budgetMs?: number;
@@ -62,8 +65,16 @@ export async function runMonitorCron(deps: CronDeps): Promise<CronResult> {
       const snapshot = { seed: normalizeSeed(seed), region, scannedAt: clock().toISOString(), phrases: toSnapshotPhrases(ideas.ideas) };
       // No stored phrase evidence is a failed scan, not an empty snapshot that would make the next one all `new`.
       if (snapshot.phrases.length === 0) throw new Error("the scan stored no phrase signals");
-      const changes = diffSnapshots(await store.snapshots(snapshot.seed, region), snapshot);
+      const earlier = await store.snapshots(snapshot.seed, region);
+      const changes = diffSnapshots(earlier, snapshot);
       await store.saveSnapshot(snapshot);
+      if (deps.alerts) {
+        try {
+          await deps.alerts.addAlerts(seedAlerts(await deps.alerts.seedWatchers(snapshot.seed, region), earlier[earlier.length - 1], snapshot));
+        } catch (err) {
+          console.error("alerts: could not write seed alerts", err); // e.g. migration 20 not applied yet
+        }
+      }
       await store.saveJob(afterRun(job, key, clock(), null));
       result.seedScans.push({ seed: snapshot.seed, region, status: "ok", phrases: snapshot.phrases.length, changes });
     } catch (err) {
