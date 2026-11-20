@@ -336,7 +336,7 @@ are in git history (`README.md`, "History").
   change).
   Measured in the Deep run: calls take 13 to 28 s when several run at once (NVIDIA queues them),
   about 7 signals a minute at concurrency 2 or 5, so the orchestrator's fixed 5-minute extract step
-  failed twice. The extract step now budgets 10 s per unanalyzed signal (minimum 5 minutes). Deep run
+  failed twice. The extract step then budgeted 10 s per unanalyzed signal (minimum 5 minutes); background Deep runs replaced that with slices of 20 signals and a 4 minute step timeout, under Hobby's 300 s function limit. Deep run
   `de881e6b` on "budgeting" then completed in 17.7 minutes with 97 of 102 signals analyzed. That
   length does not fit a Vercel function; Deep runs in production need a background job (4.2 decides
   the scheduler, DEC-001).

@@ -7,6 +7,7 @@
 // workflow bundle must not pull in Node modules, only the step bundle may.
 
 import type { DeepRunInput } from "../lib/runs/deep-steps.ts";
+import { EXTRACT_SLICE } from "../lib/runs/types.ts";
 
 async function collect(input: DeepRunInput) {
   "use step";
@@ -29,18 +30,33 @@ async function finish(input: DeepRunInput, failures: number, calls: number) {
 }
 finish.maxRetries = 1;
 
-const SLICE = 20; // = EXTRACT_SLICE in lib/runs/deep-steps.ts
+
+async function markFailed(runId: string, message: string) {
+  "use step";
+  const { markFailedStep } = await import("../lib/runs/deep-steps.ts");
+  return markFailedStep(runId, message);
+}
+markFailed.maxRetries = 1;
 
 export async function deepRunWorkflow(input: DeepRunInput) {
   "use workflow";
+  try {
+    return await runSteps(input);
+  } catch (err) {
+    // A throw outside a step's own catch (router setup, platform time limit): never leave the run in a running status.
+    await markFailed(input.runId, `The background job crashed: ${err instanceof Error ? err.message : String(err)}`);
+    throw err;
+  }
+}
 
+async function runSteps(input: DeepRunInput) {
   let failures = input.replyFailures ?? 0;
   let calls = 0;
   if (input.kind === "model") {
     const collected = await collect(input);
     if (!collected.ok) return { status: "failed", error: collected.error ?? null };
-    for (let i = 0; i < collected.pendingIds.length; i += SLICE) {
-      const done = await extractSlice(input, collected.pendingIds.slice(i, i + SLICE));
+    for (let i = 0; i < collected.pendingIds.length; i += EXTRACT_SLICE) {
+      const done = await extractSlice(input, collected.pendingIds.slice(i, i + EXTRACT_SLICE));
       if (!done.ok) return { status: "failed", error: done.error ?? null };
       failures += done.failures;
       calls += done.calls;

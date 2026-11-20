@@ -4,7 +4,7 @@
 
 import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { collectRunStep, extractRunStep, stepTimeoutMs } from "./orchestrator.ts";
+import { collectRunStep, extractRunStep, markRunFailed, stepTimeoutMs } from "./orchestrator.ts";
 import type { OrchestratorDeps, RunFrame, StoredSignalForRun } from "./orchestrator.ts";
 
 const frame: RunFrame = { runId: "run-1", query: "budgeting", mode: "deep", startedAt: "2026-11-20T00:00:00Z", seed: "budgeting" };
@@ -83,5 +83,18 @@ describe("background Deep run steps", () => {
     assert.match(log.errors[0], /timed out/);
     assert.ok(failedAt > 0);
     assert.deepEqual(log.writes, []); // nothing written after the failure
+  });
+});
+
+describe("markRunFailed", () => {
+  it("sets the failed status and records the reason, so a crashed workflow never leaves a running run", async () => {
+    const log = { statuses: [] as string[], errors: [] as string[], writes: [] as number[] };
+    await markRunFailed(deps({}, log), "run-1", "The background job crashed: boom");
+    assert.deepEqual(log.statuses, ["failed"]);
+    assert.deepEqual(log.errors, ["The background job crashed: boom"]);
+  });
+
+  it("the default step timeout stays under Hobby's 300 s function limit", () => {
+    assert.ok(stepTimeoutMs() < 300_000);
   });
 });

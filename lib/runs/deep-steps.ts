@@ -3,14 +3,8 @@
 // database, so a step that runs again on another invocation needs nothing from the one before it.
 
 import { routerForUser } from "../keys/server.ts";
-import { collectRunStep, extractRunStep, finishPastedRun, type RunFrame } from "./orchestrator.ts";
+import { collectRunStep, markRunFailed, extractRunStep, finishPastedRun, type RunFrame } from "./orchestrator.ts";
 import { createServerOrchestratorDeps } from "./service-deps.ts";
-
-/**
- * Signals per extraction step. At 10 s a signal (EXTRACT_MS_PER_SIGNAL) a slice stays inside
- * Hobby's 300 s function limit. workflows/deep-run.ts repeats this number: it must not import server code.
- */
-export const EXTRACT_SLICE = 20;
 
 /** What the workflow carries between steps: plain JSON, stored in the workflow's event log. */
 export interface DeepRunInput {
@@ -44,6 +38,11 @@ async function depsOf(i: DeepRunInput) {
     userRouter,
     marketLabels: i.marketLabels ? new Map(i.marketLabels) : undefined,
   });
+}
+
+/** The workflow crashed outside a step's own catch: mark the run failed so the page stops polling. */
+export async function markFailedStep(runId: string, message: string): Promise<void> {
+  await markRunFailed(createServerOrchestratorDeps(), runId, message);
 }
 
 export async function collectDeepStep(i: DeepRunInput): Promise<StepResult & { pendingIds: string[] }> {

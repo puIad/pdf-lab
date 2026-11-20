@@ -32,7 +32,7 @@ QUEUED → COLLECTING → NORMALIZING → CLASSIFYING → CLUSTERING → TREND_A
   A pasted run skips collect and extract: the reply route stores the analyses, claims the run
   (`classifying` to `clustering`, so a second reply gets 409) and starts the finish step.
   Progress is `GET /api/runs/<id>`: status, completeness, work figures and, for a failed run, the
-  reason (`research_runs.plan.error`). A step is cut off after 5 minutes (`DEEP_STEP_TIMEOUT_MS`
+  reason (`research_runs.plan.error`). A step is cut off after 4 minutes (`DEEP_STEP_TIMEOUT_MS`
   shortens it); the cut-off aborts an `AbortSignal` that ingest and extraction check before every
   write, so a timed-out step writes nothing after the failure.
 

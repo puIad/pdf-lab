@@ -3,8 +3,7 @@
 
 import { start } from "workflow/api";
 import { deepRunWorkflow } from "../../workflows/deep-run.ts";
-import { createServiceSupabaseClient } from "../db/client.ts";
-import { createRunFrame, type ResearchRunOptions } from "./orchestrator.ts";
+import { createRunFrame, markRunFailed, type ResearchRunOptions } from "./orchestrator.ts";
 import { createServerOrchestratorDeps } from "./service-deps.ts";
 import type { DeepRunInput } from "./deep-steps.ts";
 
@@ -13,10 +12,7 @@ type Common = Omit<DeepRunInput, "kind" | "mode" | "limit" | "sourceKeys">;
 /** Marks a run failed when its workflow could not be started, so it never sits in `queued` forever. */
 async function failStart(runId: string, err: unknown): Promise<never> {
   const message = `The background job could not be started: ${err instanceof Error ? err.message : String(err)}`;
-  const db = createServiceSupabaseClient();
-  const { data } = await db.from("research_runs").select("plan").eq("id", runId).single();
-  const plan = (data?.plan && typeof data.plan === "object" ? data.plan : {}) as Record<string, unknown>;
-  await db.from("research_runs").update({ status: "failed", plan: { ...plan, error: message } }).eq("id", runId);
+  await markRunFailed(createServerOrchestratorDeps(), runId, message);
   throw new Error(message);
 }
 

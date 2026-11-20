@@ -21,18 +21,25 @@ import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
 import { evidenceSignalType, observedPriceRange } from "../opportunities/generator.ts";
 import { OPPORTUNITY_TARGET } from "../opportunities/types.ts";
 
-const DEFAULT_STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+// Under Hobby's 300 s function limit, so the in-app timeout fires (and the run fails cleanly) before the platform stops the step.
+const DEFAULT_STEP_TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes
 /**
  * The step timeout. `DEEP_STEP_TIMEOUT_MS` shortens it to force a timeout in a live check
- * (docs/ENV.md); anything that is not a positive number keeps the 5 minutes.
+ * (docs/ENV.md); anything that is not a positive number keeps the 4 minutes.
  */
 export function stepTimeoutMs(): number {
   const n = Number(process.env.DEEP_STEP_TIMEOUT_MS);
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_STEP_TIMEOUT_MS;
 }
-// Extraction is batched (Part 6.9), but a slow provider can still take a minute per call and a
-// batch can fall back to single retries. Budget 10 s per signal, never under 5 minutes.
-export const EXTRACT_MS_PER_SIGNAL = 10_000;
+/** Marks a run failed and records why. Used when a step or the workflow dies outside its own catch. */
+export async function markRunFailed(
+  deps: Pick<OrchestratorDeps, "updateRunStatus" | "recordRunError">,
+  runId: string,
+  message: string,
+): Promise<void> {
+  await deps.updateRunStatus(runId, "failed");
+  await deps.recordRunError?.(runId, message);
+}
 // shortcut: 50 % is a first guess; revisit once runs on several seeds show the usual analysed share.
 /** A run whose analysed share of discussion signals is below this fails instead of reporting on scraps. */
 export const MIN_ANALYZED_SHARE = 0.5;
@@ -682,7 +689,7 @@ function extractWithTimeout(signals: StoredSignalForRun[], deps: OrchestratorDep
       abort.signal,
     ),
     "extract",
-    process.env.DEEP_STEP_TIMEOUT_MS ? stepTimeoutMs() : Math.max(stepTimeoutMs(), signals.length * EXTRACT_MS_PER_SIGNAL),
+    stepTimeoutMs(),
     abort,
   );
 }
