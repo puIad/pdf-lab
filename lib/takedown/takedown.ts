@@ -24,11 +24,9 @@ export function normalizeUrlKey(raw: string | null | undefined): string | null {
   }
   const host = u.hostname.toLowerCase().replace(/^www\./, "");
   const path = u.pathname.length > 1 ? u.pathname.replace(/\/+$/, "") : "";
-  const params = [...u.searchParams.entries()]
-    .filter(([k]) => !TRACKING.test(k))
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}=${v}`)
-    .join("&");
+  const kept = new URLSearchParams([...u.searchParams.entries()].filter(([k]) => !TRACKING.test(k)));
+  kept.sort();
+  const params = kept.toString(); // values stay encoded, so ?q=a%26b=c and ?q=a&b=c differ
   return `${host}${path}${params ? `?${params}` : ""}`;
 }
 

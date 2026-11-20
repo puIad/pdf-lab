@@ -178,4 +178,21 @@ describe("toSignalRow", () => {
     assert.deepEqual(first.totals, { collected: 2, normalized: 2, inserted: 1, duplicates: 0, blocked: 1 });
     assert.deepEqual(second.totals, { collected: 2, normalized: 2, inserted: 0, duplicates: 1, blocked: 1 });
   });
+
+  it("ingests normally when the blocklist cannot be read (table missing)", async () => {
+    const deps = fakeDeps([fakeAdapter("alpha", [{ externalId: "a1" }, { externalId: "a2" }])]);
+    deps.blockedUrlKeys = async () => {
+      throw new Error('relation "takedowns" does not exist');
+    };
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      const r = await runIngest({ query: "q" }, deps);
+      assert.deepEqual(deps.rows.map((x) => x.external_id), ["a1", "a2"]);
+      assert.equal(r.totals.inserted, 2);
+      assert.equal(r.totals.blocked, 0);
+    } finally {
+      console.warn = warn;
+    }
+  });
 });

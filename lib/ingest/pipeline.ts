@@ -110,9 +110,14 @@ async function ingestOne(
     let kept = normalized;
     if (deps.blockedUrlKeys) {
       const keyOf = (s: MarketSignal) => normalizeUrlKey(s.url) ?? normalizeUrlKey(s.source_id);
-      const blocked = await deps.blockedUrlKeys(
-        normalized.map(keyOf).filter((k): k is string => k !== null),
-      );
+      // Fail open: a missing takedowns table (migration not applied yet) or a read error must not
+      // stop ingest. The blocklist is treated as empty and the error is logged.
+      let blocked = new Set<string>();
+      try {
+        blocked = await deps.blockedUrlKeys(normalized.map(keyOf).filter((k): k is string => k !== null));
+      } catch (e) {
+        console.warn(`takedown blocklist unreadable, ingesting without it: ${e instanceof Error ? e.message : String(e)}`);
+      }
       if (blocked.size > 0) kept = normalized.filter((s) => !blocked.has(keyOf(s) ?? ""));
     }
     const sourceUuid = await deps.resolveSourceId(adapter.key);

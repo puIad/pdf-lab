@@ -19,6 +19,7 @@ test("real query parameters stay, in sorted order; other pages differ", () => {
   assert.equal(normalizeUrlKey("https://a.com/p?b=2&a=1"), "a.com/p?a=1&b=2");
   assert.notEqual(normalizeUrlKey("https://a.com/p?id=1"), normalizeUrlKey("https://a.com/p?id=2"));
   assert.equal(normalizeUrlKey("https://a.com/"), "a.com");
+  assert.notEqual(normalizeUrlKey("https://a.com/p?q=a%26b=c"), normalizeUrlKey("https://a.com/p?q=a&b=c"));
 });
 
 test("text that is not an http URL has no key", () => {
