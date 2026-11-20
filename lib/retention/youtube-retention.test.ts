@@ -8,9 +8,12 @@ const day = 86_400_000;
 
 function fakeStore(rows: Array<StaleSignal & { collected_at: number; content: string }>) {
   const store: RetentionStore = {
-    async listStale(cutoffIso, limit, exclude) {
+    async listStale(cutoffIso, limit) {
       const cutoff = Date.parse(cutoffIso);
-      return rows.filter((r) => r.collected_at < cutoff && !exclude.includes(r.id)).slice(0, limit);
+      return rows.filter((r) => r.collected_at < cutoff).slice(0, limit);
+    },
+    async removeStaleEvidence() {
+      return 3;
     },
     async update(id, patch) {
       const r = rows.find((x) => x.id === id)!;
@@ -46,6 +49,7 @@ test("stale comments are refreshed or deleted; fresh ones stay; none older than 
   const rows = seed();
   const adapter = new YouTubeAdapter({ apiKey: "k", minIntervalMs: 0, nowFn: () => NOW, fetchFn: apiReturning(["a"]) });
   const res = await runYouTubeRetention({ store: fakeStore(rows), refresher: adapter, now: () => NOW });
+  assert.equal(res.evidenceDeleted, 3);
   assert.deepEqual({ examined: res.examined, refreshed: res.refreshed, deleted: res.deleted }, { examined: 2, refreshed: 1, deleted: 1 });
   assert.deepEqual(rows.map((r) => r.id).sort(), ["a", "c"]);
   const a = rows.find((r) => r.id === "a")!;

@@ -24,8 +24,10 @@ export interface SignalRefresh {
 }
 
 export interface RetentionStore {
-  /** Oldest first, collected before `cutoffIso`, excluding ids already handled this run. */
-  listStale(cutoffIso: string, limit: number, excludeIds: string[]): Promise<StaleSignal[]>;
+  /** Oldest first, collected before `cutoffIso`. Handled rows are updated or removed, so they do not return. */
+  listStale(cutoffIso: string, limit: number): Promise<StaleSignal[]>;
+  /** Evidence copies of YouTube text (excerpt, claim) have no FK to signals; delete those older than the cutoff. */
+  removeStaleEvidence(cutoffIso: string): Promise<number>;
   update(id: string, patch: SignalRefresh): Promise<void>;
   remove(ids: string[]): Promise<void>;
 }
@@ -39,6 +41,8 @@ export interface RetentionResult {
   examined: number;
   refreshed: number;
   deleted: number;
+  /** Evidence rows deleted because they copy YouTube text older than 30 days. */
+  evidenceDeleted: number;
   /** Deleted because the refresh request itself failed (not because the comment is gone). */
   deletedOnFailure: number;
   error?: string;
@@ -52,14 +56,13 @@ export async function runYouTubeRetention(opts: {
 }): Promise<RetentionResult> {
   const now = opts.now ?? Date.now;
   const cutoff = new Date(now() - (opts.maxAgeDays ?? MAX_AGE_DAYS) * 86_400_000).toISOString();
-  const result: RetentionResult = { examined: 0, refreshed: 0, deleted: 0, deletedOnFailure: 0 };
-  const seen: string[] = [];
+  const result: RetentionResult = { examined: 0, refreshed: 0, deleted: 0, evidenceDeleted: 0, deletedOnFailure: 0 };
+  result.evidenceDeleted = await opts.store.removeStaleEvidence(cutoff);
 
   for (let b = 0; b < MAX_BATCHES; b++) {
-    const rows = await opts.store.listStale(cutoff, BATCH_SIZE, seen);
+    const rows = await opts.store.listStale(cutoff, BATCH_SIZE);
     if (rows.length === 0) break;
     result.examined += rows.length;
-    seen.push(...rows.map((r) => r.id));
 
     const byExternal = new Map(rows.map((r) => [r.external_id, r]));
     const toDelete: string[] = [];

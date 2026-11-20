@@ -58,7 +58,8 @@ create table signals (
 -- YouTube retention (issue #77, DEC-017): `vercel.json` runs `/api/cron/youtube-retention` daily at 03:17 UTC.
 -- Each YouTube signal with collected_at older than 30 days is re-fetched through the adapter; success
 -- updates title/content/upvotes and sets collected_at = now, a missing comment or a failed refresh deletes
--- the row (signal_analysis, market_signals, run_signals cascade). No migration: collected_at is the age.
+-- the row (signal_analysis, market_signals, run_signals cascade). `evidence` has no FK to signals and holds
+-- copies of the text (excerpt, claim), so the job also deletes YouTube evidence rows older than 30 days. No migration: collected_at is the age.
 
 -- AI extraction per signal (PRD §13–§14). Embedding dim MUST match AI-ROUTER.md.
 create table signal_analysis (

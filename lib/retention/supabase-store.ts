@@ -12,11 +12,9 @@ export function supabaseRetentionStore(): RetentionStore {
     return (sourceId = data?.id ?? "");
   };
   return {
-    async listStale(cutoffIso, limit, excludeIds) {
+    async listStale(cutoffIso, limit) {
       const id = await source();
       if (!id) return [];
-      // Excluded ids are filtered here: a long NOT IN list would overflow the request URL.
-      const skip = new Set(excludeIds);
       const { data, error } = await db
         .from("signals")
         .select("id, external_id, engagement")
@@ -24,11 +22,21 @@ export function supabaseRetentionStore(): RetentionStore {
         .lt("collected_at", cutoffIso)
         .not("external_id", "is", null)
         .order("collected_at", { ascending: true })
-        .limit(limit + skip.size);
+        .limit(limit);
       if (error) throw error;
-      return ((data ?? []) as { id: string; external_id: string; engagement: Record<string, unknown> }[])
-        .filter((r) => !skip.has(r.id))
-        .slice(0, limit);
+      return (data ?? []) as { id: string; external_id: string; engagement: Record<string, unknown> }[];
+    },
+    async removeStaleEvidence(cutoffIso) {
+      const id = await source();
+      if (!id) return 0;
+      const { data, error } = await db
+        .from("evidence")
+        .delete()
+        .eq("source_id", id)
+        .lt("created_at", cutoffIso)
+        .select("id");
+      if (error) throw error;
+      return data?.length ?? 0;
     },
     async update(id, patch) {
       const { error } = await db.from("signals").update(patch).eq("id", id);

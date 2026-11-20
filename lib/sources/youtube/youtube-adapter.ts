@@ -212,7 +212,6 @@ export class YouTubeAdapter implements SourceAdapter {
       const url = new URL(`${YOUTUBE_API_BASE}/comments`);
       url.searchParams.set("part", "snippet");
       url.searchParams.set("id", batch.map((id) => id.replace(/^yt_comment_/, "")).join(","));
-      url.searchParams.set("maxResults", String(REFRESH_BATCH));
       url.searchParams.set("textFormat", "plainText");
       url.searchParams.set("key", this.config.apiKey);
       const res = await this.config.fetchFn(url.toString());
