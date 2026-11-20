@@ -25,8 +25,11 @@ export const NVIDIA_KEY = "nvidia";
 export const NVIDIA_DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
 /** Per-key limit the user's NVIDIA key reported (2026-10-24). Override with NVIDIA_RPM. */
 export const NVIDIA_DEFAULT_RPM = 40;
-/** Probe-picked 2026-10-24 (DEC-013). Override with NVIDIA_CHEAP_MODEL / NVIDIA_STRONG_MODEL. */
-export const NVIDIA_DEFAULT_CHAT_MODEL = "openai/gpt-oss-20b";
+/**
+ * Default chat model. `openai/gpt-oss-20b` (DEC-013) reached end of life on 2026-11-18 (HTTP 410);
+ * this one answered live on 2026-11-20 (DEC-015). Override with NVIDIA_CHEAP_MODEL / NVIDIA_STRONG_MODEL.
+ */
+export const NVIDIA_DEFAULT_CHAT_MODEL = "nvidia/nemotron-3.5-bolt-e4b";
 
 export interface OpenAICompatConfig {
   apiKey?: string;
@@ -38,7 +41,7 @@ export interface OpenAICompatConfig {
   minIntervalMs?: number;
   /** Abort a request after this long; 0 = no timeout. */
   timeoutMs?: number;
-  /** Sent as `reasoning_effort` (reasoning models such as gpt-oss); omitted when unset. */
+  /** Sent as `reasoning_effort` (reasoning models); omitted when unset. */
   reasoningEffort?: string;
 }
 
@@ -62,8 +65,9 @@ export function nvidiaConfigFromEnv(env: NodeJS.ProcessEnv = process.env): OpenA
     minIntervalMs: Math.ceil(60_000 / rpm),
     // Some hosted models queue for minutes; fail over to the next provider instead.
     timeoutMs: 60_000,
-    // gpt-oss at default effort spent the whole 500-token extraction budget reasoning and returned
-    // no content on 5 of 8 signals; "low" answered 3 of 3 of those in 4-7 s (2026-10-24).
+    // Reasoning models at default effort can spend the whole 500-token extraction budget reasoning
+    // and return no content (gpt-oss did, 2026-10-24); "low" avoids that. Non-reasoning models
+    // such as the default accept and ignore it.
     reasoningEffort: env.NVIDIA_REASONING_EFFORT || "low",
   };
 }

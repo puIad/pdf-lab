@@ -429,6 +429,10 @@ are in git history (`README.md`, "History").
   `minimaxai/minimax-m3.1-flash` in 3.3 s, `openrouter/free` in 1.3 s. Batched extraction of 100
   stored signals with nemotron-3.5-bolt-e4b: 100 of 100 analysed, 10 calls (10 batch, 0 single),
   133 s wall time.
+- Note 2026-11-20 (issue #67): NVIDIA now answers `openai/gpt-oss-20b` with HTTP 410, end of life
+  2026-11-18. The code default (`NVIDIA_DEFAULT_CHAT_MODEL`) is now `nvidia/nemotron-3.5-bolt-e4b`
+  (answered in 1.0 s live with `reasoning_effort: "low"`), so a call that falls back to the default
+  no longer fails. No code path sends `openai/gpt-oss-20b`.
 
 ## DEC-016 — Where the frontend megalibrary lives
 

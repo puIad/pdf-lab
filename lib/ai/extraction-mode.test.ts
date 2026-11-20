@@ -49,7 +49,7 @@ describe("candidateModels", () => {
     const list = candidateModels(["nvidia"], ({ NVIDIA_CHEAP_MODEL: "x/custom" } as unknown as NodeJS.ProcessEnv));
     assert.ok(list.every((c) => c.provider === "nvidia"));
     assert.ok(list.some((c) => c.model === "x/custom"));
-    assert.equal(candidateModels(["nvidia"], ({ NVIDIA_CHEAP_MODEL: "nvidia/nemotron-3.5-bolt-e4b" } as unknown as NodeJS.ProcessEnv)).length, 3);
+    assert.equal(candidateModels(["nvidia"], ({ NVIDIA_CHEAP_MODEL: "nvidia/nemotron-3.5-bolt-e4b" } as unknown as NodeJS.ProcessEnv)).length, 2);
     assert.deepEqual(candidateModels([], {} as NodeJS.ProcessEnv), []);
   });
 });

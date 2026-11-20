@@ -22,8 +22,7 @@ export interface ModelCandidate {
 /** Chat models worth trying per provider. DEC-015 (2026-11-13) measured the NVIDIA ones. */
 export function candidateModels(configuredProviders: string[], env: NodeJS.ProcessEnv = process.env): ModelCandidate[] {
   const all: ModelCandidate[] = [
-    { provider: "nvidia", model: NVIDIA_DEFAULT_CHAT_MODEL, note: "The old default. Gone (HTTP 410) since 2026-11-18." },
-    { provider: "nvidia", model: "nvidia/nemotron-3.5-bolt-e4b", note: "Fast: 30 of 30 signals in 77 s, but rates intent differently." },
+    { provider: "nvidia", model: NVIDIA_DEFAULT_CHAT_MODEL, note: "Default. Fast: 30 of 30 signals in 77 s, but rates intent differently." },
     { provider: "nvidia", model: "minimaxai/minimax-m3.1-flash", note: "Closest to the stored analyses, but failed 60 % of calls." },
     { provider: "openrouter", model: env.OPENROUTER_CHEAP_MODEL || OPENROUTER_DEFAULT_CHEAP_MODEL, note: "Free pool: 50 calls a day without credits." },
     { provider: "ollama", model: env.OLLAMA_MODEL || OLLAMA_DEFAULT_MODEL, note: "Local model, no key." },

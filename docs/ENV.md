@@ -31,6 +31,7 @@ in `.env.example` (placeholders only), in client bundles, or in chat.**
 | `SUPABASE_SERVICE_ROLE_KEY` | **Server-only — NEVER `NEXT_PUBLIC_`, never imported client-side** | `.env.local` locally; Vercel dashboard → Production + Preview only | Full DB bypass. In Vercel, store as **Sensitive** type (production + preview targets; development target is not allowed for sensitive vars). Leaking this = full DB compromise → rotate immediately (Supabase dashboard → Settings → API → generate new key, then update both places). |
 | `GEMINI_API_KEY` | Server-only | Not set yet (Phase 1 Part 1.3) | Placeholder in `.env.example` only. Set when AIRouter gains a Gemini provider. |
 | `OPENAI_API_KEY` (and any `OPENAI_*`) | Server-only | Not set yet (Phase 1 Part 1.3) | Same as above, for an OpenAI-compatible provider path. |
+| `NVIDIA_CHEAP_MODEL`, `NVIDIA_STRONG_MODEL` | Server-only | Optional | NVIDIA chat model per tier. Unset, both use `nvidia/nemotron-3.5-bolt-e4b` (the old default `openai/gpt-oss-20b` is end of life, DEC-015). |
 | `OPENROUTER_API_KEY` | Server-only | Not set yet (Phase 1 Part 1.3) | Same as above, for the OpenRouter provider path. |
 | Web-search API key (ONE of Brave / Serper / Tavily / Bing — DEC-002) | Server-only | Not set yet (Phase 1 Part 1.2) | Provider picked in Part 1.2; only the winner gets a key row here. |
 | `CRON_SECRET` | Server-only | Not set yet (Phase 4 Part 4.2) | Only if Vercel Cron / scheduler path is chosen in DEC-001. |
