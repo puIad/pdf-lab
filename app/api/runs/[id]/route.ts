@@ -92,5 +92,7 @@ export async function GET(
     },
     completeness,
     work: workOfPlan(run.plan),
+    // Why a failed run failed: stored by the run itself, so it is still there after the request that started it.
+    error: currentStatus === "failed" ? ((run.plan as { error?: string } | null)?.error ?? null) : null,
   });
 }

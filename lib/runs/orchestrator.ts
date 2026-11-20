@@ -21,10 +21,25 @@ import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
 import { evidenceSignalType, observedPriceRange } from "../opportunities/generator.ts";
 import { OPPORTUNITY_TARGET } from "../opportunities/types.ts";
 
-const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-// Extraction is batched (Part 6.9), but a slow provider can still take a minute per call and a
-// batch can fall back to single retries. Budget 10 s per signal, never under 5 minutes.
-export const EXTRACT_MS_PER_SIGNAL = 10_000;
+// Under Hobby's 300 s function limit, so the in-app timeout fires (and the run fails cleanly) before the platform stops the step.
+const DEFAULT_STEP_TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes
+/**
+ * The step timeout. `DEEP_STEP_TIMEOUT_MS` shortens it to force a timeout in a live check
+ * (docs/ENV.md); anything that is not a positive number keeps the 4 minutes.
+ */
+export function stepTimeoutMs(): number {
+  const n = Number(process.env.DEEP_STEP_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_STEP_TIMEOUT_MS;
+}
+/** Marks a run failed and records why. Used when a step or the workflow dies outside its own catch. */
+export async function markRunFailed(
+  deps: Pick<OrchestratorDeps, "updateRunStatus" | "recordRunError">,
+  runId: string,
+  message: string,
+): Promise<void> {
+  await deps.updateRunStatus(runId, "failed");
+  await deps.recordRunError?.(runId, message);
+}
 // shortcut: 50 % is a first guess; revisit once runs on several seeds show the usual analysed share.
 /** A run whose analysed share of discussion signals is below this fails instead of reporting on scraps. */
 export const MIN_ANALYZED_SHARE = 0.5;
@@ -41,10 +56,16 @@ function validatedTrend(market: { trend: string; signals: StoredSignalForRun[] }
   return { trend: enforceRule2_TrendTemporalEvidence(proposed, temporalCount), temporalCount };
 }
 
-function withTimeout<T>(p: Promise<T>, label: string, ms = STEP_TIMEOUT_MS): Promise<T> {
+/**
+ * Rejects after `ms` and aborts `controller`: the work behind the promise watches the signal and
+ * stops before its next write, so a timed-out step writes nothing after the failure time.
+ */
+function withTimeout<T>(p: Promise<T>, label: string, ms = stepTimeoutMs(), controller?: AbortController): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${ms}ms`));
+      const err = new Error(`${label} timed out after ${ms}ms`);
+      controller?.abort(err);
+      reject(err);
     }, ms);
     p.then((val) => {
       clearTimeout(timer);
@@ -152,7 +173,7 @@ export interface OrchestratorDeps {
     completedAt?: string | null,
   ) => Promise<void>;
   /** Collects, stores, and links every returned signal to the run (`run_signals`). */
-  ingest: (params: { runId: string; query: string; limit: number; sourceKeys?: string[] }) => Promise<{
+  ingest: (params: { runId: string; query: string; limit: number; sourceKeys?: string[]; signal?: AbortSignal }) => Promise<{
     collected: number;
     normalized: number;
     inserted: number;
@@ -160,7 +181,7 @@ export interface OrchestratorDeps {
   }>;
   /** The run's own signals (`run_signals`), never a text match over the whole table. */
   getSignals: (runId: string) => Promise<StoredSignalForRun[]>;
-  extract: (signals: Array<{ id: string; title: string | null; content: string | null; url: string | null }>) => Promise<{
+  extract: (signals: Array<{ id: string; title: string | null; content: string | null; url: string | null }>, signal?: AbortSignal) => Promise<{
     analyzed: number;
     succeeded: number;
     failed: number;
@@ -198,6 +219,8 @@ export interface OrchestratorDeps {
    * replace) and returns the merged whole. Optional: a run without it reports its own numbers.
    */
   recordRunWork?: (runId: string, patch: Partial<RunWork>) => Promise<RunWork>;
+  /** Stores why a run failed (`plan.error`), so a poll of the run can say it after the request is gone. */
+  recordRunError?: (runId: string, message: string) => Promise<void>;
 }
 
 /** What every phase of one run needs to know about it. */
@@ -246,12 +269,14 @@ async function collectSignals(
   // 2. COLLECTING
   tracker.transition("collecting", { message: `Collecting signals from adapters for "${query}"` });
   await deps.updateRunStatus(runId, "collecting");
+  const ingestAbort = new AbortController();
   const ingestResult = await withTimeout(deps.ingest({
     runId,
     query,
     limit: options.limit || 25,
     sourceKeys: options.sourceKeys,
-  }), "ingest");
+    signal: ingestAbort.signal,
+  }), "ingest", stepTimeoutMs(), ingestAbort);
 
   // 3. NORMALIZING
   tracker.transition("normalizing", {
@@ -292,6 +317,7 @@ async function failRun(
     tracker.transition("failed", { message: errorMsg });
   }
   await deps.updateRunStatus(runId, "failed");
+  await deps.recordRunError?.(runId, errorMsg).catch(() => undefined);
 
   const completeness = await deps
     .fetchCompleteness(runId)
@@ -373,7 +399,7 @@ async function finishRun(
     });
     await deps.updateRunStatus(runId, "clustering");
 
-    const marketCandidates = await withTimeout(deps.clusterAndScore(freshSignals), "clusterAndScore");
+    const marketCandidates = await withTimeout(deps.clusterAndScore(freshSignals), "clusterAndScore", stepTimeoutMs());
     // Analysed signals that ended up in no market: the clusterer skips one with no embedding, and a
     // pasted reply can mark one as unrelated to the topic. Say how many.
     const clustered = new Set(marketCandidates.flatMap((m) => m.signals.map((s) => s.id)));
@@ -655,6 +681,19 @@ async function finishRun(
   }
 }
 
+function extractWithTimeout(signals: StoredSignalForRun[], deps: OrchestratorDeps): Promise<ExtractionCounts> {
+  const abort = new AbortController();
+  return withTimeout(
+    deps.extract(
+      signals.map((s) => ({ id: s.id, title: s.title, content: s.content, url: s.url })),
+      abort.signal,
+    ),
+    "extract",
+    stepTimeoutMs(),
+    abort,
+  );
+}
+
 /** A Deep run in one request: collect, extract with the AIRouter, analyse, report. */
 export async function executeResearchRun(
   options: ResearchRunOptions,
@@ -666,19 +705,57 @@ export async function executeResearchRun(
     const { signals } = await collectSignals(frame, options, deps, tracker, "Analyzing signals with AIRouter for intent, urgency, and PDF relevance");
     const unanalyzedSignals = signals.filter((s) => !s.analysis);
     if (unanalyzedSignals.length > 0) {
-      extraction = await withTimeout(deps.extract(
-        unanalyzedSignals.map((s) => ({
-          id: s.id,
-          title: s.title,
-          content: s.content,
-          url: s.url,
-        })),
-      ), "extract", Math.max(STEP_TIMEOUT_MS, unanalyzedSignals.length * EXTRACT_MS_PER_SIGNAL));
+      extraction = await extractWithTimeout(unanalyzedSignals, deps);
     }
   } catch (err) {
     return failRun(frame, deps, tracker, err, 0);
   }
   return finishRun(frame, deps, tracker, extraction);
+}
+
+/**
+ * Background Deep run (issue #24, DEC-001). The run row is created at once so the caller can
+ * return its id; every later piece reads its inputs from the database and runs as its own
+ * workflow step, so a closed tab or a restarted function loses nothing.
+ */
+export async function createRunFrame(options: ResearchRunOptions, deps: OrchestratorDeps): Promise<RunFrame> {
+  return (await openRun(options, deps)).frame;
+}
+
+/** Step 1: collect, then list the discussion signals that still need an analysis. */
+export async function collectRunStep(
+  frame: RunFrame,
+  options: ResearchRunOptions,
+  deps: OrchestratorDeps,
+): Promise<{ failed: RunSummary | null; pendingIds: string[]; signals: number }> {
+  const tracker = new LifecycleTracker("queued", `Research run queued for "${frame.query}"`);
+  try {
+    const { signals } = await collectSignals(frame, options, deps, tracker, "Analyzing signals with AIRouter for intent, urgency, and PDF relevance");
+    await deps.recordRunWork?.(frame.runId, { activeMs: activeMsOf(tracker) }).catch(() => undefined);
+    return { failed: null, pendingIds: signals.filter((s) => !s.analysis).map((s) => s.id), signals: signals.length };
+  } catch (err) {
+    return { failed: await failRun(frame, deps, tracker, err, 0), pendingIds: [], signals: 0 };
+  }
+}
+
+/** Step 2..n: extract one slice of the pending ids. Ids that already have an analysis are skipped. */
+export async function extractRunStep(
+  frame: RunFrame,
+  deps: OrchestratorDeps,
+  ids: string[],
+): Promise<{ failed: RunSummary | null; failures: number; calls: number }> {
+  const tracker = new LifecycleTracker("classifying", "Extracting a slice of the run's signals");
+  const started = Date.now();
+  try {
+    const wanted = new Set(ids);
+    const todo = (await deps.getSignals(frame.runId)).filter((s) => wanted.has(s.id) && !s.analysis);
+    if (todo.length === 0) return { failed: null, failures: 0, calls: 0 };
+    const res = await extractWithTimeout(todo, deps);
+    await deps.recordRunWork?.(frame.runId, { activeMs: Date.now() - started }).catch(() => undefined);
+    return { failed: null, failures: res.failed, calls: res.calls ?? 0 };
+  } catch (err) {
+    return { failed: await failRun(frame, deps, tracker, err, 0), failures: 0, calls: 0 };
+  }
 }
 
 export interface PausedRun {
@@ -707,7 +784,7 @@ export async function startPastedRun(options: ResearchRunOptions, deps: Orchestr
 }
 
 /** Second half: the analyses are stored; cluster, score and report. `failed` = items the reply got wrong. */
-export async function finishPastedRun(frame: RunFrame, deps: OrchestratorDeps, failed: number): Promise<RunSummary> {
-  const tracker = new LifecycleTracker("classifying", "Pasted model reply stored");
-  return finishRun(frame, deps, tracker, { failed, calls: 0 });
+export async function finishPastedRun(frame: RunFrame, deps: OrchestratorDeps, failed: number, calls = 0): Promise<RunSummary> {
+  const tracker = new LifecycleTracker("classifying", "Analyses stored");
+  return finishRun(frame, deps, tracker, { failed, calls });
 }
