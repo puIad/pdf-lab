@@ -12,6 +12,7 @@ import { detectTopicTrend, type SignalRecord } from "@/lib/trends";
 import { executeResearchRun } from "@/lib/runs/orchestrator";
 import { pastedModeResponse } from "@/lib/settings/pasted-gate";
 import { createServerOrchestratorDeps } from "@/lib/runs/service-deps";
+import { routerForUser } from "@/lib/keys/server";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { OPPORTUNITY_PROMPT_VERSION } from "@/lib/opportunities";
 import { isDemandOnly } from "@/lib/sources/demand-only";
@@ -116,7 +117,7 @@ export async function POST(req: Request) {
           pipelinePromptVersions: { extraction: EXTRACTION_PROMPT_VERSION, opportunity: OPPORTUNITY_PROMPT_VERSION },
         },
       },
-      createServerOrchestratorDeps(),
+      createServerOrchestratorDeps({ userRouter: await routerForUser(userId) }),
     );
     return NextResponse.json(
       { runId: result.runId, plan, result: { mode: "deep", run: result } },

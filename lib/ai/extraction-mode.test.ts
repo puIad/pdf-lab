@@ -122,6 +122,37 @@ describe("router pinned model", () => {
   });
 });
 
+describe("pinned model with a person's own keys", () => {
+  const pin = { tier: "cheap" as const, system: "s", user: "u", providerName: "openrouter", model: "pinned/m" };
+
+  it("tries their key for the same provider first, with the pinned model", async () => {
+    const hosted = provider("openrouter", () => "hosted");
+    const mine = provider("byok-openrouter", () => "mine");
+    const r = routerWith(hosted);
+    r.registerByok(mine, "their/own-model");
+    const res = await r.generateText(pin);
+    assert.equal(res.provider, "byok-openrouter");
+    assert.equal(res.keySource, "byok");
+    assert.equal(mine.seen[0].model, "pinned/m");
+    assert.equal(hosted.seen.length, 0);
+  });
+
+  it("falls to the hosted provider when their key fails, and ignores their keys for other providers", async () => {
+    const hosted = provider("openrouter", () => "hosted");
+    const mine = provider("byok-openrouter", () => {
+      throw new Error("HTTP 500");
+    });
+    const other = provider("byok-gemini", () => "gemini");
+    const r = routerWith(hosted);
+    r.registerByok(mine);
+    r.registerByok(other);
+    const res = await r.generateText(pin);
+    assert.equal(res.provider, "openrouter");
+    assert.equal(other.seen.length, 0);
+    assert.equal(hosted.seen[0].model, "pinned/m");
+  });
+});
+
 describe("pastedModeRefusal and canManageSettings", () => {
   it("refuses only in pasted mode", () => {
     assert.equal(pastedModeRefusal(null), null);
@@ -145,7 +176,7 @@ describe("/api/runs gate", () => {
     const src = readFileSync(new URL("../../app/api/runs/route.ts", import.meta.url), "utf8");
     const gate = src.indexOf("await pastedModeResponse()");
     assert.ok(gate > 0, "route calls the gate");
-    assert.ok(gate < src.indexOf("createServerOrchestratorDeps()"), "gate runs before the run is built");
+    assert.ok(gate < src.indexOf("createServerOrchestratorDeps("), "gate runs before the run is built");
     assert.ok(!/if \(mode === "deep"\)[^}]*pastedModeResponse/.test(src), "gate is not limited to deep");
   });
 });
