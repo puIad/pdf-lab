@@ -1,4 +1,4 @@
--- Migration 13: success-metrics events (Phase 6 Part 6.2, PRD §58 to §59, issue #31).
+-- Migration 14: success-metrics events (Phase 6 Part 6.2, PRD §58 to §59, issue #31).
 -- One row per thing a signed-in person did that says the product was useful. Counted actions
 -- (searches, Deep runs) stay in usage_events; this table holds the signals the north-star metric
 -- and its companions are read from.

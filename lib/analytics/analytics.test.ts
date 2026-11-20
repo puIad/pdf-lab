@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeMetrics, parseVote, returnEvent, savedEvent, voteEvent } from "./metrics.ts";
-import { recordEvent } from "./store.ts";
+import { loadMetrics, recordEvent } from "./store.ts";
 
 /** In-memory metric_events honouring upsert onConflict / ignoreDuplicates like Postgres. */
 function fakeDb() {
@@ -99,4 +99,41 @@ test("with no active user the north star is not observed, never zero or infinity
   assert.equal(m.northStar, null);
   assert.equal(m.coverage.share, 1);
   assert.equal(computeMetrics({ opportunities: [], activeUserIds: [], events: [] }).coverage.share, null);
+});
+
+/** A read-only fake: every filter is a no-op, `range` slices the table, so only paging is under test. */
+function readDb(tables: Record<string, Array<Record<string, unknown>>>) {
+  const calls: Record<string, number> = {};
+  const from = (table: string) => {
+    const b: Record<string, unknown> = {};
+    for (const m of ["select", "eq", "gte", "in", "not", "order"]) b[m] = () => b;
+    b.range = async (a: number, z: number) => {
+      calls[table] = (calls[table] ?? 0) + 1;
+      return { data: (tables[table] ?? []).slice(a, z + 1), error: null };
+    };
+    return b;
+  };
+  return { calls, db: { from } as unknown as SupabaseClient };
+}
+
+test("loadMetrics reads past the 1000-row response cap on every table", async () => {
+  const runs = [{ id: "r1", user_id: "u1" }];
+  const opportunities = Array.from({ length: 2500 }, (_, i) => ({ id: `o${i}`, run_id: "r1" }));
+  const evidence = opportunities.map((o) => ({
+    id: `e${o.id}`, entity_type: "opportunity", entity_id: o.id, source_id: "s", claim: "c", excerpt: "x", url: null, created_at: "",
+  }));
+  const usage = Array.from({ length: 1500 }, (_, i) => ({ user_id: `u${i}` }));
+  const { db, calls } = readDb({ research_runs: runs, opportunities, evidence, metric_events: [], usage_events: usage });
+  const m = await loadMetrics(db, new Date("2026-11-20T00:00:00Z"));
+  assert.equal(m.validatedOpportunities, 2500);
+  assert.equal(m.activeUsers, 1500);
+  assert.equal(calls.usage_events, 2);
+});
+
+test("a changed vote is written with today's date, a save is not", async () => {
+  const { rows, db } = fakeDb();
+  await recordEvent(db, voteEvent("u1", "opp", true));
+  assert.ok(typeof rows[0].created_at === "string");
+  await recordEvent(db, savedEvent("u1", watch));
+  assert.equal(rows[1].created_at, undefined);
 });

@@ -9,7 +9,7 @@ import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { loadMetrics } from "@/lib/analytics/store";
-import { WINDOW_DAYS } from "@/lib/analytics/metrics";
+import { WINDOW_DAYS, type Metrics } from "@/lib/analytics/metrics";
 import { resolveCaller } from "@/lib/quotas/guard";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +36,10 @@ export default async function MetricsPage() {
   const allowed = caller.plan === "local" || (caller.email !== null && admins.includes(caller.email.toLowerCase()));
   if (!allowed) notFound();
 
-  let result: Awaited<ReturnType<typeof loadMetrics>> | null = null;
-  let loadError: string | null = null;
+  let m: Metrics | null = null;
+  let loadError = "";
   try {
-    result = await loadMetrics(createServiceSupabaseClient());
+    m = await loadMetrics(createServiceSupabaseClient());
   } catch (err) {
     loadError = err instanceof Error ? err.message : String(err);
   }
@@ -54,56 +54,49 @@ export default async function MetricsPage() {
           </p>
         </div>
 
-        {loadError || !result ? (
+        {!m ? (
           <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">
             Could not read the metrics: {loadError}
           </p>
         ) : (
           <>
-            {(() => {
-              const m = result.metrics;
-              return (
-                <>
-                  <Card>
-                    <CardHeader>
-                      <CardDescription>North star: validated opportunities discovered per active user</CardDescription>
-                      <CardTitle className="text-4xl tabular-nums" data-testid="north-star">
-                        {m.northStar === null ? "Not observed" : m.northStar.toFixed(2)}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground">
-                      {m.validatedOpportunities} validated opportunities (completed Deep runs, at least one sourced evidence row) across {m.activeUsers}{" "}
-                      active signed-in {m.activeUsers === 1 ? "user" : "users"} (a counted action or a metric event). Searches performed are not counted.
-                    </CardContent>
-                  </Card>
+            <Card>
+              <CardHeader>
+                <CardDescription>North star: validated opportunities discovered per active user</CardDescription>
+                <CardTitle className="text-4xl tabular-nums" data-testid="north-star">
+                  {m.northStar === null ? "Not observed" : m.northStar.toFixed(2)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                {m.validatedOpportunities} validated opportunities (completed Deep runs, at least one sourced evidence row) across {m.activeUsers}{" "}
+                active signed-in {m.activeUsers === 1 ? "user" : "users"} (a counted action or a metric event). Searches performed are not counted.
+              </CardContent>
+            </Card>
 
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <Stat
-                      title="Claim-evidence coverage"
-                      value={pct(m.coverage.share)}
-                      note={`${m.coverage.withEvidence} of ${m.coverage.opportunities} opportunities have a sourced evidence row.`}
-                    />
-                    <Stat title="Opportunities saved" value={String(m.saved)} note="First saves of a market, seed or idea (usefulness)." />
-                    <Stat
-                      title="Useful votes"
-                      value={`${m.votes.useful} / ${m.votes.useful + m.votes.notUseful}`}
-                      note="Opportunities rated useful, of all rated (quality)."
-                    />
-                    <Stat title="New-market detections" value={String(m.newMarkets)} note="Markets in a Deep run that no earlier market carried." />
-                    <Stat
-                      title="Research to creation"
-                      value={pct(m.conversion.share)}
-                      note={`${m.conversion.creators} of ${m.conversion.discoverers} people who discovered an opportunity built a brief file.`}
-                    />
-                    <Stat
-                      title="Monitor returns"
-                      value={String(m.returns.events)}
-                      note={`Watchlist opens, one per person per day, by ${m.returns.people} ${m.returns.people === 1 ? "person" : "people"} (retention).`}
-                    />
-                  </div>
-                </>
-              );
-            })()}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Stat
+                title="Claim-evidence coverage"
+                value={pct(m.coverage.share)}
+                note={`${m.coverage.withEvidence} of ${m.coverage.opportunities} opportunities have a sourced evidence row.`}
+              />
+              <Stat title="Opportunities saved" value={String(m.saved)} note="First saves of a market, seed or idea (usefulness)." />
+              <Stat
+                title="Useful votes"
+                value={`${m.votes.useful} / ${m.votes.useful + m.votes.notUseful}`}
+                note="Opportunities rated useful, of all rated (quality)."
+              />
+              <Stat title="New-market detections" value={String(m.newMarkets)} note="Markets in a Deep run that no earlier market carried." />
+              <Stat
+                title="Research to creation"
+                value={pct(m.conversion.share)}
+                note={`${m.conversion.creators} of ${m.conversion.discoverers} people who discovered an opportunity built a brief file.`}
+              />
+              <Stat
+                title="Monitor returns"
+                value={String(m.returns.events)}
+                note={`Watchlist opens, one per person per day, by ${m.returns.people} ${m.returns.people === 1 ? "person" : "people"} (retention).`}
+              />
+            </div>
           </>
         )}
       </div>

@@ -241,7 +241,7 @@ create table metric_events (
 - North star, shown at `/admin/metrics`: validated opportunities (completed Deep run, sourced
   evidence, `completed_at` in the last 30 days) divided by active signed-in users (a `usage_events`
   or `metric_events` row in the window). No active user shows "Not observed". Searches are not in it.
-- Migration: `supabase/migrations/20261120000013_metric_events.sql`.
+- Migration: `supabase/migrations/20261120000014_metric_events.sql`.
 
 ## RLS (Supabase)
 

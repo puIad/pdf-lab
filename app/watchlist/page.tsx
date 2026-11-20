@@ -84,8 +84,8 @@ export default async function WatchlistPage() {
   let markets = new Map<string, StoredMarket>();
   let loadError: string | null = null;
   // Retention event (Part 6.2): one per person per day.
-  if (caller.userId) await recordEventSafely(createServiceSupabaseClient(), returnEvent(caller.userId, new Date()));
   if (caller.userId) {
+    await recordEventSafely(createServiceSupabaseClient(), returnEvent(caller.userId, new Date()));
     try {
       items = await listWatches(caller.userId);
       markets = await loadMarkets(items.filter((i) => i.kind === "market").map((i) => i.ref));

@@ -9,12 +9,38 @@ import { computeMetrics, newMarketEvent, WINDOW_DAYS, type Metrics, type MetricE
 const CHUNK = 100;
 const chunks = <T>(items: T[]): T[][] => Array.from({ length: Math.ceil(items.length / CHUNK) }, (_, i) => items.slice(i * CHUNK, (i + 1) * CHUNK));
 
+/** PostgREST caps a response at max_rows (1000 on hosted Supabase), so reads go in ordered pages. */
+export const PAGE = 1000;
+
+/** What a Supabase select builder offers once it is ordered: a page by range. */
+type Pageable = { range: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }> };
+
+/** Reads every row of an ordered query, page by page, until a short page (as lib/trends/load.ts). */
+async function readAll<T>(label: string, query: () => Pageable): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await query().range(from, from + PAGE - 1);
+    if (error) throw new Error(`Failed to load ${label}: ${error.message}`);
+    rows.push(...((data ?? []) as T[]));
+    if ((data?.length ?? 0) < PAGE) return rows;
+  }
+}
+
 /**
  * Writes one event. Throws when the row cannot be written. A vote replaces the person's earlier
- * vote; any other repeated dedupe key keeps the first row.
+ * vote and moves to today; any other repeated dedupe key keeps the first row.
  */
 export async function recordEvent(db: SupabaseClient, e: MetricEvent): Promise<void> {
-  const row = { user_id: e.userId, kind: e.kind, subject_type: e.subjectType, subject_ref: e.subjectRef, value: e.value, dedupe_key: e.dedupeKey };
+  const row = {
+    user_id: e.userId,
+    kind: e.kind,
+    subject_type: e.subjectType,
+    subject_ref: e.subjectRef,
+    value: e.value,
+    dedupe_key: e.dedupeKey,
+    // A changed vote is a recent vote: without this it keeps its first date and can leave the window.
+    ...(e.kind === "useful_vote" ? { created_at: new Date().toISOString() } : {}),
+  };
   const query = e.dedupeKey
     ? db.from("metric_events").upsert(row, { onConflict: "dedupe_key", ignoreDuplicates: e.kind !== "useful_vote" })
     : db.from("metric_events").insert(row);
@@ -23,13 +49,11 @@ export async function recordEvent(db: SupabaseClient, e: MetricEvent): Promise<v
 }
 
 /** A metric must never make the action it measures fail: log and go on. */
-export async function recordEventSafely(db: SupabaseClient, e: MetricEvent): Promise<boolean> {
+export async function recordEventSafely(db: SupabaseClient, e: MetricEvent): Promise<void> {
   try {
     await recordEvent(db, e);
-    return true;
   } catch (err) {
     console.error(`Could not record the ${e.kind} event:`, err instanceof Error ? err.message : err);
-    return false;
   }
 }
 
@@ -53,38 +77,37 @@ export async function recordNewMarkets(db: SupabaseClient, runId: string, market
 }
 
 /** Loads the window's rows from the database and computes the metrics. Throws when a read fails. */
-export async function loadMetrics(db: SupabaseClient, now = new Date(), days = WINDOW_DAYS): Promise<{ metrics: Metrics; since: string }> {
+export async function loadMetrics(db: SupabaseClient, now = new Date(), days = WINDOW_DAYS): Promise<Metrics> {
   const since = new Date(now.getTime() - days * 86_400_000).toISOString();
-  const must = <T>(r: { data: T | null; error: { message: string } | null }): T => {
-    if (r.error) throw new Error(r.error.message);
-    return r.data as T;
-  };
 
-  const runs = must(
-    await db.from("research_runs").select("id, user_id").eq("mode", "deep").eq("status", "completed").gte("completed_at", since),
-  ) as Array<{ id: string; user_id: string | null }>;
+  const runs = await readAll<{ id: string; user_id: string | null }>("runs", () =>
+    db.from("research_runs").select("id, user_id").eq("mode", "deep").eq("status", "completed").gte("completed_at", since).order("id"),
+  );
   const owner = new Map(runs.map((r) => [r.id, r.user_id]));
 
   const opps: Array<{ id: string; run_id: string }> = [];
   for (const ids of chunks(runs.map((r) => r.id))) {
-    opps.push(...(must(await db.from("opportunities").select("id, run_id").in("run_id", ids)) as typeof opps));
+    opps.push(...(await readAll<{ id: string; run_id: string }>("opportunities", () => db.from("opportunities").select("id, run_id").in("run_id", ids).order("id"))));
   }
   const evidence: EvidenceRow[] = [];
   for (const ids of chunks(opps.map((o) => o.id))) {
     evidence.push(
-      ...(must(
-        await db.from("evidence").select("id, entity_type, entity_id, source_id, claim, excerpt, url, created_at").eq("entity_type", "opportunity").in("entity_id", ids),
-      ) as EvidenceRow[]),
+      ...(await readAll<EvidenceRow>("evidence", () =>
+        db.from("evidence").select("id, entity_type, entity_id, source_id, claim, excerpt, url, created_at").eq("entity_type", "opportunity").in("entity_id", ids).order("id"),
+      )),
     );
   }
 
-  const events = must(await db.from("metric_events").select("kind, user_id, value").gte("created_at", since)) as Array<{ kind: MetricKind; user_id: string; value: number | null }>;
-  const usage = must(await db.from("usage_events").select("user_id").not("user_id", "is", null).gte("created_at", since)) as Array<{ user_id: string }>;
+  const events = await readAll<{ kind: MetricKind; user_id: string; value: number | null }>("metric events", () =>
+    db.from("metric_events").select("kind, user_id, value").gte("created_at", since).order("id"),
+  );
+  const usage = await readAll<{ user_id: string }>("usage events", () =>
+    db.from("usage_events").select("user_id").not("user_id", "is", null).gte("created_at", since).order("id"),
+  );
 
-  const metrics = computeMetrics({
+  return computeMetrics({
     opportunities: opps.map((o) => ({ id: o.id, runUserId: owner.get(o.run_id) ?? null, sourcedEvidence: sourcedEvidenceCount(o.id, evidence) })),
     activeUserIds: [...usage.map((u) => u.user_id), ...events.map((e) => e.user_id)],
     events: events.map((e) => ({ kind: e.kind, userId: e.user_id, value: e.value })),
   });
-  return { metrics, since };
 }
