@@ -19,6 +19,7 @@ import { enforceRule1_OpportunityEvidence, QCViolationError } from "../evidence/
 import { buildIdeas } from "../ideas/ideas.ts";
 import { capIdeaOnlyScores } from "./generator.ts";
 import { marketFor } from "./from-ideas.ts";
+import { isUndescribedProblem } from "./match.ts";
 
 function createMockMarkets(): OpportunityMarketInput[] {
   return [
@@ -611,14 +612,15 @@ test("mergeSharedProblems folds one audience and problem across markets and form
   assert.equal(isIdeaOnly([]), false);
 });
 
-test("a signal whose analysed problem says none is described yields no opportunity (issue #88)", async () => {
-  const { isUndescribedProblem } = await import("./match.ts");
+test("a signal whose analysed problem says none is described yields no opportunity (issue #88)", () => {
   assert.equal(isUndescribedProblem("No specific PC fault is described; the text only advertises guidance."), true);
   assert.equal(isUndescribedProblem("No PC problem is evidenced; the text is a rig-building subreddit."), true);
   assert.equal(isUndescribedProblem("Users need to restart and update drivers."), false);
   assert.equal(isUndescribedProblem("No one can find the boot menu key on new laptops."), false);
   assert.equal(isUndescribedProblem("No clear guide exists for flashing the BIOS on B550 boards."), false);
   assert.equal(isUndescribedProblem("No specific error code appears, but the laptop shuts down under load."), false);
+  assert.equal(isUndescribedProblem("No one can fix the driver issue that is mentioned in every thread."), false);
+  assert.equal(isUndescribedProblem("No issues are mentioned with the GPU, but the CPU overheats under load."), false);
   assert.equal(isUndescribedProblem("No error message is given when the Windows update fails."), false);
 
   const mk = (id: string, problem: string) => ({

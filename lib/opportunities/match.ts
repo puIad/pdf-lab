@@ -72,7 +72,7 @@ export function commonWords(market: OpportunitySignalInput[]): Set<string> {
  * A problem noun must precede the verb, so "No clear guide exists for ..." stays a real problem.
  */
 export function isUndescribedProblem(problem: string): boolean {
-  return /^\W*(no|none)\b[^.;]*\b(problem|fault|issue|pain|need|complaint)s?\b[^.;]*\b(is|are|was|were) (described|evidenced|stated|mentioned|identified|specified)\b/i.test(problem);
+  return /^\W*no\s+(?:[\w-]+\s+){0,3}(problem|fault|issue|pain|need|complaint)s?\s+(is|are|was|were)\s+(described|evidenced|stated|mentioned|identified|specified)\b(?![^.;]*\bbut\b)/i.test(problem);
 }
 
 /**
