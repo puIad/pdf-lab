@@ -610,3 +610,21 @@ test("mergeSharedProblems folds one audience and problem across markets and form
   assert.equal(isIdeaOnly([`[type: frequency | conf: 0.80] ${IDEA_CLAIM_PREFIX} "x"`]), true);
   assert.equal(isIdeaOnly([]), false);
 });
+
+test("a signal whose analysed problem says none is described yields no opportunity (issue #88)", async () => {
+  const { isUndescribedProblem } = await import("./generator.ts");
+  assert.equal(isUndescribedProblem("No specific PC fault is described; the text only advertises guidance."), true);
+  assert.equal(isUndescribedProblem("No PC problem is evidenced; the text is a rig-building subreddit."), true);
+  assert.equal(isUndescribedProblem("Users need to restart and update drivers."), false);
+  assert.equal(isUndescribedProblem("No one can find the boot menu key on new laptops."), false);
+
+  const mk = (id: string, problem: string) => ({
+    id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",
+    analysis: { audience: "PC users", problem, intent: "strong", urgency: null, pdf_relevance: 0.8 },
+  });
+  const pool = generateCandidatePool([{
+    id: "m1", name: "PC", demandScore: 50, confidence: 0.5,
+    signals: [mk("a", "The PC will not boot after an update."), mk("b", "No specific PC fault is described; only advertises help.")],
+  }]);
+  assert.deepEqual(pool.map((c) => c.problem), ["The PC will not boot after an update."]);
+});
