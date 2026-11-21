@@ -53,6 +53,15 @@ export interface GenerationResult {
 /** Problems sharing this much of their content words are one problem. */
 export const SAME_PROBLEM = 0.6;
 
+/** A phrase-only candidate never outranks one with analysed evidence: its score is capped at the lowest evidenced score (issue #85). */
+export function capIdeaOnlyScores(candidates: GeneratedOpportunity[]): GeneratedOpportunity[] {
+  const ideaOnly = (c: GeneratedOpportunity) => isIdeaOnly(c.evidence.map((e) => e.claim));
+  const evidenced = candidates.filter((c) => !ideaOnly(c));
+  if (evidenced.length === 0) return candidates;
+  const cap = Math.min(...evidenced.map((c) => c.opportunityScore));
+  return candidates.map((c) => (ideaOnly(c) && c.opportunityScore > cap ? { ...c, opportunityScore: cap } : c));
+}
+
 /**
  * One opportunity per (audience, problem), across markets and formats (issue #70). Best score
  * first; a later candidate with the same audience and a near-identical problem is folded into the
@@ -425,7 +434,7 @@ export async function generate25Opportunities(
 
   // A candidate without a sourced evidence row is dropped here, not saved (QC Rule 1, Part 6.8),
   // and no two different problems may cite the identical signal set.
-  const sourced = deduped.filter((c) => sourcedEvidenceCount(c.id, c.evidence) > 0);
+  const sourced = capIdeaOnlyScores(deduped.filter((c) => sourcedEvidenceCount(c.id, c.evidence) > 0));
   const { kept: candidatePool, merged: mergedSimilar } = mergeSharedProblems(
     distinctEvidenceSets(sourced, new Map(markets.map((m) => [m.id, m.signals.length]))),
   );

@@ -711,7 +711,8 @@ export default async function MarketPage(props: MarketPageProps) {
                 Diversified PDF Product Opportunities ({oppList.length})
               </h2>
               <p className="text-xs text-muted-foreground">
-                Pairwise-distinct across audience, problem, and format (PRD §29 diversification constraint).
+                Selected for distinct audience, problem, and format (PRD §29 diversification constraint). At most one opportunity per market
+                rests on search phrases alone, and ranks below those with analysed evidence.
                 A run targets up to 25; a lower count means the evidence supported fewer.
               </p>
             </div>

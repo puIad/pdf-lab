@@ -34,5 +34,5 @@ export type {
   GenerationResult,
 } from "./generator.ts";
 
-export { IDEA_CANDIDATES, IDEA_CLAIM_PREFIX, ideaCandidates, pickDistinctIdeas } from "./from-ideas.ts";
+export { IDEA_CANDIDATES, IDEA_CLAIM_PREFIX, ideaCandidates, ideasInNoMarket, pickDistinctIdeas } from "./from-ideas.ts";
 export type { IdeaSignalRef } from "./from-ideas.ts";

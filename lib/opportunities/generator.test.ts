@@ -525,6 +525,21 @@ test("Part 3.8: quick ideas join the Deep-run candidate pool", async (t) => {
     assert.equal(ideaCandidates("x", ideas, [], refs).length, 0); // no market, no candidate
   });
 
+  await t.test("phrases of one market merge into one candidate that cites each (issue #85)", () => {
+    const cands = ideaCandidates("pc troubleshooting", ideas, markets, refs);
+    assert.equal(new Set(cands.map((c) => c.marketId)).size, cands.length);
+    const placed = pickDistinctIdeas(ideas).filter((i) => marketFor(i.phrase, markets, "pc troubleshooting"));
+    assert.equal(cands.reduce((n, c) => n + c.evidence.length, 0), placed.reduce((n, i) => n + i.evidence.length, 0));
+  });
+
+  await t.test("a phrase-only candidate is capped at the lowest evidenced score (issue #85)", async () => {
+    const { capIdeaOnlyScores } = await import("./generator.ts");
+    const [idea] = ideaCandidates("pc troubleshooting", ideas, markets, refs);
+    const evidenced = { ...idea, id: "e", opportunityScore: 12, evidence: [{ ...idea.evidence[0], claim: "Reddit post" }] };
+    assert.equal(capIdeaOnlyScores([{ ...idea, opportunityScore: 70 }, evidenced])[0].opportunityScore, 12);
+    assert.equal(capIdeaOnlyScores([{ ...idea, opportunityScore: 70 }])[0].opportunityScore, 70);
+  });
+
   await t.test("ideas join the pool; the count is what the pool supports, all distinct, one traced to a phrase", async () => {
     const extra = ideaCandidates("pc troubleshooting", ideas, markets, refs);
     const res = await generate25Opportunities(markets, { targetCount: 25, extraCandidates: extra });
