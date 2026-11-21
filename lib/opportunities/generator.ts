@@ -144,7 +144,7 @@ export function observedPriceRange(prices: Array<string | null | undefined>): st
 
 /** `pain_point` only when extraction found a problem on the signal; otherwise the source's own type. */
 export function evidenceSignalType(sig: { source_type?: string; analysis?: { problem?: string | null } | null }): string {
-  return sig.analysis?.problem?.trim() && !isUndescribedProblem(sig.analysis.problem.trim()) ? "pain_point" : sig.source_type || "general";
+  return sig.analysis?.problem?.trim() ? "pain_point" : sig.source_type || "general";
 }
 
 function signalEvidence(
@@ -226,7 +226,7 @@ export function distinctEvidenceSets(
  * Candidates built only from stored rows: one per distinct (audience, problem) that extraction
  * found on a market's signals, backed by the market's signals that match that problem
  * (`matchSignals`, at most 5, its own first). A signal without both fields yields
- * nothing (so does one whose problem says none is described, issue #88), so a thin market gives few candidates and an unanalysed one gives none. Format is the
+ * nothing, so a thin market gives few candidates and an unanalysed one gives none. Format is the
  * one the wording names (`matchFormat`), or null when it names none: no default (issue #49).
  * Price is the market's observed competitor range or null.
  */
@@ -240,7 +240,7 @@ export function generateCandidatePool(
     for (const sig of market.signals) {
       const audience = sig.analysis?.audience?.trim();
       const problem = sig.analysis?.problem?.trim();
-      if (!audience || !problem || isUndescribedProblem(problem)) continue;
+      if (!audience || !problem) continue;
       const key = `${normalizeKey(audience)}::${normalizeKey(problem)}`;
       const group = groups.get(key) ?? { audience, problem, signals: [] };
       group.signals.push(sig);
@@ -407,9 +407,12 @@ export function computeDiversificationStats(opportunities: GeneratedOpportunity[
  * `targetCount` diversified opportunities (never padded), enforces QC Rules 1, 4, 5.
  */
 export async function generate25Opportunities(
-  markets: OpportunityMarketInput[],
+  allMarkets: OpportunityMarketInput[],
   options: GenerateOpportunitiesOptions = {},
 ): Promise<GenerationResult> {
+  // The one place a signal whose analysed problem says none is described (issue #88) is dropped:
+  // pool, model input, own signals, evidence and demand counts below only ever see described ones.
+  const markets = allMarkets.map((m) => ({ ...m, signals: m.signals.filter((s) => !isUndescribedProblem(s.analysis?.problem?.trim() ?? "")) }));
   const targetCount = options.targetCount ?? OPPORTUNITY_TARGET;
   const promptVersion = options.promptVersion ?? OPPORTUNITY_PROMPT_VERSION;
 
@@ -492,7 +495,7 @@ async function generateWithAIRouter(
       demandScore: m.demandScore,
       confidence: m.confidence,
       topSignals: m.signals
-        .filter((s) => s.analysis?.audience?.trim() && s.analysis?.problem?.trim() && !isUndescribedProblem(s.analysis.problem.trim()))
+        .filter((s) => s.analysis?.audience?.trim() && s.analysis?.problem?.trim())
         .slice(0, 4)
         .map((s) => ({ id: s.id, title: s.title, problem: s.analysis!.problem, audience: s.analysis!.audience })),
     }))
