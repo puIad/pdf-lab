@@ -662,6 +662,8 @@ test("a format the wording does not name is suggested from the market's competit
     formatBasis: "suggested from 3 of 9 competitor listings",
   });
   assert.equal(suggestFormat(shares({ planner: 2, guide: 2 })).format, null); // tie: no suggestion
+  assert.deepEqual(suggestFormat(shares({ worksheet: 5, checklist: 1 })), { format: "workbook", formatBasis: "suggested from 5 of 6 competitor listings" });
+  assert.deepEqual(suggestFormat(shares({ ebook: 3, checklist: 2, guide: 1 })), { format: "guide", formatBasis: "suggested from 4 of 6 competitor listings" });
   assert.equal(suggestFormat(shares({ "not stated": 4, other: 2 })).format, null); // none named: no default
   assert.equal(suggestFormat([]).format, null);
 

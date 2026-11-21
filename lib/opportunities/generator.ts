@@ -411,10 +411,17 @@ export function computeDiversificationStats(opportunities: GeneratedOpportunity[
  * most common give no suggestion.
  */
 export function suggestFormat(shares: LandscapeShare[]): Pick<GeneratedOpportunity, "format" | "formatBasis"> {
-  const named = shares.filter((s) => (ALLOWED_FORMATS as readonly string[]).includes(s.label)).sort((a, b) => b.count - a.count);
-  if (!named[0] || named[0].count === named[1]?.count) return { format: null, formatBasis: null };
+  // Fold listing labels into the formats an opportunity can have, the way quick ideas do (ebook = guide).
+  const ideaMap = Object.fromEntries(Object.entries(IDEA_FORMAT_MAP).map(([k, v]) => [k.toLowerCase().replace(/ /g, "_"), v]));
+  const byFormat = new Map<string, number>();
+  for (const s of shares) {
+    const fmt = (ALLOWED_FORMATS as readonly string[]).includes(s.label) ? s.label : ideaMap[s.label];
+    if (fmt) byFormat.set(fmt, (byFormat.get(fmt) ?? 0) + s.count);
+  }
+  const named = [...byFormat].sort((a, b) => b[1] - a[1]);
+  if (!named[0] || named[0][1] === named[1]?.[1]) return { format: null, formatBasis: null };
   const total = shares.reduce((n, s) => n + s.count, 0);
-  return { format: named[0].label as OpportunityFormat, formatBasis: `suggested from ${named[0].count} of ${total} competitor listings` };
+  return { format: named[0][0] as OpportunityFormat, formatBasis: `suggested from ${named[0][1]} of ${total} competitor listings` };
 }
 
 /**

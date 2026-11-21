@@ -287,6 +287,7 @@ export function ExplorerTable({
                                   className="text-[10px] py-0 h-4 uppercase tracking-wider font-mono text-muted-foreground"
                                 >
                                   {topOpp.format}
+                                  {topOpp.format_basis ? " · suggested" : ""}
                                 </Badge>
                               )}
                               <span className="text-[11px] font-mono font-semibold text-primary">

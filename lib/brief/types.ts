@@ -53,6 +53,8 @@ export interface Brief {
   source: BriefSource;
   title: string;
   format: string;
+  /** Set when the format is a suggestion from competitor listings rather than named by the wording. */
+  formatBasis?: string | null;
   promise: BriefFact;
   audience: BriefFact | null;
   outline: BriefSection[];

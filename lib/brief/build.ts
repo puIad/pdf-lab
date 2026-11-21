@@ -24,6 +24,8 @@ export interface BriefInput {
   source: BriefSource;
   title: string;
   format: IdeaFormat;
+  /** Why the format is a suggestion ("suggested from 3 of 9 competitor listings"); null = the wording names it. */
+  formatBasis?: string | null;
   /** The phrase the product answers: the idea itself, or the phrase / market a Deep opportunity came from. */
   mainPhrase: string;
   mainCites: BriefCite[];
@@ -156,6 +158,7 @@ export function buildBrief(input: BriefInput): Brief {
     source: input.source,
     title: input.title,
     format: input.format,
+    formatBasis: input.formatBasis ?? null,
     promise: input.promise,
     audience: input.audience,
     outline,
