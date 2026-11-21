@@ -594,7 +594,7 @@ test("mergeSharedProblems folds one audience and problem across markets and form
   const { mergeSharedProblems } = await import("./generator.ts");
   const { isIdeaOnly } = await import("./from-ideas.ts");
   const base = {
-    solution: "s", priceRange: null, sophistication: null, mechanism: null, outcome: null, urgency: null,
+    solution: "s", formatBasis: null, priceRange: null, sophistication: null, mechanism: null, outcome: null, urgency: null,
     confidence: 0.5, evidence: [], matchingSignals: 1, marketSignals: null,
   };
   const a = { ...base, id: "a", marketId: "m1", title: "a", targetAudience: "People with computer problems", problem: "PDF for people with computer problems that will not boot", format: null, opportunityScore: 60 };
@@ -653,3 +653,27 @@ test("a signal whose analysed problem says none is described yields no opportuni
   assert.equal(viaModel.opportunities.some((o) => o.title === "Basic guide"), false);
 });
 
+
+test("a format the wording does not name is suggested from the market's competitor listings (issue #87)", async () => {
+  const { suggestFormat } = await import("./generator.ts");
+  const shares = (o: Record<string, number>) => Object.entries(o).map(([label, count]) => ({ label, count, percentage: 0 }));
+  assert.deepEqual(suggestFormat(shares({ planner: 3, "not stated": 5, guide: 1 })), {
+    format: "planner",
+    formatBasis: "suggested from 3 of 9 competitor listings",
+  });
+  assert.equal(suggestFormat(shares({ planner: 2, guide: 2 })).format, null); // tie: no suggestion
+  assert.equal(suggestFormat(shares({ "not stated": 4, other: 2 })).format, null); // none named: no default
+  assert.equal(suggestFormat([]).format, null);
+
+  const sig = (id: string) => ({
+    id, source_id: "s" + id, title: "Laptop will not boot", content: "c", url: "https://x.test/" + id,
+    analysis: { audience: "Laptop owners", problem: "Laptop will not boot", urgency: "low" },
+  });
+  const market = { id: "m", name: "M", demandScore: 60, confidence: 0.6, signals: [sig("1"), sig("2")] };
+  const withShares = await generate25Opportunities([{ ...market, formatShares: shares({ checklist: 2, "not stated": 1 }) }]);
+  assert.equal(withShares.opportunities[0].format, "checklist");
+  assert.equal(withShares.opportunities[0].formatBasis, "suggested from 2 of 3 competitor listings");
+  const without = await generate25Opportunities([market]);
+  assert.equal(without.opportunities[0].format, null);
+  assert.equal(without.opportunities[0].formatBasis, null);
+});

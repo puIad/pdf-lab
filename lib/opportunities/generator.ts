@@ -4,6 +4,7 @@
 
 import type { AIRouter } from "../ai/router.ts";
 import { parsePriceText } from "../competition/check.ts";
+import type { LandscapeShare } from "../competition/types.ts";
 import type { EvidenceInput } from "../evidence/types.ts";
 import {
   enforceRule1_OpportunityEvidence,
@@ -264,6 +265,7 @@ export function generateCandidatePool(
         problem,
         solution: `A ${formatLabel} for ${audience} that addresses: ${problem}`,
         format,
+        formatBasis: null,
         priceRange: market.priceRange ?? null,
         sophistication: null,
         mechanism: null,
@@ -404,6 +406,18 @@ export function computeDiversificationStats(opportunities: GeneratedOpportunity[
 }
 
 /**
+ * The most common format the market's competitor listings name, labelled as a suggestion. No
+ * default: listings that name none, a format outside ALLOWED_FORMATS ("other"), or a tie for the
+ * most common give no suggestion.
+ */
+export function suggestFormat(shares: LandscapeShare[]): Pick<GeneratedOpportunity, "format" | "formatBasis"> {
+  const named = shares.filter((s) => (ALLOWED_FORMATS as readonly string[]).includes(s.label)).sort((a, b) => b.count - a.count);
+  if (!named[0] || named[0].count === named[1]?.count) return { format: null, formatBasis: null };
+  const total = shares.reduce((n, s) => n + s.count, 0);
+  return { format: named[0].label as OpportunityFormat, formatBasis: `suggested from ${named[0].count} of ${total} competitor listings` };
+}
+
+/**
  * Master generator function: takes market clusters, builds a candidate pool, selects up to
  * `targetCount` diversified opportunities (never padded), enforces QC Rules 1, 4, 5.
  */
@@ -444,7 +458,12 @@ export async function generate25Opportunities(
   );
 
   // Step 2: Select a diversified set of at most targetCount
-  const finalOpportunities = selectDiversifiedOpportunities(candidatePool, targetCount);
+  // A format the wording does not name is suggested from the market's competitor listings, after
+  // selection so the suggestion never changes which candidates are distinct or capped.
+  const sharesOf = new Map(markets.map((m) => [m.id, m.formatShares ?? []]));
+  const finalOpportunities = selectDiversifiedOpportunities(candidatePool, targetCount).map((o) =>
+    o.format ? o : { ...o, ...suggestFormat(sharesOf.get(o.marketId) ?? []) },
+  );
 
   // Step 3: Enforce QC Rules 1, 4, 5 on every selected opportunity
   for (const opp of finalOpportunities) {
@@ -601,6 +620,7 @@ ${JSON.stringify(marketSummaries, null, 2)}`;
       problem: raw.problem.trim(),
       solution: raw.solution.trim(),
       format,
+      formatBasis: null,
       priceRange: market.priceRange ?? null,
       sophistication: (SOPHISTICATION_LEVELS as readonly string[]).includes(soph) ? (soph as SophisticationLevel) : null,
       mechanism: filled(raw.mechanism) ? raw.mechanism.trim() : null,

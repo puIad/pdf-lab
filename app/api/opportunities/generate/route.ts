@@ -8,6 +8,7 @@ import { createServiceSupabaseClient } from "@/lib/db/client";
 import { routerForUser } from "@/lib/keys/server";
 import { generate25Opportunities, observedPriceRange } from "@/lib/opportunities/index";
 import type { OpportunityMarketInput, OpportunitySignalInput } from "@/lib/opportunities/index";
+import { calculateLandscape, listingFormat } from "@/lib/competition/index";
 import { writeEvidence } from "@/lib/evidence/writer";
 import { createServerEvidenceDeps } from "@/lib/evidence/service-deps";
 
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
   // Observed competitor prices per market; a market with none gets a null price range.
   const { data: competitorRows } = await supabase
     .from("competitors")
-    .select("market_id, price")
+    .select("market_id, price, title")
     .in("market_id", marketRows.map((m) => m.id));
 
   // 2. Map DB records to OpportunityMarketInput
@@ -121,6 +122,11 @@ export async function POST(req: Request) {
       priceRange: observedPriceRange(
         (competitorRows ?? []).filter((c) => c.market_id === m.id).map((c) => c.price as string | null),
       ),
+      formatShares: calculateLandscape(
+        (competitorRows ?? [])
+          .filter((c) => c.market_id === m.id)
+          .map((c) => ({ platform: "web", title: c.title as string, url: null, price: null, format: listingFormat(c.title as string), rating: null, reviewCount: null })),
+      ).formatShares,
       signals: rawSignals,
     };
   });
@@ -141,6 +147,7 @@ export async function POST(req: Request) {
     problem: opp.problem,
     solution: opp.solution,
     format: opp.format,
+    format_basis: opp.formatBasis,
     price_range: opp.priceRange,
     opportunity_score: opp.opportunityScore,
     confidence: opp.confidence,

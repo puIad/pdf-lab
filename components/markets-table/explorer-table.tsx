@@ -283,6 +283,7 @@ export function ExplorerTable({
                               {topOpp?.format && (
                                 <Badge
                                   variant="outline"
+                                  title={topOpp.format_basis ?? undefined}
                                   className="text-[10px] py-0 h-4 uppercase tracking-wider font-mono text-muted-foreground"
                                 >
                                   {topOpp.format}

@@ -17,6 +17,7 @@ import {
   type ReportSignal,
 } from "../report/observed.ts";
 import { parsePrice } from "../sources/marketplace-helper.ts";
+import { formatText } from "../opportunities/format.ts";
 import {
   listingFormat,
   mineReviewsAndGaps,
@@ -98,7 +99,7 @@ export async function fetchReportExportData(
   const scopedRunId = (marketData.run_id as string | null) ?? null;
   let oppQuery = supabase
     .from("opportunities")
-    .select("id, market_id, title, target_audience, problem, solution, format, price_range, opportunity_score, confidence, created_at");
+    .select("id, market_id, title, target_audience, problem, solution, format, format_basis, price_range, opportunity_score, confidence, created_at");
   oppQuery = scopedRunId ? oppQuery.eq("run_id", scopedRunId) : oppQuery.eq("market_id", targetMarketId);
   const { data: oppRows } = await oppQuery.order("opportunity_score", { ascending: false });
 
@@ -146,7 +147,7 @@ export async function fetchReportExportData(
       targetAudience: opp.target_audience || NOT_OBSERVED,
       problem: opp.problem || NOT_OBSERVED,
       solution: opp.solution || NOT_OBSERVED,
-      format: opp.format || NOT_OBSERVED,
+      format: formatText(opp.format, opp.format_basis) ?? NOT_OBSERVED,
       priceRange: opp.price_range || NOT_OBSERVED,
       opportunityScore: Math.round(opp.opportunity_score ?? 0),
       confidence: opp.confidence,
