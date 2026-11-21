@@ -489,3 +489,26 @@ are in git history (`README.md`, "History").
   for personal use (own app id still #44). YouTube's 30-day rule (III.E.4) applies to every API
   client, commercial or not, so keeping YouTube needs a refresh-or-delete job: #77. The takedown
   blocklist is #76. Both are follow-ups and do not block the tag.
+
+
+## DEC-018 — Where review text for competitor listings comes from (#89)
+
+- Date: 2026-11-21
+- Part: defect #89 (MVP gate: a market with 7 competitor listings stores no gap)
+- Expected: a market with competitor listings reports at least one cited gap, or says which listings
+  have no reviews to mine.
+- Found: marketplace listings come from Serper web-search snippets only (DEC-007 option b), so a
+  listing carries a title, price, rating and a snippet, never review text. `mineReviewsAndGaps`
+  already runs on `reviews` and `positioning`, and finds nothing because `reviews` is empty for
+  Etsy and KDP rows. Getting review text means scraping etsy.com or amazon.com (barred by their
+  terms, DEC-007 a) or a paid scraping API (DEC-007 c, recurring cost). The acceptance also needs a
+  fresh live `pc troubleshooting` run, which this session cannot produce (no live database or keys).
+- Options: (a) accept the limit: mine only the snippet and the run's own signals, and show per market
+  "N listings, none with review text to mine" instead of the bare "No review-mined gap" line;
+  honest, free, usually still no gap. (b) Add a paid review source (Rainforest or similar): gaps for
+  KDP, recurring cost. (c) Use buyer complaints from the Reddit and YouTube signals already stored,
+  matched to the market by topic: free, but those are discussion, not reviews of these listings.
+- Recommendation: (a) now, plus (c) as a follow-up part; (b) only if the owner accepts the cost.
+- Question for user: "Show an honest 'no review text for these N listings' line and stop there, or
+  also add a paid review source?"
+- Resolution: _open_
