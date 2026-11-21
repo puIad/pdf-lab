@@ -19,6 +19,7 @@ import { enforceRule1_OpportunityEvidence, QCViolationError } from "../evidence/
 import { buildIdeas } from "../ideas/ideas.ts";
 import { capIdeaOnlyScores } from "./generator.ts";
 import { marketFor } from "./from-ideas.ts";
+import { isUndescribedProblem } from "./match.ts";
 
 function createMockMarkets(): OpportunityMarketInput[] {
   return [
@@ -374,6 +375,7 @@ test("Evidence belongs to the opportunity (Part 6.8)", async (t) => {
   await t.test("signal type follows the signal: pain_point only when a problem was extracted", () => {
     assert.equal(evidenceSignalType({ source_type: "reddit", analysis: { problem: "rent is too high" } }), "pain_point");
     assert.equal(evidenceSignalType({ source_type: "gtrends", analysis: null }), "gtrends");
+    assert.equal(evidenceSignalType({ source_type: "web", analysis: { problem: "No specific PC fault is described; only advertises help." } }), "web");
     assert.equal(evidenceSignalType({ source_type: "web", analysis: { problem: "  " } }), "web");
     assert.equal(evidenceSignalType({}), "general");
   });
@@ -610,3 +612,44 @@ test("mergeSharedProblems folds one audience and problem across markets and form
   assert.equal(isIdeaOnly([`[type: frequency | conf: 0.80] ${IDEA_CLAIM_PREFIX} "x"`]), true);
   assert.equal(isIdeaOnly([]), false);
 });
+
+test("a signal whose analysed problem says none is described yields no opportunity (issue #88)", async () => {
+  assert.equal(isUndescribedProblem("No specific PC fault is described; the text only advertises guidance."), true);
+  assert.equal(isUndescribedProblem("No PC problem is evidenced; the text is a rig-building subreddit."), true);
+  assert.equal(isUndescribedProblem("Users need to restart and update drivers."), false);
+  assert.equal(isUndescribedProblem("No one can find the boot menu key on new laptops."), false);
+  assert.equal(isUndescribedProblem("No clear guide exists for flashing the BIOS on B550 boards."), false);
+  assert.equal(isUndescribedProblem("No specific error code appears, but the laptop shuts down under load."), false);
+  assert.equal(isUndescribedProblem("No one can fix the driver issue that is mentioned in every thread."), false);
+  assert.equal(isUndescribedProblem("No issues are mentioned with the GPU, but the CPU overheats under load."), false);
+  assert.equal(isUndescribedProblem("No error message is given when the Windows update fails."), false);
+
+  const mk = (id: string, problem: string, embedding: number[]) => ({
+    id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",
+    analysis: { audience: "Desktop PC users", problem, intent: "strong", urgency: null, pdf_relevance: 0.8 },
+    embedding,
+  });
+  const empty = mk("b", "No specific PC fault is described; the text only advertises basic troubleshooting guidance for common desktop problems.", [0.99, 0.1, 0]);
+  const real = mk("a", "The PC will not boot after an update.", [1, 0, 0]);
+  const market = { id: "m1", name: "PC", demandScore: 50, confidence: 0.5, signals: [real, empty] };
+
+  // Pool path: only the described signal makes an opportunity, and the other is not cited.
+  const viaPool = await generate25Opportunities([market]);
+  assert.deepEqual(viaPool.opportunities.map((o) => o.problem), ["The PC will not boot after an update."]);
+  assert.deepEqual(viaPool.opportunities[0].evidenceSignalIds, ["a"]);
+
+  // Model path: wording that overlaps the no-problem signal (not the real one) must not make it `own`.
+  const router = {
+    generateObject: async (o: { validate: (r: unknown) => unknown }) => ({
+      object: o.validate([{
+        marketId: "m1", title: "Basic guide", targetAudience: "Desktop PC users",
+        problem: "Desktop PC users lack basic troubleshooting guidance for common desktop problems",
+        solution: "A guide", format: "guide",
+      }]),
+    }),
+  } as unknown as AIRouter;
+  const viaModel = await generate25Opportunities([market], { router });
+  assert.equal(viaModel.opportunities.some((o) => o.evidenceSignalIds?.includes("b")), false);
+  assert.equal(viaModel.opportunities.some((o) => o.title === "Basic guide"), false);
+});
+

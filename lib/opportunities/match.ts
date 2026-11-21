@@ -67,6 +67,15 @@ export function commonWords(market: OpportunitySignalInput[]): Set<string> {
 }
 
 /**
+ * True when extraction's problem text says the signal names none ("No specific PC problem is
+ * described; ..."). Such a signal is not a problem to build a PDF on, nor evidence for one (issue #88).
+ * Dropped once, in generate25Opportunities. A problem noun must precede the verb, so "No clear guide exists for ..." stays a real problem.
+ */
+export function isUndescribedProblem(problem: string): boolean {
+  return /^\W*no\s+(?:[\w-]+\s+){0,3}(problem|fault|issue|pain|need|complaint)s?\s+(is|are|was|were)\s+(described|evidenced|stated|mentioned|identified|specified)\b(?![^.;]*\bbut\b)/i.test(problem);
+}
+
+/**
  * `own`: the signals the candidate was built from; they always match. Every other signal of the
  * market is ranked by embedding similarity to the centroid of `own`, or by token overlap with the
  * problem text when an embedding is missing.

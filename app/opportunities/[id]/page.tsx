@@ -205,7 +205,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
                 <span className="font-bold text-foreground font-mono">
                   {opp.matching_signals} of {opp.market_signal_count}
                 </span>{" "}
-                discussions in this market mention this problem
+                discussions in this market that describe a problem mention this one
               </div>
             )}
           </div>

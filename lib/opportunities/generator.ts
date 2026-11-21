@@ -11,7 +11,7 @@ import {
   enforceRule5_SeparationOfConcerns,
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
-import { commonWords, matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
+import { commonWords, isUndescribedProblem, matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
 import { jaccard, matchFormat, tokens } from "../ideas/ideas.ts";
 import { IDEA_FORMAT_MAP, isIdeaOnly } from "./from-ideas.ts";
 import {
@@ -144,7 +144,8 @@ export function observedPriceRange(prices: Array<string | null | undefined>): st
 
 /** `pain_point` only when extraction found a problem on the signal; otherwise the source's own type. */
 export function evidenceSignalType(sig: { source_type?: string; analysis?: { problem?: string | null } | null }): string {
-  return sig.analysis?.problem?.trim() ? "pain_point" : sig.source_type || "general";
+  const problem = sig.analysis?.problem?.trim();
+  return problem && !isUndescribedProblem(problem) ? "pain_point" : sig.source_type || "general";
 }
 
 function signalEvidence(
@@ -407,9 +408,12 @@ export function computeDiversificationStats(opportunities: GeneratedOpportunity[
  * `targetCount` diversified opportunities (never padded), enforces QC Rules 1, 4, 5.
  */
 export async function generate25Opportunities(
-  markets: OpportunityMarketInput[],
+  allMarkets: OpportunityMarketInput[],
   options: GenerateOpportunitiesOptions = {},
 ): Promise<GenerationResult> {
+  // The one place a signal whose analysed problem says none is described (issue #88) is dropped:
+  // pool, model input, own signals, evidence and demand counts below only ever see described ones.
+  const markets = allMarkets.map((m) => ({ ...m, signals: m.signals.filter((s) => !isUndescribedProblem(s.analysis?.problem?.trim() ?? "")) }));
   const targetCount = options.targetCount ?? OPPORTUNITY_TARGET;
   const promptVersion = options.promptVersion ?? OPPORTUNITY_PROMPT_VERSION;
 
