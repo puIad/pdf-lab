@@ -37,6 +37,7 @@ import { NOT_OBSERVED, platformCounts } from "@/lib/report/observed";
 import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
 import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
 import { ideaOnlyNote, isIdeaOnly } from "@/lib/opportunities/from-ideas";
+import { formatText } from "@/lib/opportunities/format";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   const { data: opp, error: oppErr } = await supabase
     .from("opportunities")
     .select(`
-      id, market_id, title, target_audience, problem, solution, format,
+      id, market_id, title, target_audience, problem, solution, format, format_basis,
       price_range, opportunity_score, confidence, created_at, matching_signals, market_signal_count,
       markets (
         id, run_id, name, trend, demand_score, pdf_fit_score
@@ -99,7 +100,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
 
   const score = typeof opp.opportunity_score === "number" ? Math.round(opp.opportunity_score) : null;
   const confPct = Math.round(opp.confidence * 100);
-  const formatLabel = opp.format ? opp.format.replace("_", " ") : NOT_OBSERVED;
+  const formatLabel = formatText(opp.format, opp.format_basis) ?? NOT_OBSERVED;
   const priceRange = opp.price_range || NOT_OBSERVED;
   const trend = market?.trend || "unknown";
 
@@ -431,7 +432,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
               sampleSizeNote: `Calculated from ${directEvidence.length} evidence rows`,
             }}
             suggestion={{
-              format: opp.format || NOT_OBSERVED,
+              format: formatLabel,
               mechanism: opp.solution || NOT_OBSERVED,
               outcome: NOT_OBSERVED,
               priceRange,

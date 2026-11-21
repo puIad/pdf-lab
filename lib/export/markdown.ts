@@ -155,7 +155,7 @@ export function generateReportMarkdown(data: ReportExportData): string {
     lines.push("|---|---|");
     lines.push(`| **Target Audience** | ${opp.targetAudience} |`);
     lines.push(`| **Core Problem** | ${opp.problem} |`);
-    lines.push(`| **Recommended Format** | \`${opp.format.toUpperCase()}\` |`);
+    lines.push(`| **Recommended Format** | \`${opp.format.toUpperCase()}\`${opp.formatBasis ? ` (${opp.formatBasis})` : ""} |`);
     lines.push(`| **Price Range** | ${opp.priceRange} |`);
     lines.push(
       `| **Opportunity Score** | **${Math.round(opp.opportunityScore)}/100** (Confidence: ${Math.round(
