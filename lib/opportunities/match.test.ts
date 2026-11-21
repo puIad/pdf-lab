@@ -85,3 +85,11 @@ test("a market of three signals or fewer keeps every word", () => {
   assert.equal(commonWords(market).size, 0);
   assert.equal(matchSignals(market[2].analysis!.problem!, [market[2]], market).matchCount, 3);
 });
+
+test("a no-problem signal is never matched as evidence, even when it is close (issue #88)", () => {
+  const own = sig("own", "pc will not boot after update", [1, 0, 0]);
+  const empty = sig("empty", "No specific PC problem is evidenced; the text only advertises guidance.", [0.99, 0.1, 0]);
+  const match = matchSignals(own.analysis!.problem!, [own], [own, empty]);
+  assert.deepEqual(match.signals.map((s) => s.id), ["own"]);
+  assert.equal(match.matchCount, 1);
+});

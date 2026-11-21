@@ -67,6 +67,15 @@ export function commonWords(market: OpportunitySignalInput[]): Set<string> {
 }
 
 /**
+ * True when extraction's problem text says the signal names none ("No specific PC problem is
+ * described; ..."). Such a signal is not a problem to build a PDF on, nor evidence for one (issue #88).
+ * A problem noun must precede the verb, so "No clear guide exists for ..." stays a real problem.
+ */
+export function isUndescribedProblem(problem: string): boolean {
+  return /^\W*(no|none)\b[^.;]*\b(problem|fault|issue|pain|need|complaint)s?\b[^.;]*\b(is|are|was|were) (described|evidenced|stated|mentioned|identified|specified)\b/i.test(problem);
+}
+
+/**
  * `own`: the signals the candidate was built from; they always match. Every other signal of the
  * market is ranked by embedding similarity to the centroid of `own`, or by token overlap with the
  * problem text when an embedding is missing.
@@ -83,7 +92,7 @@ export function matchSignals(
   const matches: Array<{ signal: OpportunitySignalInput; rank: number }> = own.map((signal) => ({ signal, rank: 2 }));
   const common = commonWords(market);
   for (const signal of market) {
-    if (ownIds.has(signal.id)) continue;
+    if (ownIds.has(signal.id) || isUndescribedProblem(signal.analysis?.problem ?? "")) continue;
     if (query && signal.embedding?.length === query.length) {
       const score = cosine(query, signal.embedding);
       if (score >= MIN_EMBEDDING_MATCH) matches.push({ signal, rank: score });

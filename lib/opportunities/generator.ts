@@ -11,7 +11,7 @@ import {
   enforceRule5_SeparationOfConcerns,
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
-import { commonWords, matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
+import { commonWords, isUndescribedProblem, matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
 import { jaccard, matchFormat, tokens } from "../ideas/ideas.ts";
 import { IDEA_FORMAT_MAP, isIdeaOnly } from "./from-ideas.ts";
 import {
@@ -52,15 +52,6 @@ export interface GenerationResult {
 
 /** Problems sharing this much of their content words are one problem. */
 export const SAME_PROBLEM = 0.6;
-
-/**
- * True when extraction's problem text says the signal names none ("No specific PC fault is
- * described; ..."). Such a signal is not a problem to build a PDF on (issue #88).
- */
-export function isUndescribedProblem(problem: string): boolean {
-  return /^\W*no (specific|concrete|particular|clear|identifiable)\b/i.test(problem) ||
-    /^\W*(no|none)\b[^.;]*\b(is|are|was|were) (described|evidenced|stated|named|mentioned|identified|specified|given)\b/i.test(problem);
-}
 
 /** A phrase-only candidate never outranks one with analysed evidence: its score is one below the lowest evidenced score (0 at the floor, where a tie remains) (issue #85). */
 export function capIdeaOnlyScores(candidates: GeneratedOpportunity[]): GeneratedOpportunity[] {
@@ -153,7 +144,7 @@ export function observedPriceRange(prices: Array<string | null | undefined>): st
 
 /** `pain_point` only when extraction found a problem on the signal; otherwise the source's own type. */
 export function evidenceSignalType(sig: { source_type?: string; analysis?: { problem?: string | null } | null }): string {
-  return sig.analysis?.problem?.trim() ? "pain_point" : sig.source_type || "general";
+  return sig.analysis?.problem?.trim() && !isUndescribedProblem(sig.analysis.problem.trim()) ? "pain_point" : sig.source_type || "general";
 }
 
 function signalEvidence(
