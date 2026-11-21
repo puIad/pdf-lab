@@ -144,7 +144,8 @@ export function observedPriceRange(prices: Array<string | null | undefined>): st
 
 /** `pain_point` only when extraction found a problem on the signal; otherwise the source's own type. */
 export function evidenceSignalType(sig: { source_type?: string; analysis?: { problem?: string | null } | null }): string {
-  return sig.analysis?.problem?.trim() ? "pain_point" : sig.source_type || "general";
+  const problem = sig.analysis?.problem?.trim();
+  return problem && !isUndescribedProblem(problem) ? "pain_point" : sig.source_type || "general";
 }
 
 function signalEvidence(

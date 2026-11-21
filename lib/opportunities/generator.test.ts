@@ -375,6 +375,7 @@ test("Evidence belongs to the opportunity (Part 6.8)", async (t) => {
   await t.test("signal type follows the signal: pain_point only when a problem was extracted", () => {
     assert.equal(evidenceSignalType({ source_type: "reddit", analysis: { problem: "rent is too high" } }), "pain_point");
     assert.equal(evidenceSignalType({ source_type: "gtrends", analysis: null }), "gtrends");
+    assert.equal(evidenceSignalType({ source_type: "web", analysis: { problem: "No specific PC fault is described; only advertises help." } }), "web");
     assert.equal(evidenceSignalType({ source_type: "web", analysis: { problem: "  " } }), "web");
     assert.equal(evidenceSignalType({}), "general");
   });
