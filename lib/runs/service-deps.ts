@@ -16,7 +16,7 @@ import { fetchRunCompleteness } from "./completeness.ts";
 import { mergeWork, workOfPlan } from "./work.ts";
 import { loadRunSignals, recordRunSignals } from "./run-signals.ts";
 import { isStoreUrl } from "../competition/map.ts";
-import { generate25Opportunities, ideaCandidates, OPPORTUNITY_TARGET, pickDistinctIdeas, type OpportunityMarketInput } from "../opportunities/index.ts";
+import { generate25Opportunities, ideaCandidates, ideasInNoMarket, OPPORTUNITY_TARGET, type OpportunityMarketInput } from "../opportunities/index.ts";
 import { loadStoredIdeas } from "../ideas/stored.ts";
 import type { OrchestratorDeps, OrchestratorCompetitorItem } from "./orchestrator.ts";
 import { extractionPin, loadExtractionMode } from "../settings/extraction-mode.ts";
@@ -325,7 +325,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
       });
       const fromIdeas = stored ? ideaCandidates(seed, stored.result.ideas, marketInputs, stored.refs) : [];
       // Ideas whose words are in no market of the run are not filed under one (issue #42).
-      const ideasInNoMarket = stored && marketInputs.length > 0 ? pickDistinctIdeas(stored.result.ideas).length - fromIdeas.length : 0;
+      const unplacedIdeas = stored && marketInputs.length > 0 ? ideasInNoMarket(seed, stored.result.ideas, marketInputs) : 0;
       const res = await generate25Opportunities(marketInputs, {
         targetCount: OPPORTUNITY_TARGET,
         router: marketLabels ? undefined : router,
@@ -350,7 +350,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         },
         evidence: opp.evidence,
       }));
-      return Object.assign(pairs, { droppedUnsourced: res.droppedUnsourced, ideasInNoMarket, mergedSimilar: res.mergedSimilar });
+      return Object.assign(pairs, { droppedUnsourced: res.droppedUnsourced, ideasInNoMarket: unplacedIdeas, mergedSimilar: res.mergedSimilar });
     },
 
     saveOpportunities: async (opportunities, runId) => {

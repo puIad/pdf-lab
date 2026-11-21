@@ -17,6 +17,7 @@ import {
 import type { AIRouter } from "../ai/router.ts";
 import { enforceRule1_OpportunityEvidence, QCViolationError } from "../evidence/qc.ts";
 import { buildIdeas } from "../ideas/ideas.ts";
+import { capIdeaOnlyScores } from "./generator.ts";
 import { marketFor } from "./from-ideas.ts";
 
 function createMockMarkets(): OpportunityMarketInput[] {
@@ -523,6 +524,23 @@ test("Part 3.8: quick ideas join the Deep-run candidate pool", async (t) => {
       assert.ok(c.evidence.every((e) => e.entityId === c.id && e.claim.startsWith(IDEA_CLAIM_PREFIX) && e.sourceId === "src-web"));
     }
     assert.equal(ideaCandidates("x", ideas, [], refs).length, 0); // no market, no candidate
+  });
+
+  await t.test("phrases of one market merge into one candidate that cites each (issue #85)", () => {
+    const two = buildIdeas("pc troubleshooting", [phrase("why does my gpu crash", 3), phrase("gpu driver crash fix", 4)]).ideas;
+    const twoRefs = new Map(two.flatMap((i) => i.evidence).map((e) => [e.source_id, { sourceUuid: "src-web", excerpt: e.title }]));
+    const gpu = marketFor("why does my gpu crash", markets, "pc troubleshooting");
+    assert.equal(marketFor("gpu driver crash fix", markets, "pc troubleshooting")?.id, gpu?.id);
+    const cands = ideaCandidates("pc troubleshooting", two, markets, twoRefs).filter((c) => c.marketId === gpu?.id);
+    assert.equal(cands.length, 1);
+    assert.equal(cands[0].evidence.length, 2);
+  });
+
+  await t.test("a phrase-only candidate is capped one below the lowest evidenced score (issue #85)", () => {
+    const [idea] = ideaCandidates("pc troubleshooting", ideas, markets, refs);
+    const evidenced = { ...idea, id: "e", opportunityScore: 12, evidence: [{ ...idea.evidence[0], claim: "Reddit post" }] };
+    assert.equal(capIdeaOnlyScores([{ ...idea, opportunityScore: 70 }, evidenced])[0].opportunityScore, 11);
+    assert.equal(capIdeaOnlyScores([{ ...idea, opportunityScore: 70 }])[0].opportunityScore, 70);
   });
 
   await t.test("ideas join the pool; the count is what the pool supports, all distinct, one traced to a phrase", async () => {

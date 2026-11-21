@@ -70,32 +70,62 @@ export function marketFor(phrase: string, markets: OpportunityMarketInput[], see
   return best;
 }
 
-/** Quick ideas as candidates of a Deep run, each under the market its words are found in. */
+/**
+ * The picked ideas grouped by the market their words are found in, strongest idea first. An idea
+ * that fits no market of the run is counted in `unplaced`: `opportunities.market_id` is required,
+ * and filing it under an unrelated market would claim a link nobody observed (issue #42). It stays
+ * a quick idea on the seed's scan.
+ */
+function placeIdeas(seed: string, ideas: QuickIdea[], markets: OpportunityMarketInput[]) {
+  const byMarket = new Map<string, { market: OpportunityMarketInput; ideas: QuickIdea[] }>();
+  let unplaced = 0;
+  for (const idea of markets.length === 0 ? [] : pickDistinctIdeas(ideas)) {
+    const market = marketFor(idea.phrase, markets, seed);
+    if (!market) {
+      unplaced++;
+      continue;
+    }
+    const group = byMarket.get(market.id) ?? { market, ideas: [] };
+    group.ideas.push(idea);
+    byMarket.set(market.id, group);
+  }
+  return { groups: [...byMarket.values()], unplaced };
+}
+
+/** How many picked quick ideas fit no market of the run and are left out of it. */
+export function ideasInNoMarket(seed: string, ideas: QuickIdea[], markets: OpportunityMarketInput[]): number {
+  return placeIdeas(seed, ideas, markets).unplaced;
+}
+
+/**
+ * Quick ideas as candidates of a Deep run: one per market. Phrases found in one market share its
+ * need, so they are one opportunity that cites every phrase (issue #85); the market holds the
+ * need, a search phrase alone cannot tell two needs apart.
+ * shortcut: one phrase-only opportunity per market, even when its phrases ask for two things;
+ * split by phrase overlap if a market's phrases turn out to hold separate needs.
+ */
 export function ideaCandidates(
   seed: string,
   ideas: QuickIdea[],
   markets: OpportunityMarketInput[],
   refs: Map<string, IdeaSignalRef>,
 ): GeneratedOpportunity[] {
-  if (markets.length === 0) return [];
-  // An idea that fits no market of the run is left out of the run: `opportunities.market_id` is
-  // required, and filing it under an unrelated market would claim a link nobody observed. It
-  // stays a quick idea on the seed's scan.
-  return pickDistinctIdeas(ideas).flatMap((idea) => {
+  return placeIdeas(seed, ideas, markets).groups.map(({ market, ideas: group }) => {
+    const idea = group[0];
     const id = crypto.randomUUID();
-    const market = marketFor(idea.phrase, markets, seed);
-    if (!market) return [];
     const format = IDEA_FORMAT_MAP[idea.format];
-    const evidence: EvidenceInput[] = idea.evidence.map((e) => ({
-      entityType: "opportunity",
-      entityId: id,
-      sourceId: refs.get(e.source_id)?.sourceUuid ?? null,
-      claim: `${IDEA_CLAIM_PREFIX} "${idea.phrase}" for seed "${seed}" (${e.source}): ${idea.demandBasis}`,
-      excerpt: refs.get(e.source_id)?.excerpt ?? e.title,
-      url: e.url,
-      signalType: "frequency",
-      confidence: idea.confidence,
-    }));
+    const evidence: EvidenceInput[] = group.flatMap((g) =>
+      g.evidence.map((e) => ({
+        entityType: "opportunity" as const,
+        entityId: id,
+        sourceId: refs.get(e.source_id)?.sourceUuid ?? null,
+        claim: `${IDEA_CLAIM_PREFIX} "${g.phrase}" for seed "${seed}" (${e.source}): ${g.demandBasis}`,
+        excerpt: refs.get(e.source_id)?.excerpt ?? e.title,
+        url: e.url,
+        signalType: "frequency" as const,
+        confidence: g.confidence,
+      })),
+    );
     return {
       id,
       marketId: market.id,
@@ -112,7 +142,7 @@ export function ideaCandidates(
       opportunityScore: idea.opportunity,
       confidence: idea.confidence,
       evidence,
-      matchingSignals: evidence.length, // phrase rows observed for this idea, not market discussions
+      matchingSignals: evidence.length, // phrase rows observed for this need, not market discussions
       marketSignals: null,
     } satisfies GeneratedOpportunity;
   });
@@ -126,5 +156,5 @@ export function isIdeaOnly(claims: string[]): boolean {
 
 /** Report wording for an idea-only opportunity (issue #70). */
 export function ideaOnlyNote(): string {
-  return "Rests on one search phrase and has no problem, buyer-intent or gap evidence beyond a search suggestion.";
+  return "Rests on search phrases alone and has no problem, buyer-intent or gap evidence beyond a search suggestion.";
 }
