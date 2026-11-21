@@ -511,4 +511,4 @@ are in git history (`README.md`, "History").
 - Recommendation: (a) now, plus (c) as a follow-up part; (b) only if the owner accepts the cost.
 - Question for user: "Show an honest 'no review text for these N listings' line and stop there, or
   also add a paid review source?"
-- Resolution: _open_
+- Resolution: _resolved 2026-11-21_ by the owner: (c). Match the stored Reddit and YouTube signals to each market by topic and mine them for gaps, labelled as buyer discussion, not as reviews of these listings. Still show per market which listings have no review text. No paid review source.
