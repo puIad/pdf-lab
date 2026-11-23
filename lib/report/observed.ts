@@ -91,8 +91,13 @@ function strongestLine<K extends string>(counts: Record<K, number>, order: reado
     (rated < analysed ? ` (${rated} rated)` : "");
 }
 
-/** Buyer intent and urgency of a market's analysed signals, as the opportunity page and brief state them. */
-export function intentUrgencyLines(o: MarketObservations): { intent: string; urgency: string } {
+/**
+ * Buyer intent and urgency of a market's analysed signals, as the opportunity page states them.
+ * A phrase-only opportunity (search suggestions alone) has no analysed signal of its own, so
+ * the market's levels are not its own and both read "Not observed" (issue #100).
+ */
+export function intentUrgencyLines(o: MarketObservations, phraseOnly = false): { intent: string; urgency: string } {
+  if (phraseOnly) return { intent: NOT_OBSERVED, urgency: NOT_OBSERVED };
   return {
     intent: strongestLine(o.intent, INTENT_VALUES, o.analysedSignals),
     urgency: strongestLine(o.urgency, URGENCY_VALUES, o.analysedSignals),
