@@ -53,21 +53,29 @@ export interface GenerationResult {
 /** Problems sharing this much of their content words are one problem. */
 export const SAME_PROBLEM = 0.6;
 
+/** Scoring's thin-data ceiling (`lib/scoring/scoring.ts`, fewer than 3 analysed rows): a phrase-only row has none. */
+const IDEA_ONLY_CONFIDENCE_CEILING = 0.35;
+
 /**
  * A phrase-only candidate never outranks or out-trusts one with analysed evidence: its score is
  * one below the lowest evidenced score (0 at the floor, where a tie remains) (issue #85), and its
- * confidence is at most the lowest evidenced confidence, since search phrases alone give no
+ * confidence (and each of its evidence rows') is at most the lowest evidenced confidence and never above the thin-data ceiling, since search phrases alone give no
  * problem or buyer-intent observation (issue #100).
  */
 export function capIdeaOnlyScores(candidates: GeneratedOpportunity[]): GeneratedOpportunity[] {
   const ideaOnly = (c: GeneratedOpportunity) => isIdeaOnly(c.evidence.map((e) => e.claim));
   const evidenced = candidates.filter((c) => !ideaOnly(c));
-  if (evidenced.length === 0) return candidates;
+  // No evidenced candidate: Math.min() is Infinity, so the score cap is a no-op and only the ceiling applies.
   const cap = Math.max(0, Math.min(...evidenced.map((c) => c.opportunityScore)) - 1);
-  const confCap = Math.min(...evidenced.map((c) => c.confidence));
+  const confCap = Math.min(IDEA_ONLY_CONFIDENCE_CEILING, ...evidenced.map((c) => c.confidence));
   return candidates.map((c) =>
-    ideaOnly(c) && (c.opportunityScore > cap || c.confidence > confCap)
-      ? { ...c, opportunityScore: Math.min(c.opportunityScore, cap), confidence: Math.min(c.confidence, confCap) }
+    ideaOnly(c)
+      ? {
+          ...c,
+          opportunityScore: Math.min(c.opportunityScore, cap),
+          confidence: Math.min(c.confidence, confCap),
+          evidence: c.evidence.map((e) => ({ ...e, confidence: Math.min(e.confidence ?? confCap, confCap) })),
+        }
       : c,
   );
 }
