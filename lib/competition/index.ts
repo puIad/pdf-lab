@@ -4,3 +4,4 @@ export * from "./types.ts";
 export { calculateLandscape, listingFormat, FORMAT_NOT_STATED } from "./landscape.ts";
 export { mineReviewsAndGaps, type ReviewSourceSignal } from "./review-miner.ts";
 export { analyzeCompetition, type AnalyzeCompetitionInput } from "./analyzer.ts";
+export { BUYER_DISCUSSION_LABEL, discussionForMarket } from "./discussion.ts";
