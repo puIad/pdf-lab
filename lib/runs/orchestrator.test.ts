@@ -493,4 +493,31 @@ describe("executeResearchRun (lifecycle & acceptance)", () => {
     assert.deepEqual(extracted, [], "the only unanalyzed rows were demand rows");
     assert.deepEqual(clustered.sort(), ["sig-1", "sig-2"]);
   });
+
+  it("mines gaps for a market with listings from Reddit discussion on its topic, labelled (issue #89)", async () => {
+    const base = createMockOrchestratorDeps();
+    const stored = await base.deps.getSignals("run");
+    const unclustered: StoredSignalForRun = {
+      id: "sig-3", title: "Boot diagnostics and POST recovery guides", url: "https://reddit.com/r/buildapc/3",
+      content: "Every POST recovery guide I bought was too technical for me. I wanted something printable.",
+      source_id: "src-reddit", source_type: "reddit", published_at: "2026-09-03T12:00:00Z", analysis: null,
+    };
+    const offTopic: StoredSignalForRun = {
+      ...unclustered, id: "sig-4", title: "Best sourdough starter", url: "https://reddit.com/r/baking/4",
+      content: "Most sourdough books are too technical.",
+    };
+    const { deps, state } = createMockOrchestratorDeps({
+      getSignals: async () => [...stored, unclustered, offTopic],
+      clusterAndScore: async (signals) => base.deps.clusterAndScore(signals.filter((x) => x.id < "sig-3")),
+      observeCompetition: async () => [
+        { platform: "kdp", title: "Boot Diagnostics POST Recovery Handbook", url: "https://www.amazon.com/dp/1" },
+      ],
+    });
+    const result = await executeResearchRun({ query: "pc troubleshooting", mode: "deep" }, deps);
+    assert.equal(result.status, "completed", result.error ?? "");
+    const gaps = state.storedEvidence.filter((e) => e.entity_type === "competition" && e.claim.startsWith("Product gap"));
+    assert.ok(gaps.length > 0, "a market with a listing stores a gap");
+    assert.ok(gaps.every((g) => g.claim.includes("buyer discussion, not reviews of these listings")));
+    assert.ok(gaps.every((g) => g.url === "https://reddit.com/r/buildapc/3"), "cited to the Reddit post on topic, not the off-topic one");
+  });
 });

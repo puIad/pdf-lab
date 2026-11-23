@@ -88,7 +88,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
       .from("evidence")
       .select("id, entity_type, entity_id, source_id, claim, excerpt, url, created_at")
       .eq("entity_id", opp.market_id),
-    supabase.from("competitors").select("platform").eq("market_id", opp.market_id),
+    supabase.from("competitors").select("platform, title").eq("market_id", opp.market_id).order("title"),
   ]);
 
   const market = Array.isArray(opp.markets) ? opp.markets[0] : opp.markets;
@@ -402,15 +402,24 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
                 {platforms.map((p) => `${p.platform} ${p.count}`).join(", ")}.
               </p>
             )}
+            {competitorTotal > 0 && (
+              <p>
+                No review text is stored for any of these listings (they come from search snippets), so nothing is mined
+                from them: {(competitors ?? []).map((c) => c.title).join("; ")}.
+              </p>
+            )}
             {gapRows.length === 0 ? (
-              <p>No review-mined gap is stored for this market.</p>
+              <p>No gap is stored for this market from buyer discussion on its topic.</p>
             ) : (
-              gapRows.slice(0, 3).map((e) => (
-                <div key={e.id} className="rounded bg-muted/50 p-2.5 text-[11px] flex flex-col gap-1">
-                  <span className="text-foreground">{parseEvidenceClaim(e.claim).rawClaim}</span>
-                  {e.excerpt && <span className="italic">&ldquo;{e.excerpt}&rdquo;</span>}
-                </div>
-              ))
+              <>
+                <p>Gaps are mined from buyer discussion on this market&apos;s topic, not from reviews of the listings.</p>
+                {gapRows.slice(0, 3).map((e) => (
+                  <div key={e.id} className="rounded bg-muted/50 p-2.5 text-[11px] flex flex-col gap-1">
+                    <span className="text-foreground">{parseEvidenceClaim(e.claim).rawClaim}</span>
+                    {e.excerpt && <span className="italic">&ldquo;{e.excerpt}&rdquo;</span>}
+                  </div>
+                ))}
+              </>
             )}
           </CardContent>
         </Card>

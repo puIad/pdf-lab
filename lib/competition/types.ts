@@ -38,6 +38,8 @@ export interface QuotedReviewExcerpt {
   source: string;
   url?: string | null;
   sentiment?: "dislike" | "missing" | "confusing" | "request" | "like";
+  /** "listing" = text stored with a marketplace listing; "discussion" = a stored Reddit/YouTube/web signal. */
+  origin?: "listing" | "discussion";
 }
 
 export interface ProductGap {

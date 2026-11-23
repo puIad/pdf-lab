@@ -117,6 +117,7 @@ export function mineReviewsAndGaps(
     text: string;
     source: string;
     url: string | null;
+    origin: "listing" | "discussion";
   }> = [];
 
   for (const c of competitors) {
@@ -124,11 +125,11 @@ export function mineReviewsAndGaps(
     const sourceName = `${c.platform}: ${c.title}`;
     if (c.reviews && c.reviews.length > 0) {
       for (const rev of c.reviews) {
-        textCandidates.push({ text: rev, source: sourceName, url });
+        textCandidates.push({ text: rev, source: sourceName, url, origin: "listing" });
       }
     }
     if (c.positioning) {
-      textCandidates.push({ text: c.positioning, source: sourceName, url });
+      textCandidates.push({ text: c.positioning, source: sourceName, url, origin: "listing" });
     }
   }
 
@@ -138,6 +139,7 @@ export function mineReviewsAndGaps(
         text: s.content,
         source: s.source_type ? `${s.source_type}: ${s.title || "signal"}` : s.title || "User Discussion",
         url: s.url || null,
+        origin: "discussion",
       });
     }
   }
@@ -153,6 +155,7 @@ export function mineReviewsAndGaps(
             source: candidate.source,
             url: candidate.url,
             sentiment: pat.sentiment,
+            origin: candidate.origin,
           };
 
           if (!gapExcerptsMap.has(pat.category)) {
