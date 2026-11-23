@@ -154,6 +154,18 @@ test("generateReportCsv produces valid RFC-4180 CSV containing all 25 opportunit
   assert.ok(row1.includes("https://reddit.com/r/pchelp/comments/post_1"));
 });
 
+test("format basis reaches the CSV, JSON and markdown exports", () => {
+  const data = createMockReportData(2);
+  const basis = "suggested from 3 of 9 competitor listings";
+  data.opportunities[0].formatBasis = basis;
+
+  const lines = generateReportCsv(data).trim().split("\n");
+  assert.ok(lines[0].includes("Format Basis"), "CSV header must name the basis column");
+  assert.ok(lines[1].includes(`checklist,${basis},`), "CSV row must carry the basis after the format");
+  assert.ok(generateReportJson(data).includes(`"formatBasis": "${basis}"`));
+  assert.ok(generateReportMarkdown(data).includes(`(${basis})`));
+});
+
 test("generateReportMarkdown produces structured, cited document per PRD §46 & §55", () => {
   const data = createMockReportData(25);
   const md = generateReportMarkdown(data);
