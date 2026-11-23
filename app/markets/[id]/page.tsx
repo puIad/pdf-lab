@@ -36,7 +36,7 @@ import { parsePrice } from "@/lib/sources/marketplace-helper";
 import { QualityPanel } from "@/components/quality-panel";
 import { calculateCompleteness } from "@/lib/runs/completeness";
 import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
-import { formatText } from "@/lib/opportunities/format";
+import { formatBadge } from "@/lib/opportunities/format";
 import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
 import {
   marketCompletenessCounts,
@@ -757,8 +757,8 @@ export default async function MarketPage(props: MarketPageProps) {
                         {opp.target_audience}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="capitalize text-[11px]">
-                          {formatText(opp.format, opp.format_basis) ?? "Not observed"}
+                        <Badge variant="secondary" className="text-[11px]">
+                          {formatBadge(opp.format, opp.format_basis) ?? "Not observed"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs font-mono text-foreground">

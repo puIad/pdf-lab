@@ -37,7 +37,7 @@ import { NOT_OBSERVED, platformCounts } from "@/lib/report/observed";
 import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
 import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
 import { ideaOnlyNote, isIdeaOnly } from "@/lib/opportunities/from-ideas";
-import { formatText } from "@/lib/opportunities/format";
+import { formatBadge, formatText } from "@/lib/opportunities/format";
 
 export const dynamic = "force-dynamic";
 
@@ -158,9 +158,9 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
             <Badge variant="outline" className="font-mono text-xs uppercase tracking-wide">
               Product Opportunity Spec
             </Badge>
-            <Badge variant="secondary" className="capitalize text-xs font-semibold bg-primary/10 text-primary">
+            <Badge variant="secondary" className="text-xs font-semibold bg-primary/10 text-primary">
               <FileText className="mr-1 size-3" />
-              Format: {formatLabel}
+              Format: {formatBadge(opp.format, opp.format_basis) ?? NOT_OBSERVED}
             </Badge>
             <Badge variant="outline" className="font-mono text-xs">
               <DollarSign className="mr-0.5 size-3 text-emerald-500" />
@@ -295,8 +295,8 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
           </CardHeader>
           <CardContent className="text-xs leading-relaxed text-muted-foreground flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="outline" className="capitalize text-xs font-semibold">
-                Format: {formatLabel}
+              <Badge variant="outline" className="text-xs font-semibold">
+                Format: {formatBadge(opp.format, opp.format_basis) ?? NOT_OBSERVED}
               </Badge>
               <Badge variant="secondary" className="text-xs">
                 Suggestion, not an observation
