@@ -70,6 +70,8 @@ const NOUN = "(?:problem|fault|issue|pain|need|complaint)s?";
 const DONE = "(?:described|evidenced|stated|mentioned|identified|specified|named|given|clear)";
 // "no other issue is mentioned" is a remark about a problem already named, not an absent problem.
 const FILLER = "(?!(?:other|further|additional|more|else)\\b)[\\w-]+";
+// Words a request may use before "without" and still carry no symptom of its own ("Asks how to fix their PC's issues ...").
+const REQUEST_WORD = "(?:how|help|advice|guidance|simple|common|general|to|for|with|about|fix|fixes|fixing|solve|solving|their|my|a|an|the|pc|pcs|pc['\\u2019]s|computer|computers|laptop|laptops|issues?|problems?)";
 const END = "\\s*[.;]?\\s*$";
 const SAYING = "(?:saying|stating|naming|specifying|mentioning|describing)";
 const WHAT_IS = `what\\s+(?:the|their)\\s+(?:[\\w-]+\\s+)?${NOUN}\\s+(?:is|are)`;
@@ -79,8 +81,8 @@ const UNDESCRIBED_PATTERNS = [
   new RegExp(`^\\W*no\\s+(?:${FILLER}\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}\\b(?![^.;]*\\bbut\\b)`, "i"),
   // "...; no specific fault is named." (the closing clause)
   new RegExp(`[.;]\\s*no\\s+(?:${FILLER}\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}${END}`, "i"),
-  // "Asks how to fix their PC's issues without saying what the issue is." (the text opens as a request, so no symptom comes before it)
-  new RegExp(`^\\W*(?:asks|wants|seeks|looks|needs)\\b[^;]*\\bwithout\\s+${SAYING}\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
+  // "Asks how to fix their PC's issues without saying what the issue is." (a request whose words before without name no symptom)
+  new RegExp(`^\\W*(?:asks|wants|seeks|looks|needs)\\b(?:\\s+${REQUEST_WORD}){0,8}\\s+without\\s+${SAYING}\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
   // "The post does not name a specific problem." (the text itself is the subject)
   new RegExp(`^\\W*(?:the\\s+)?(?:post|text|thread|comment|signal|listing|title|author|user)\\s+(?:does\\s+not|doesn['\u2019]t|did\\s+not|didn['\u2019]t)\\s+(?:say|state|name|specify|mention|describe)\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
 ];

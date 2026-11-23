@@ -641,6 +641,8 @@ test("a signal whose analysed problem says none is described yields no opportuni
   assert.equal(isUndescribedProblem("Wi-Fi drops every hour without naming any specific problem."), false);
   assert.equal(isUndescribedProblem("Battery drains overnight without stating a clear issue."), false);
   assert.equal(isUndescribedProblem("Asks how to fix their PC without saying what the issues are."), true);
+  assert.equal(isUndescribedProblem("Asks how to fix a printer that jams every page without naming a problem."), false);
+  assert.equal(isUndescribedProblem("Asks how to fix their PC\u2019s issues without saying what the issue is."), true);
 
   const mk = (id: string, problem: string, embedding: number[]) => ({
     id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",
