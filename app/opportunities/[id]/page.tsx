@@ -33,7 +33,7 @@ import {
   FactsInterpretationSuggestion,
 } from "@/components/evidence";
 import { parseEvidenceClaim, type EvidenceRow } from "@/lib/evidence/types";
-import { NOT_OBSERVED, platformCounts } from "@/lib/report/observed";
+import { NOT_OBSERVED, intentUrgencyLines, loadMarketReportSignals, observeMarket, platformCounts } from "@/lib/report/observed";
 import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
 import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
 import { ideaOnlyNote, isIdeaOnly } from "@/lib/opportunities/from-ideas";
@@ -109,6 +109,9 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   const trendClaims = marketRows.filter((e) => e.entity_type === "trend").map((e) => parseEvidenceClaim(e.claim).rawClaim);
   const gapRows = marketRows.filter(
     (e) => e.entity_type === "competition" && parseEvidenceClaim(e.claim).rawClaim.startsWith("Product gap"),
+  );
+  const { intent: buyerIntent, urgency } = intentUrgencyLines(
+    observeMarket(await loadMarketReportSignals(supabase, opp.market_id)),
   );
   const platforms = platformCounts(competitors ?? []);
   const competitorTotal = platforms.reduce((n, p) => n + p.count, 0);
@@ -432,7 +435,8 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
             interpretation={{
               demandScore: score,
               trendLabel: trend,
-              urgency: NOT_OBSERVED,
+              buyerIntent,
+              urgency,
               confidence: opp.confidence,
               sampleSizeNote: `Calculated from ${directEvidence.length} evidence rows`,
             }}

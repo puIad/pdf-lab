@@ -3,10 +3,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { marketCompletenessCounts, marketQcRules, observeMarket, platformCounts } from "./observed.ts";
+import { intentUrgencyLines, marketCompletenessCounts, marketQcRules, observeMarket, platformCounts } from "./observed.ts";
 import { calculateCompleteness } from "../runs/completeness.ts";
 
-const signal = (type: string, analysis?: { audience?: string; problem?: string; urgency?: string; pdf_relevance?: number }) => ({
+const signal = (type: string, analysis?: { audience?: string; problem?: string; intent?: string; urgency?: string; pdf_relevance?: number }) => ({
   sources: { type },
   signal_analysis: analysis ? [analysis] : [],
 });
@@ -156,4 +156,22 @@ test("a market page's 15% completeness slot is the share of checked rules that h
   // Before #52 any market page got the 15 points.
   assert.equal(calculateCompleteness(marketCompletenessCounts(base)).completenessPercentage, 15);
   assert.equal(calculateCompleteness(marketCompletenessCounts({ ...base, rules: [rule(false)] })).completenessPercentage, 0);
+});
+
+test("intentUrgencyLines states the strongest stored level and its count, and Not observed for phrase-only rows", () => {
+  const o = observeMarket([
+    signal("reddit", { intent: "very_strong", urgency: "high" }),
+    signal("reddit", { intent: "weak", urgency: "low" }),
+    signal("web", { intent: "weak", urgency: "low" }),
+    signal("web"),
+  ]);
+  assert.deepEqual(o.intent, { very_strong: 1, strong: 0, medium: 0, weak: 2 });
+  assert.deepEqual(intentUrgencyLines(o), {
+    intent: "very strong, 1 of 3 analysed signals",
+    urgency: "high, 1 of 3 analysed signals",
+  });
+  assert.deepEqual(intentUrgencyLines(observeMarket([signal("gtrends"), signal("gtrends")])), {
+    intent: "Not observed",
+    urgency: "Not observed",
+  });
 });
