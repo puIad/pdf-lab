@@ -411,14 +411,12 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
             {gapRows.length === 0 ? (
               <p>No gap is stored for this market from buyer discussion on its topic.</p>
             ) : (
-              <>
-                {gapRows.slice(0, 3).map((e) => (
-                  <div key={e.id} className="rounded bg-muted/50 p-2.5 text-[11px] flex flex-col gap-1">
-                    <span className="text-foreground">{parseEvidenceClaim(e.claim).rawClaim}</span>
-                    {e.excerpt && <span className="italic">&ldquo;{e.excerpt}&rdquo;</span>}
-                  </div>
-                ))}
-              </>
+              gapRows.slice(0, 3).map((e) => (
+                <div key={e.id} className="rounded bg-muted/50 p-2.5 text-[11px] flex flex-col gap-1">
+                  <span className="text-foreground">{parseEvidenceClaim(e.claim).rawClaim}</span>
+                  {e.excerpt && <span className="italic">&ldquo;{e.excerpt}&rdquo;</span>}
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
