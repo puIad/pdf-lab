@@ -112,7 +112,7 @@ const UNDESCRIBED_PATTERNS = [
 const STOCK_ADVICE = /\b(?:starting\s+with\s+)?restart(?:ing)?\s+the\s+device\b|\bnoting\s+(?:any\s+)?error\s+messages?\b|\bstarting\s+with\b/gi;
 
 // Guidance framing (issue #99): the need is a procedure (a method, steps, an order) ...
-const PROCEDURE = /\b(?:\w+-step|steps?|methods?|process|order|sequence|procedure|approach|routine)\b/i;
+const PROCEDURE = /\b(?:\w+-step|steps?|methods?|process|sequence|procedure|approach|routine)\b|\border\s+(?:of|to)\b|\b(?:know|right|correct|proper)\s+(?:the\s+)?order\b/i;
 // ... applied to a whole class of problems: "common issues", "covering ... errors", "startup, video and sound errors".
 const CLASS = String.raw`(?:problems?|issues?|errors?|faults?|failures?)`;
 const BROAD_SCOPE = new RegExp(
@@ -121,7 +121,9 @@ const BROAD_SCOPE = new RegExp(
 );
 // A symptom of its own: a failure verb or negation. "users do not know the order" is a knowledge gap, not a symptom.
 const KNOWLEDGE_GAP = /\b(?:do|does|did)(?:\s+not|n['’]t)\s+(?:know|understand|have)\b|\b(?:unsure|unclear|unknown)\b/gi;
-const SYMPTOM = /\b(?:not|cannot|can['’]t|won['’]t|n['’]t|fails?|failed|failing|crash\w*|freez\w*|stuck|overheat\w*|slow|dead|corrupt\w*)\b/i;
+const SYMPTOM = /\b(?:not|cannot|can['’]t|won['’]t|\w+n['’]t|fails?|failed|failing|crash\w*|freez\w*|stuck|overheat\w*|slow|dead|corrupt\w*)\b/i;
+// Something concrete named in the text: an error code, a blue screen, or a product or tool written with a capital mid-sentence ("QuickBooks", "Dell").
+const NAMED_THING = /0x[0-9a-f]+|\b[Ee]rror\s*(?:[Cc]ode\s+)?[a-z]?\d+|\b[Bb]lue\s+[Ss]creen\b|\b[Bb][Ss][Oo][Dd]\b|(?<=[a-z,;]\s)(?!(?:PCs?|OS|DIY|BIOS)\b)[A-Z][A-Za-z0-9]+/;
 
 /**
  * True when extraction's problem text names no concrete problem, so the signal is not a problem to
@@ -138,7 +140,7 @@ export function isUndescribedProblem(problem: string): boolean {
   if (UNDESCRIBED_PATTERNS.some((re) => re.test(problem))) return true;
   const words = tokens(problem.replace(STOCK_ADVICE, " ")).filter((t) => t.length > 1);
   if (words.length > 0 && words.every((t) => FRAME_WORDS.has(t))) return true;
-  return PROCEDURE.test(problem) && BROAD_SCOPE.test(problem) && !SYMPTOM.test(problem.replace(KNOWLEDGE_GAP, " "));
+  return PROCEDURE.test(problem) && BROAD_SCOPE.test(problem) && !NAMED_THING.test(problem) && !SYMPTOM.test(problem.replace(KNOWLEDGE_GAP, " "));
 }
 
 /**
