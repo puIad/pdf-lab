@@ -2,6 +2,7 @@
 // A page renders what these return or "Not observed". Nothing here has a default or a floor.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { INTENT_VALUES, URGENCY_VALUES } from "../ai/extraction.ts";
 
 export const NOT_OBSERVED = "Not observed";
 
@@ -21,9 +22,6 @@ export interface ReportSignal {
   }>;
 }
 
-/** Buyer-intent ladder and urgency labels, weakest first (`lib/ai/extraction.ts`). */
-const INTENT_LEVELS = ["weak", "medium", "strong", "very_strong"] as const;
-const URGENCY_LEVELS = ["low", "medium", "high"] as const;
 
 export interface MarketObservations {
   totalSignals: number;
@@ -63,7 +61,7 @@ export function observeMarket(signals: ReportSignal[], maxProblems = 5): MarketO
     const u = a.urgency?.toLowerCase().trim();
     if (u === "high" || u === "medium" || u === "low") urgency[u]++;
     const i = a.intent?.toLowerCase().trim();
-    if (i === "very_strong" || i === "strong" || i === "medium" || i === "weak") intent[i]++;
+    if (i && (INTENT_VALUES as readonly string[]).includes(i)) intent[i as keyof typeof intent]++;
     if (typeof a.pdf_relevance === "number") relevance.push(a.pdf_relevance);
   }
 
@@ -82,21 +80,22 @@ export function observeMarket(signals: ReportSignal[], maxProblems = 5): MarketO
 
 /**
  * The strongest level stored on a market's analysed signals and how many carry a level, as one
- * line ("very strong, 2 of 6 analysed signals"); "Not observed" when none carries one.
+ * line ("Very strong, 2 of 6 analysed signals"); "Not observed" when none carries one.
  */
 function strongestLine<K extends string>(counts: Record<K, number>, order: readonly K[], analysed: number): string {
   const rated = order.reduce((n, k) => n + counts[k], 0);
   const top = [...order].reverse().find((k) => counts[k] > 0);
   if (!top) return NOT_OBSERVED;
-  return `${top.replace("_", " ")}, ${counts[top]} of ${analysed} analysed signal${analysed === 1 ? "" : "s"}` +
+  const label = top.replace("_", " ");
+  return `${label[0].toUpperCase()}${label.slice(1)}, ${counts[top]} of ${analysed} analysed signal${analysed === 1 ? "" : "s"}` +
     (rated < analysed ? ` (${rated} rated)` : "");
 }
 
 /** Buyer intent and urgency of a market's analysed signals, as the opportunity page and brief state them. */
 export function intentUrgencyLines(o: MarketObservations): { intent: string; urgency: string } {
   return {
-    intent: strongestLine(o.intent, INTENT_LEVELS, o.analysedSignals),
-    urgency: strongestLine(o.urgency, URGENCY_LEVELS, o.analysedSignals),
+    intent: strongestLine(o.intent, INTENT_VALUES, o.analysedSignals),
+    urgency: strongestLine(o.urgency, URGENCY_VALUES, o.analysedSignals),
   };
 }
 

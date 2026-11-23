@@ -4,6 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { intentUrgencyLines, marketCompletenessCounts, marketQcRules, observeMarket, platformCounts } from "./observed.ts";
+import { INTENT_VALUES } from "../ai/extraction.ts";
 import { calculateCompleteness } from "../runs/completeness.ts";
 
 const signal = (type: string, analysis?: { audience?: string; problem?: string; intent?: string; urgency?: string; pdf_relevance?: number }) => ({
@@ -167,11 +168,17 @@ test("intentUrgencyLines states the strongest stored level and its count, and No
   ]);
   assert.deepEqual(o.intent, { very_strong: 1, strong: 0, medium: 0, weak: 2 });
   assert.deepEqual(intentUrgencyLines(o), {
-    intent: "very strong, 1 of 3 analysed signals",
-    urgency: "high, 1 of 3 analysed signals",
+    intent: "Very strong, 1 of 3 analysed signals",
+    urgency: "High, 1 of 3 analysed signals",
   });
   assert.deepEqual(intentUrgencyLines(observeMarket([signal("gtrends"), signal("gtrends")])), {
     intent: "Not observed",
     urgency: "Not observed",
   });
+});
+
+test("observeMarket counts every buyer-intent level extraction can store", () => {
+  const o = observeMarket(INTENT_VALUES.map((intent) => signal("reddit", { intent })));
+  assert.deepEqual(Object.keys(o.intent).sort(), [...INTENT_VALUES].sort());
+  assert.ok(Object.values(o.intent).every((n) => n === 1));
 });

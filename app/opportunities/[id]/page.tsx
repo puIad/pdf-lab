@@ -79,7 +79,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   }
 
   // 2. Evidence of this opportunity, evidence of its market, and the market's stored competitors
-  const [{ data: evidenceRows }, { data: marketEvidence }, { data: competitors }] = await Promise.all([
+  const [{ data: evidenceRows }, { data: marketEvidence }, { data: competitors }, marketSignals] = await Promise.all([
     supabase
       .from("evidence")
       .select("id, entity_type, entity_id, source_id, claim, excerpt, url, created_at")
@@ -89,6 +89,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
       .select("id, entity_type, entity_id, source_id, claim, excerpt, url, created_at")
       .eq("entity_id", opp.market_id),
     supabase.from("competitors").select("platform, title").eq("market_id", opp.market_id).order("title"),
+    loadMarketReportSignals(supabase, opp.market_id),
   ]);
 
   const market = Array.isArray(opp.markets) ? opp.markets[0] : opp.markets;
@@ -110,9 +111,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   const gapRows = marketRows.filter(
     (e) => e.entity_type === "competition" && parseEvidenceClaim(e.claim).rawClaim.startsWith("Product gap"),
   );
-  const { intent: buyerIntent, urgency } = intentUrgencyLines(
-    observeMarket(await loadMarketReportSignals(supabase, opp.market_id)),
-  );
+  const { intent: buyerIntent, urgency } = intentUrgencyLines(observeMarket(marketSignals));
   const platforms = platformCounts(competitors ?? []);
   const competitorTotal = platforms.reduce((n, p) => n + p.count, 0);
 
