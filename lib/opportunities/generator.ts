@@ -53,13 +53,23 @@ export interface GenerationResult {
 /** Problems sharing this much of their content words are one problem. */
 export const SAME_PROBLEM = 0.6;
 
-/** A phrase-only candidate never outranks one with analysed evidence: its score is one below the lowest evidenced score (0 at the floor, where a tie remains) (issue #85). */
+/**
+ * A phrase-only candidate never outranks or out-trusts one with analysed evidence: its score is
+ * one below the lowest evidenced score (0 at the floor, where a tie remains) (issue #85), and its
+ * confidence is at most the lowest evidenced confidence, since search phrases alone give no
+ * problem or buyer-intent observation (issue #100).
+ */
 export function capIdeaOnlyScores(candidates: GeneratedOpportunity[]): GeneratedOpportunity[] {
   const ideaOnly = (c: GeneratedOpportunity) => isIdeaOnly(c.evidence.map((e) => e.claim));
   const evidenced = candidates.filter((c) => !ideaOnly(c));
   if (evidenced.length === 0) return candidates;
   const cap = Math.max(0, Math.min(...evidenced.map((c) => c.opportunityScore)) - 1);
-  return candidates.map((c) => (ideaOnly(c) && c.opportunityScore > cap ? { ...c, opportunityScore: cap } : c));
+  const confCap = Math.min(...evidenced.map((c) => c.confidence));
+  return candidates.map((c) =>
+    ideaOnly(c) && (c.opportunityScore > cap || c.confidence > confCap)
+      ? { ...c, opportunityScore: Math.min(c.opportunityScore, cap), confidence: Math.min(c.confidence, confCap) }
+      : c,
+  );
 }
 
 /**

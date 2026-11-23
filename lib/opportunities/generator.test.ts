@@ -543,6 +543,10 @@ test("Part 3.8: quick ideas join the Deep-run candidate pool", async (t) => {
     const evidenced = { ...idea, id: "e", opportunityScore: 12, evidence: [{ ...idea.evidence[0], claim: "Reddit post" }] };
     assert.equal(capIdeaOnlyScores([{ ...idea, opportunityScore: 70 }, evidenced])[0].opportunityScore, 11);
     assert.equal(capIdeaOnlyScores([{ ...idea, opportunityScore: 70 }])[0].opportunityScore, 70);
+    // issue #100: its confidence is capped at the lowest evidenced confidence too
+    const capped = capIdeaOnlyScores([{ ...idea, confidence: 1 }, { ...evidenced, confidence: 0.6 }, { ...evidenced, id: "f", confidence: 0.8 }]);
+    assert.equal(capped[0].confidence, 0.6);
+    assert.deepEqual(capped.slice(1).map((c) => c.confidence), [0.6, 0.8]);
   });
 
   await t.test("ideas join the pool; the count is what the pool supports, all distinct, one traced to a phrase", async () => {

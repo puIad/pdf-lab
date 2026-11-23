@@ -182,3 +182,9 @@ test("observeMarket counts every buyer-intent level extraction can store", () =>
   assert.deepEqual(Object.keys(o.intent).sort(), [...INTENT_VALUES].sort());
   assert.ok(Object.values(o.intent).every((n) => n === 1));
 });
+
+test("a phrase-only opportunity reads Not observed for intent and urgency, not its market's levels", () => {
+  const o = observeMarket([signal("reddit", { intent: "strong", urgency: "high" })]);
+  assert.deepEqual(intentUrgencyLines(o, true), { intent: "Not observed", urgency: "Not observed" });
+  assert.equal(intentUrgencyLines(o).intent, "Strong, 1 of 1 analysed signal");
+});
