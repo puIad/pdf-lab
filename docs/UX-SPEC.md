@@ -88,3 +88,8 @@ positioning, search keywords, customer language, evidence sources.
   separate, labelled layers (QC Rule 5); export Markdown / DOCX, Google Docs after 5.4.
 - Never show a number without its basis. PDFMakerHub's random "live" metrics are the
   anti-example (`docs/research/2026-10-24-competitor-sweep.md`).
+
+- Opportunity page, AI Interpretation block: Buyer Intent and Urgency Level state the strongest level stored on the
+  market's analysed signals with its count ("Strong, 2 of 6 analysed signals", `intentUrgencyLines` in
+  `lib/report/observed.ts`); "Not observed" only when no linked signal was analysed. An opportunity stores no link to
+  individual signals, so these are its market's signals.
