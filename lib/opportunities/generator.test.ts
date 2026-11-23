@@ -623,6 +623,13 @@ test("a signal whose analysed problem says none is described yields no opportuni
   assert.equal(isUndescribedProblem("No one can fix the driver issue that is mentioned in every thread."), false);
   assert.equal(isUndescribedProblem("No issues are mentioned with the GPU, but the CPU overheats under load."), false);
   assert.equal(isUndescribedProblem("No error message is given when the Windows update fails."), false);
+  // Issue #94: the other ways extraction says "no problem named".
+  assert.equal(isUndescribedProblem("Looks for simple fixes for common PC issues; no specific fault is named."), true);
+  assert.equal(isUndescribedProblem("Asks how to fix their PC's issues without saying what the issue is."), true);
+  assert.equal(isUndescribedProblem("The post does not name a specific problem."), true);
+  assert.equal(isUndescribedProblem("Wants help, without naming any problem, after a Windows update."), true);
+  assert.equal(isUndescribedProblem("Laptop is slow without saying what the fan noise means, no fault is named but it overheats."), false);
+  assert.equal(isUndescribedProblem("Computer will not turn on or boot after a power cut."), false);
 
   const mk = (id: string, problem: string, embedding: number[]) => ({
     id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",

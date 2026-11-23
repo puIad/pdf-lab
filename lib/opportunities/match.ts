@@ -66,13 +66,28 @@ export function commonWords(market: OpportunitySignalInput[]): Set<string> {
   return new Set([...seen].filter(([, n]) => n > market.length / 2).map(([t]) => t));
 }
 
+const NOUN = "(?:problem|fault|issue|pain|need|complaint)s?";
+const DONE = "(?:described|evidenced|stated|mentioned|identified|specified|named|given|clear)";
+/** Phrasings extraction uses to say a signal names no problem. Each is anchored; "but" later in the sentence means a real problem follows. */
+const UNDESCRIBED_PATTERNS = [
+  // "No specific PC fault is described", "No specific fault is named"
+  new RegExp(`^\\W*no\\s+(?:[\\w-]+\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}\\b(?![^.;]*\\bbut\\b)`, "i"),
+  // "...; no specific fault is named." at the end of a sentence
+  new RegExp(`\\bno\\s+(?:[\\w-]+\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}\\s*\\W*$`, "i"),
+  // "without saying what the issue is", "without naming a problem"
+  new RegExp(`\\bwithout\\s+(?:saying|stating|naming|specifying|mentioning|describing)\\s+(?:what\\s+(?:the|their)\\s+(?:[\\w-]+\\s+)?${NOUN.replace("s?", "")}\\s+(?:is|are)|(?:a|any|the)\\s+(?:[\\w-]+\\s+)?${NOUN})`, "i"),
+  // "does not say what the issue is", "doesn't name a specific problem"
+  new RegExp(`\\b(?:does\\s+not|doesn't|did\\s+not|didn't)\\s+(?:say|state|name|specify|mention|describe)\\s+(?:what\\s+(?:the|their)\\s+(?:[\\w-]+\\s+)?${NOUN.replace("s?", "")}\\s+(?:is|are)|(?:a|any|the)\\s+(?:[\\w-]+\\s+)?${NOUN})`, "i"),
+];
+
 /**
  * True when extraction's problem text says the signal names none ("No specific PC problem is
- * described; ..."). Such a signal is not a problem to build a PDF on, nor evidence for one (issue #88).
- * Dropped once, in generate25Opportunities. A problem noun must precede the verb, so "No clear guide exists for ..." stays a real problem.
+ * described; ...", "... without saying what the issue is"). Such a signal is not a problem to build
+ * a PDF on, nor evidence for one (issues #88, #94). Dropped once, in generate25Opportunities. A
+ * problem noun must precede the verb, so "No clear guide exists for ..." stays a real problem.
  */
 export function isUndescribedProblem(problem: string): boolean {
-  return /^\W*no\s+(?:[\w-]+\s+){0,3}(problem|fault|issue|pain|need|complaint)s?\s+(is|are|was|were)\s+(described|evidenced|stated|mentioned|identified|specified)\b(?![^.;]*\bbut\b)/i.test(problem);
+  return UNDESCRIBED_PATTERNS.some((re) => re.test(problem));
 }
 
 /**
