@@ -122,8 +122,8 @@ const BROAD_SCOPE = new RegExp(
 // A symptom of its own: a failure verb or negation. "users do not know the order" is a knowledge gap, not a symptom.
 const KNOWLEDGE_GAP = /\b(?:do|does|did)(?:\s+not|n['’]t)\s+(?:know|understand|have)\b|\b(?:unsure|unclear|unknown)\b/gi;
 const SYMPTOM = /\b(?:not|cannot|can['’]t|won['’]t|\w+n['’]t|fails?|failed|failing|crash\w*|freez\w*|stuck|overheat\w*|slow|dead|corrupt\w*)\b/i;
-// Something concrete named in the text: an error code, a blue screen, or a product or tool written with a capital mid-sentence ("QuickBooks", "Dell").
-const NAMED_THING = /0x[0-9a-f]+|\b[Ee]rror\s*(?:[Cc]ode\s+)?[a-z]?\d+|\b[Bb]lue\s+[Ss]creen\b|\b[Bb][Ss][Oo][Dd]\b|(?<=[a-z,;]\s)(?!(?:PCs?|OS|DIY|BIOS)\b)[A-Z][A-Za-z0-9]+/;
+// Something concrete named in the text: an error code, or a blue screen. A product or platform name alone ("Windows", "Excel") does not count: generic guidance names them too.
+const NAMED_THING = /0x[0-9a-f]+|\b[Ee]rror\s*(?:[Cc]ode\s+)?[a-z]?\d+|\b[Bb]lue\s+[Ss]creen\b|\b[Bb][Ss][Oo][Dd]\b/;
 
 /**
  * True when extraction's problem text names no concrete problem, so the signal is not a problem to

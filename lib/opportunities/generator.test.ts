@@ -686,6 +686,10 @@ test("generic-advice signals name no concrete problem and never outrank concrete
     "Wants solutions to the top 30 desktop PC problems; no single fault is named.",
     // Gate run 18522c17 (issue #99): a method or an order for a whole class of problems.
     "They need the three-step method of identifying the problem, testing solutions and completing the process, covering startup, video, sound and application errors.",
+    "Needs a three-step method covering common Windows errors.",
+    "Wants a method for fixing common Excel issues.",
+    "Needs the steps for handling common issues with Mac, Windows and Linux machines.",
+    "Needs a process for handling common payroll errors in QuickBooks.",
     "Common computer issues can be addressed with restarting, updating drivers and checking connections, but users do not know the order.",
   ];
   const concrete = [
@@ -703,7 +707,6 @@ test("generic-advice signals name no concrete problem and never outrank concrete
     "Needs the steps; the laptop isn't charging, covering common power issues.",
     "Needs the steps to fix common Windows update errors like 0x80070005.",
     "Blue screen on boot; needs the steps covering driver errors.",
-    "Needs a process for handling common payroll errors in QuickBooks.",
     "Customers place an order but common checkout errors appear.",
     "Computer restarts.",
     "Error message on start.",
