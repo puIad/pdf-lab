@@ -37,7 +37,7 @@ import { NOT_OBSERVED, intentUrgencyLines, loadMarketReportSignals, observeMarke
 import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
 import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
 import { ideaOnlyNote, isIdeaOnly } from "@/lib/opportunities/from-ideas";
-import { formatBadge, formatText } from "@/lib/opportunities/format";
+import { formatBadge } from "@/lib/opportunities/format";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +101,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
 
   const score = typeof opp.opportunity_score === "number" ? Math.round(opp.opportunity_score) : null;
   const confPct = Math.round(opp.confidence * 100);
-  const formatLabel = formatText(opp.format, opp.format_basis) ?? NOT_OBSERVED;
+  const formatLabel = formatBadge(opp.format, opp.format_basis) ?? NOT_OBSERVED;
   const priceRange = opp.price_range || NOT_OBSERVED;
   const trend = market?.trend || "unknown";
 
