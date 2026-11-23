@@ -14,7 +14,15 @@ import {
   enforceRule5_SeparationOfConcerns,
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
-import { calculateLandscape, listingFormat, mineReviewsAndGaps, type CompetitorProduct, type LandscapeShare } from "../competition/index.ts";
+import {
+  BUYER_DISCUSSION_LABEL,
+  calculateLandscape,
+  discussionForMarket,
+  listingFormat,
+  mineReviewsAndGaps,
+  type CompetitorProduct,
+  type LandscapeShare,
+} from "../competition/index.ts";
 import { placeCompetitor } from "../competition/map.ts";
 import { isDemandOnly, isListing } from "../sources/demand-only.ts";
 import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
@@ -539,7 +547,9 @@ async function finishRun(
         market.formatShares = calculateLandscape(competitorProducts).formatShares;
         const { productGaps } = mineReviewsAndGaps(
           competitorProducts,
-          market.signals.map((s) => ({
+          // The market's own signals plus the run's Reddit and YouTube discussion on its topic
+          // (issue #89): listings carry no review text, so these are the text a gap can come from.
+          [...market.signals, ...discussionForMarket(market.id, mapTargets, seedText, freshSignals)].map((s) => ({
             title: s.title,
             content: s.content,
             url: s.url,
@@ -553,7 +563,7 @@ async function finishRun(
             compEvidenceItems.push({
               entityType: "competition",
               entityId: market.id,
-              claim: `Product gap "${gap.title}": ${gap.opportunityTranslation}`,
+              claim: `Product gap "${gap.title}"${excerpt.origin === "discussion" ? ` (${BUYER_DISCUSSION_LABEL})` : ""}: ${gap.opportunityTranslation}`,
               excerpt: excerpt.quote,
               url: excerpt.url,
               signalType: "competition_observed",
