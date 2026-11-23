@@ -66,13 +66,64 @@ export function commonWords(market: OpportunitySignalInput[]): Set<string> {
   return new Set([...seen].filter(([, n]) => n > market.length / 2).map(([t]) => t));
 }
 
+// Words that carry no problem of their own: advice vocabulary (what the reader wants to receive),
+// vague qualifiers, the generic nouns of a niche and the filler of an analysis sentence. A problem
+// whose every content word is one of these ("needs guidance on common computer problems") names
+// nothing to build a PDF on, whatever the sentence says about itself (issue #94).
+// shortcut: tuned for PC troubleshooting; replace with a stored "concrete problem" flag from extraction once a second niche shows generic rows.
+const FRAME_WORDS = new Set(
+  tokens(
+    `user users owner owners reader readers technician technicians student students people person someone anyone
+    need needs want wants look looks ask asks seek seeks require requires requiring wish wishes try tries trying
+    guidance guide guides instruction instructions manual manuals schematic schematics resource resources tip tips trick tricks
+    step steps tutorial tutorials documentation overview introduction introduces introduce basics technique techniques
+    solution solutions fix fixes help advice checklist diy learn understand information list text covering covers cover encountered
+    common typical basic simple general various everyday any some many own their its them they
+    problem problems issue issues trouble troubles troubleshooting troubleshoot repair repairs diagnostic diagnostics
+    pc pcs computer computers device devices desktop desktops laptop laptops hardware software operating system systems os
+    note noting say saying without perform performing
+    will would should could may might also just only more most other
+    `,
+  ),
+);
+
+const NOUN = "(?:problem|fault|issue|pain|need|complaint)s?";
+const DONE = "(?:described|evidenced|stated|mentioned|identified|specified|named|given|clear)";
+// "no other issue is mentioned" is a remark about a problem already named, not an absent problem.
+const FILLER = "(?!(?:other|further|additional|more|else)\\b)[\\w-]+";
+// Words a request may use before "without" and still carry no symptom of its own ("Asks how to fix their PC's issues ...").
+const REQUEST_WORD = "(?:how|help|advice|guidance|simple|common|general|to|for|with|about|fix|fixes|fixing|solve|solving|their|my|a|an|the|pc|pcs|pc['\\u2019]s|computer|computers|laptop|laptops|issues?|problems?)";
+const END = "\\s*[.;]?\\s*$";
+const SAYING = "(?:saying|stating|naming|specifying|mentioning|describing)";
+const WHAT_IS = `what\\s+(?:the|their)\\s+(?:[\\w-]+\\s+)?${NOUN}\\s+(?:is|are)`;
+/** Phrasings extraction uses to say a signal names no problem. Each is anchored at both ends or at a clause boundary; "but" later in the sentence means a real problem follows. */
+const UNDESCRIBED_PATTERNS = [
+  // "No specific PC fault is described; ..." (starts the text)
+  new RegExp(`^\\W*no\\s+(?:${FILLER}\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}\\b(?![^.;]*\\bbut\\b)`, "i"),
+  // "...; no specific fault is named." (the closing clause)
+  new RegExp(`[.;]\\s*no\\s+(?:${FILLER}\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}${END}`, "i"),
+  // "Asks how to fix their PC's issues without saying what the issue is." (a request whose words before without name no symptom)
+  new RegExp(`^\\W*(?:asks|wants|seeks|looks|needs)\\b(?:\\s+${REQUEST_WORD}){0,8}\\s+without\\s+${SAYING}\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
+  // "The post does not name a specific problem." (the text itself is the subject)
+  new RegExp(`^\\W*(?:the\\s+)?(?:post|text|thread|comment|signal|listing|title|author|user)\\s+(?:does\\s+not|doesn['\u2019]t|did\\s+not|didn['\u2019]t)\\s+(?:say|state|name|specify|mention|describe)\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
+];
+
 /**
- * True when extraction's problem text says the signal names none ("No specific PC problem is
- * described; ..."). Such a signal is not a problem to build a PDF on, nor evidence for one (issue #88).
- * Dropped once, in generate25Opportunities. A problem noun must precede the verb, so "No clear guide exists for ..." stays a real problem.
+ * True when extraction's problem text names no concrete problem, so the signal is not a problem to
+ * build a PDF on, nor evidence for one (issues #88, #94). Two independent tests, either one is enough:
+ * the analysis says so itself (the anchored phrasings above), or no content word is left once advice
+ * vocabulary, vague qualifiers and generic niche nouns are removed ("guidance on troubleshooting
+ * common computer problems"). Dropped once, in generate25Opportunities. A problem noun must precede
+ * the verb, so "No clear guide exists for ..." stays a real problem, as does anything with a symptom
+ * or a named task left over ("computer will not turn on", "Windows Reset or reinstall").
  */
+// Stock opening advice ("restart the device", "noting error messages"): generic as a phrase, though "restarts" or "error message" alone are symptoms.
+const STOCK_ADVICE = /\b(?:starting\s+with\s+)?restart(?:ing)?\s+the\s+device\b|\bnoting\s+(?:any\s+)?error\s+messages?\b|\bstarting\s+with\b/gi;
+
 export function isUndescribedProblem(problem: string): boolean {
-  return /^\W*no\s+(?:[\w-]+\s+){0,3}(problem|fault|issue|pain|need|complaint)s?\s+(is|are|was|were)\s+(described|evidenced|stated|mentioned|identified|specified)\b(?![^.;]*\bbut\b)/i.test(problem);
+  if (UNDESCRIBED_PATTERNS.some((re) => re.test(problem))) return true;
+  const words = tokens(problem.replace(STOCK_ADVICE, " ")).filter((t) => t.length > 1);
+  return words.length > 0 && words.every((t) => FRAME_WORDS.has(t));
 }
 
 /**

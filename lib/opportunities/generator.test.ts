@@ -623,6 +623,26 @@ test("a signal whose analysed problem says none is described yields no opportuni
   assert.equal(isUndescribedProblem("No one can fix the driver issue that is mentioned in every thread."), false);
   assert.equal(isUndescribedProblem("No issues are mentioned with the GPU, but the CPU overheats under load."), false);
   assert.equal(isUndescribedProblem("No error message is given when the Windows update fails."), false);
+  // Issue #94: the other ways extraction says "no problem named".
+  assert.equal(isUndescribedProblem("Looks for simple fixes for common PC issues; no specific fault is named."), true);
+  assert.equal(isUndescribedProblem("Asks how to fix their PC's issues without saying what the issue is."), true);
+  assert.equal(isUndescribedProblem("The post does not name a specific problem."), true);
+  assert.equal(isUndescribedProblem("Wants help without naming any problem."), true);
+  assert.equal(isUndescribedProblem("The post doesn\u2019t name a specific problem."), true);
+  assert.equal(isUndescribedProblem("Laptop is slow without saying what the fan noise means, no fault is named but it overheats."), false);
+  assert.equal(isUndescribedProblem("Computer will not turn on or boot after a power cut."), false);
+  assert.equal(isUndescribedProblem("The printer jams on every page; no other issue is mentioned."), false);
+  assert.equal(isUndescribedProblem("GPU fans spin at full speed after the driver update; no further problems are described."), false);
+  assert.equal(isUndescribedProblem("Asks for help with a blue screen on boot without describing the issue in detail."), false);
+  assert.equal(isUndescribedProblem("Laptop overheats while gaming; user posts without specifying the fault code."), false);
+  assert.equal(isUndescribedProblem("Fan grinds loudly at idle and the manual does not describe the problem."), false);
+  assert.equal(isUndescribedProblem("Wrist strain while typing, without mentioning a painful posture."), false);
+  assert.equal(isUndescribedProblem("Screen flickers after the Windows update, without specifying a fault."), false);
+  assert.equal(isUndescribedProblem("Wi-Fi drops every hour without naming any specific problem."), false);
+  assert.equal(isUndescribedProblem("Battery drains overnight without stating a clear issue."), false);
+  assert.equal(isUndescribedProblem("Asks how to fix their PC without saying what the issues are."), true);
+  assert.equal(isUndescribedProblem("Asks how to fix a printer that jams every page without naming a problem."), false);
+  assert.equal(isUndescribedProblem("Asks how to fix their PC\u2019s issues without saying what the issue is."), true);
 
   const mk = (id: string, problem: string, embedding: number[]) => ({
     id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",
@@ -653,3 +673,41 @@ test("a signal whose analysed problem says none is described yields no opportuni
   assert.equal(viaModel.opportunities.some((o) => o.title === "Basic guide"), false);
 });
 
+
+test("generic-advice signals name no concrete problem and never outrank concrete ones (issue #94)", async () => {
+  // Real analysed problems of gate run 6c798623 (`pc troubleshooting`).
+  const generic = [
+    "The user needs guidance on troubleshooting common computer problems, starting with restarting the device and noting error messages.",
+    "Desktop PC users need repair instructions, manuals, schematics, and DIY troubleshooting resources.",
+    "No specific PC fault is described; the text only advertises basic troubleshooting guidance for common desktop problems.",
+    "Looks for simple fixes for common PC issues; no specific fault is named.",
+    "Asks how to fix their PC's issues without saying what the issue is.",
+    "The text introduces a step-by-step guide covering typical hardware and operating system problems encountered by technicians.",
+    "Wants solutions to the top 30 desktop PC problems; no single fault is named.",
+  ];
+  const concrete = [
+    "The user's computer will not turn on or boot, requiring step-by-step diagnostics.",
+    "The user needs instructions on performing Windows repair, Reset, Refresh, or reinstalling the Windows OS for common troubleshooting.",
+    "Laptop overheats and shuts down under load.",
+    "Windows update fails with error 0x80070005.",
+    "Seeks a checklist for onboarding new hires.",
+    "No specific error code appears, but the laptop shuts down under load.",
+    "Computer restarts.",
+    "Error message on start.",
+    "Laptop overheats and shuts down under load; no other problem is mentioned.",
+    "Wants to fix BSOD 0x0000007E without saying which driver.",
+  ];
+  for (const p of generic) assert.equal(isUndescribedProblem(p), true, p);
+  for (const p of concrete) assert.equal(isUndescribedProblem(p), false, p);
+
+  const sig = (id: string, problem: string) => ({
+    id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",
+    analysis: { audience: "PC users", problem, intent: "strong", urgency: null, pdf_relevance: 0.8 },
+    embedding: null,
+  });
+  // The generic signals share the big market (higher demand), as in the gate run.
+  const big = { id: "m1", name: "Basic PC troubleshooting steps", demandScore: 80, confidence: 0.9, signals: generic.map((p, i) => sig(`g${i}`, p)) };
+  const small = { id: "m2", name: "PC won't power on", demandScore: 30, confidence: 0.5, signals: [sig("c0", concrete[0])] };
+  const res = await generate25Opportunities([big, small]);
+  assert.deepEqual(res.opportunities.map((o) => o.problem), [concrete[0]]);
+});
