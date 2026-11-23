@@ -684,6 +684,9 @@ test("generic-advice signals name no concrete problem and never outrank concrete
     "Asks how to fix their PC's issues without saying what the issue is.",
     "The text introduces a step-by-step guide covering typical hardware and operating system problems encountered by technicians.",
     "Wants solutions to the top 30 desktop PC problems; no single fault is named.",
+    // Gate run 18522c17 (issue #99): a method or an order for a whole class of problems.
+    "They need the three-step method of identifying the problem, testing solutions and completing the process, covering startup, video, sound and application errors.",
+    "Common computer issues can be addressed with restarting, updating drivers and checking connections, but users do not know the order.",
   ];
   const concrete = [
     "The user's computer will not turn on or boot, requiring step-by-step diagnostics.",
@@ -692,6 +695,10 @@ test("generic-advice signals name no concrete problem and never outrank concrete
     "Windows update fails with error 0x80070005.",
     "Seeks a checklist for onboarding new hires.",
     "No specific error code appears, but the laptop shuts down under load.",
+    "A builder made a free PC build troubleshooting flowchart because non-experts lack a way to diagnose build problems.",
+    "Needs a step-by-step method to fix a laptop that will not charge.",
+    "Wants a process for recovering common deleted files from a formatted SD card.",
+    "Does not know the order of the BIOS boot menu keys on a Dell, and the laptop will not boot.",
     "Computer restarts.",
     "Error message on start.",
     "Laptop overheats and shuts down under load; no other problem is mentioned.",
