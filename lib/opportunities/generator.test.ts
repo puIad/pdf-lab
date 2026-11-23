@@ -692,6 +692,10 @@ test("generic-advice signals name no concrete problem and never outrank concrete
     "Windows update fails with error 0x80070005.",
     "Seeks a checklist for onboarding new hires.",
     "No specific error code appears, but the laptop shuts down under load.",
+    "Computer restarts.",
+    "Error message on start.",
+    "Laptop overheats and shuts down under load; no other problem is mentioned.",
+    "Wants to fix BSOD 0x0000007E without saying which driver.",
   ];
   for (const p of generic) assert.equal(isUndescribedProblem(p), true, p);
   for (const p of concrete) assert.equal(isUndescribedProblem(p), false, p);

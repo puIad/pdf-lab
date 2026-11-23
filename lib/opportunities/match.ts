@@ -70,6 +70,7 @@ export function commonWords(market: OpportunitySignalInput[]): Set<string> {
 // vague qualifiers, the generic nouns of a niche and the filler of an analysis sentence. A problem
 // whose every content word is one of these ("needs guidance on common computer problems") names
 // nothing to build a PDF on, whatever the sentence says about itself (issue #94).
+// shortcut: tuned for PC troubleshooting; replace with a stored "concrete problem" flag from extraction once a second niche shows generic rows.
 const FRAME_WORDS = new Set(
   tokens(
     `user users owner owners reader readers technician technicians student students people person someone anyone
@@ -80,7 +81,7 @@ const FRAME_WORDS = new Set(
     common typical basic simple general various everyday any some many own their its them they
     problem problems issue issues trouble troubles troubleshooting troubleshoot repair repairs diagnostic diagnostics
     pc pcs computer computers device devices desktop desktops laptop laptops hardware software operating system systems os
-    restart restarting restarts start starting note noting error errors message messages say saying without perform performing
+    note noting say saying without perform performing
     will would should could may might also just only more most other
     `,
   ),
@@ -116,9 +117,12 @@ const UNDESCRIBED_PATTERNS = [
  * the verb, so "No clear guide exists for ..." stays a real problem, as does anything with a symptom
  * or a named task left over ("computer will not turn on", "Windows Reset or reinstall").
  */
+// Stock opening advice ("restart the device", "noting error messages"): generic as a phrase, though "restarts" or "error message" alone are symptoms.
+const STOCK_ADVICE = /\b(?:starting\s+with\s+)?restart(?:ing)?\s+the\s+device\b|\bnoting\s+(?:any\s+)?error\s+messages?\b|\bstarting\s+with\b/gi;
+
 export function isUndescribedProblem(problem: string): boolean {
   if (UNDESCRIBED_PATTERNS.some((re) => re.test(problem))) return true;
-  const words = tokens(problem).filter((t) => t.length > 1);
+  const words = tokens(problem.replace(STOCK_ADVICE, " ")).filter((t) => t.length > 1);
   return words.length > 0 && words.every((t) => FRAME_WORDS.has(t));
 }
 
