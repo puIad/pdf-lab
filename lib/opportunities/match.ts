@@ -68,16 +68,21 @@ export function commonWords(market: OpportunitySignalInput[]): Set<string> {
 
 const NOUN = "(?:problem|fault|issue|pain|need|complaint)s?";
 const DONE = "(?:described|evidenced|stated|mentioned|identified|specified|named|given|clear)";
-/** Phrasings extraction uses to say a signal names no problem. Each is anchored; "but" later in the sentence means a real problem follows. */
+// "no other issue is mentioned" is a remark about a problem already named, not an absent problem.
+const FILLER = "(?!(?:other|further|additional|more|else)\\b)[\\w-]+";
+const END = "\\s*[.;]?\\s*$";
+const SAYING = "(?:saying|stating|naming|specifying|mentioning|describing)";
+const WHAT_IS = `what\\s+(?:the|their)\\s+(?:[\\w-]+\\s+)?${NOUN.replace("s?", "")}\\s+(?:is|are)`;
+/** Phrasings extraction uses to say a signal names no problem. Each is anchored at both ends or at a clause boundary; "but" later in the sentence means a real problem follows. */
 const UNDESCRIBED_PATTERNS = [
-  // "No specific PC fault is described", "No specific fault is named"
-  new RegExp(`^\\W*no\\s+(?:[\\w-]+\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}\\b(?![^.;]*\\bbut\\b)`, "i"),
-  // "...; no specific fault is named." at the end of a sentence
-  new RegExp(`\\bno\\s+(?:[\\w-]+\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}\\s*\\W*$`, "i"),
-  // "without saying what the issue is", "without naming a problem"
-  new RegExp(`\\bwithout\\s+(?:saying|stating|naming|specifying|mentioning|describing)\\s+(?:what\\s+(?:the|their)\\s+(?:[\\w-]+\\s+)?${NOUN.replace("s?", "")}\\s+(?:is|are)|(?:a|any|the)\\s+(?:[\\w-]+\\s+)?${NOUN})`, "i"),
-  // "does not say what the issue is", "doesn't name a specific problem"
-  new RegExp(`\\b(?:does\\s+not|doesn't|did\\s+not|didn't)\\s+(?:say|state|name|specify|mention|describe)\\s+(?:what\\s+(?:the|their)\\s+(?:[\\w-]+\\s+)?${NOUN.replace("s?", "")}\\s+(?:is|are)|(?:a|any|the)\\s+(?:[\\w-]+\\s+)?${NOUN})`, "i"),
+  // "No specific PC fault is described; ..." (starts the text)
+  new RegExp(`^\\W*no\\s+(?:${FILLER}\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}\\b(?![^.;]*\\bbut\\b)`, "i"),
+  // "...; no specific fault is named." (the closing clause)
+  new RegExp(`[.;]\\s*no\\s+(?:${FILLER}\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}${END}`, "i"),
+  // "Asks how to fix their PC's issues without saying what the issue is." (one clause, nothing concrete before it)
+  new RegExp(`^[^;]*\\bwithout\\s+${SAYING}\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
+  // "The post does not name a specific problem." (the text itself is the subject)
+  new RegExp(`^\\W*(?:the\\s+)?(?:post|text|thread|comment|signal|listing|title|author|user)\\s+(?:does\\s+not|doesn['\u2019]t|did\\s+not|didn['\u2019]t)\\s+(?:say|state|name|specify|mention|describe)\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
 ];
 
 /**

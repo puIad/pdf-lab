@@ -627,9 +627,16 @@ test("a signal whose analysed problem says none is described yields no opportuni
   assert.equal(isUndescribedProblem("Looks for simple fixes for common PC issues; no specific fault is named."), true);
   assert.equal(isUndescribedProblem("Asks how to fix their PC's issues without saying what the issue is."), true);
   assert.equal(isUndescribedProblem("The post does not name a specific problem."), true);
-  assert.equal(isUndescribedProblem("Wants help, without naming any problem, after a Windows update."), true);
+  assert.equal(isUndescribedProblem("Wants help without naming any problem."), true);
+  assert.equal(isUndescribedProblem("The post doesn\u2019t name a specific problem."), true);
   assert.equal(isUndescribedProblem("Laptop is slow without saying what the fan noise means, no fault is named but it overheats."), false);
   assert.equal(isUndescribedProblem("Computer will not turn on or boot after a power cut."), false);
+  assert.equal(isUndescribedProblem("The printer jams on every page; no other issue is mentioned."), false);
+  assert.equal(isUndescribedProblem("GPU fans spin at full speed after the driver update; no further problems are described."), false);
+  assert.equal(isUndescribedProblem("Asks for help with a blue screen on boot without describing the issue in detail."), false);
+  assert.equal(isUndescribedProblem("Laptop overheats while gaming; user posts without specifying the fault code."), false);
+  assert.equal(isUndescribedProblem("Fan grinds loudly at idle and the manual does not describe the problem."), false);
+  assert.equal(isUndescribedProblem("Wrist strain while typing, without mentioning a painful posture."), false);
 
   const mk = (id: string, problem: string, embedding: number[]) => ({
     id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",
