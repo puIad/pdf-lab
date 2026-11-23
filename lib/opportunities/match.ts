@@ -66,13 +66,46 @@ export function commonWords(market: OpportunitySignalInput[]): Set<string> {
   return new Set([...seen].filter(([, n]) => n > market.length / 2).map(([t]) => t));
 }
 
+// Words that carry no problem of their own: advice vocabulary (what the reader wants to receive),
+// vague qualifiers, the generic nouns of a niche and the filler of an analysis sentence. A problem
+// whose every content word is one of these ("needs guidance on common computer problems") names
+// nothing to build a PDF on, whatever the sentence says about itself (issue #94).
+const FRAME_WORDS = new Set(
+  tokens(
+    `user users owner owners reader readers technician technicians student students people person someone anyone
+    need needs want wants look looks ask asks seek seeks require requires requiring wish wishes try tries trying
+    guidance guide guides instruction instructions manual manuals schematic schematics resource resources tip tips trick tricks
+    step steps tutorial tutorials documentation overview introduction introduces introduce basics technique techniques
+    solution solutions fix fixes help advice checklist diy learn understand information list text covering covers cover encountered
+    common typical basic simple general various everyday any some many own their its them they
+    problem problems issue issues trouble troubles troubleshooting troubleshoot repair repairs diagnostic diagnostics
+    pc pcs computer computers device devices desktop desktops laptop laptops hardware software operating system systems os
+    restart restarting restarts start starting note noting error errors message messages say saying without perform performing
+    will would should could may might also just only more most other
+    `,
+  ),
+);
+
+/** Wording that says outright that the signal names no specific problem. */
+const ADMISSION = [
+  /(?:^|[.;:(,])\W*no\s+(?:[\w-]+\s+){0,3}(?:problem|fault|issue|pain|need|complaint)s?\s+(?:is|are|was|were)\s+(?:described|evidenced|stated|mentioned|identified|specified|named|given|said|reported)\b(?![^.;]*\bbut\b)/i,
+  /\bwithout\s+(?:saying|stating|naming|specifying|mentioning|describing)\s+(?:what|which)\b(?![^.;]*\bbut\b)/i,
+];
+
 /**
- * True when extraction's problem text says the signal names none ("No specific PC problem is
- * described; ..."). Such a signal is not a problem to build a PDF on, nor evidence for one (issue #88).
- * Dropped once, in generate25Opportunities. A problem noun must precede the verb, so "No clear guide exists for ..." stays a real problem.
+ * True when extraction's problem text names no concrete problem, so the signal is not a problem to
+ * build a PDF on, nor evidence for one (issues #88, #94). Two independent tests, either one is enough:
+ * the analysis says so itself ("No specific PC fault is described", "no single fault is named",
+ * "without saying what the issue is"), or no content word is left once advice vocabulary, vague
+ * qualifiers and generic niche nouns are removed ("guidance on troubleshooting common computer
+ * problems"). Dropped once, in generate25Opportunities. A problem noun must precede the verb, so
+ * "No clear guide exists for ..." stays a real problem, as does anything with a symptom or a
+ * named task left over ("computer will not turn on", "Windows Reset or reinstall").
  */
 export function isUndescribedProblem(problem: string): boolean {
-  return /^\W*no\s+(?:[\w-]+\s+){0,3}(problem|fault|issue|pain|need|complaint)s?\s+(is|are|was|were)\s+(described|evidenced|stated|mentioned|identified|specified)\b(?![^.;]*\bbut\b)/i.test(problem);
+  if (ADMISSION.some((re) => re.test(problem))) return true;
+  const words = tokens(problem).filter((t) => t.length > 1);
+  return words.length > 0 && words.every((t) => FRAME_WORDS.has(t));
 }
 
 /**

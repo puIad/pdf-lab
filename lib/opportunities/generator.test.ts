@@ -653,3 +653,37 @@ test("a signal whose analysed problem says none is described yields no opportuni
   assert.equal(viaModel.opportunities.some((o) => o.title === "Basic guide"), false);
 });
 
+
+test("generic-advice signals name no concrete problem and never outrank concrete ones (issue #94)", async () => {
+  // Real analysed problems of gate run 6c798623 (`pc troubleshooting`).
+  const generic = [
+    "The user needs guidance on troubleshooting common computer problems, starting with restarting the device and noting error messages.",
+    "Desktop PC users need repair instructions, manuals, schematics, and DIY troubleshooting resources.",
+    "No specific PC fault is described; the text only advertises basic troubleshooting guidance for common desktop problems.",
+    "Looks for simple fixes for common PC issues; no specific fault is named.",
+    "Asks how to fix their PC's issues without saying what the issue is.",
+    "The text introduces a step-by-step guide covering typical hardware and operating system problems encountered by technicians.",
+    "Wants solutions to the top 30 desktop PC problems; no single fault is named.",
+  ];
+  const concrete = [
+    "The user's computer will not turn on or boot, requiring step-by-step diagnostics.",
+    "The user needs instructions on performing Windows repair, Reset, Refresh, or reinstalling the Windows OS for common troubleshooting.",
+    "Laptop overheats and shuts down under load.",
+    "Windows update fails with error 0x80070005.",
+    "Seeks a checklist for onboarding new hires.",
+    "No specific error code appears, but the laptop shuts down under load.",
+  ];
+  for (const p of generic) assert.equal(isUndescribedProblem(p), true, p);
+  for (const p of concrete) assert.equal(isUndescribedProblem(p), false, p);
+
+  const sig = (id: string, problem: string) => ({
+    id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",
+    analysis: { audience: "PC users", problem, intent: "strong", urgency: null, pdf_relevance: 0.8 },
+    embedding: null,
+  });
+  // The generic signals share the big market (higher demand), as in the gate run.
+  const big = { id: "m1", name: "Basic PC troubleshooting steps", demandScore: 80, confidence: 0.9, signals: generic.map((p, i) => sig(`g${i}`, p)) };
+  const small = { id: "m2", name: "PC won't power on", demandScore: 30, confidence: 0.5, signals: [sig("c0", concrete[0])] };
+  const res = await generate25Opportunities([big, small]);
+  assert.deepEqual(res.opportunities.map((o) => o.problem), [concrete[0]]);
+});
