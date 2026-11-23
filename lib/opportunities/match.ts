@@ -72,15 +72,15 @@ const DONE = "(?:described|evidenced|stated|mentioned|identified|specified|named
 const FILLER = "(?!(?:other|further|additional|more|else)\\b)[\\w-]+";
 const END = "\\s*[.;]?\\s*$";
 const SAYING = "(?:saying|stating|naming|specifying|mentioning|describing)";
-const WHAT_IS = `what\\s+(?:the|their)\\s+(?:[\\w-]+\\s+)?${NOUN.replace("s?", "")}\\s+(?:is|are)`;
+const WHAT_IS = `what\\s+(?:the|their)\\s+(?:[\\w-]+\\s+)?${NOUN}\\s+(?:is|are)`;
 /** Phrasings extraction uses to say a signal names no problem. Each is anchored at both ends or at a clause boundary; "but" later in the sentence means a real problem follows. */
 const UNDESCRIBED_PATTERNS = [
   // "No specific PC fault is described; ..." (starts the text)
   new RegExp(`^\\W*no\\s+(?:${FILLER}\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}\\b(?![^.;]*\\bbut\\b)`, "i"),
   // "...; no specific fault is named." (the closing clause)
   new RegExp(`[.;]\\s*no\\s+(?:${FILLER}\\s+){0,3}${NOUN}\\s+(?:is|are|was|were)\\s+${DONE}${END}`, "i"),
-  // "Asks how to fix their PC's issues without saying what the issue is." (one clause, nothing concrete before it)
-  new RegExp(`^[^;]*\\bwithout\\s+${SAYING}\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
+  // "Asks how to fix their PC's issues without saying what the issue is." (the text opens as a request, so no symptom comes before it)
+  new RegExp(`^\\W*(?:asks|wants|seeks|looks|needs)\\b[^;]*\\bwithout\\s+${SAYING}\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
   // "The post does not name a specific problem." (the text itself is the subject)
   new RegExp(`^\\W*(?:the\\s+)?(?:post|text|thread|comment|signal|listing|title|author|user)\\s+(?:does\\s+not|doesn['\u2019]t|did\\s+not|didn['\u2019]t)\\s+(?:say|state|name|specify|mention|describe)\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
 ];

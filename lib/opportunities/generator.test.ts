@@ -637,6 +637,10 @@ test("a signal whose analysed problem says none is described yields no opportuni
   assert.equal(isUndescribedProblem("Laptop overheats while gaming; user posts without specifying the fault code."), false);
   assert.equal(isUndescribedProblem("Fan grinds loudly at idle and the manual does not describe the problem."), false);
   assert.equal(isUndescribedProblem("Wrist strain while typing, without mentioning a painful posture."), false);
+  assert.equal(isUndescribedProblem("Screen flickers after the Windows update, without specifying a fault."), false);
+  assert.equal(isUndescribedProblem("Wi-Fi drops every hour without naming any specific problem."), false);
+  assert.equal(isUndescribedProblem("Battery drains overnight without stating a clear issue."), false);
+  assert.equal(isUndescribedProblem("Asks how to fix their PC without saying what the issues are."), true);
 
   const mk = (id: string, problem: string, embedding: number[]) => ({
     id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",
