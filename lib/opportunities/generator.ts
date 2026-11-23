@@ -432,7 +432,7 @@ export async function generate25Opportunities(
   allMarkets: OpportunityMarketInput[],
   options: GenerateOpportunitiesOptions = {},
 ): Promise<GenerationResult> {
-  // The one place a signal whose analysed problem says none is described (issue #88) is dropped:
+  // The one place a signal whose analysed problem names no concrete problem (issues #88, #94) is dropped:
   // pool, model input, own signals, evidence and demand counts below only ever see described ones.
   const markets = allMarkets.map((m) => ({ ...m, signals: m.signals.filter((s) => !isUndescribedProblem(s.analysis?.problem?.trim() ?? "")) }));
   const targetCount = options.targetCount ?? OPPORTUNITY_TARGET;

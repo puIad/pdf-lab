@@ -1,6 +1,9 @@
 // lib/report/observed.ts — values the report pages show, computed from stored rows only (Part 6.14).
 // A page renders what these return or "Not observed". Nothing here has a default or a floor.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { INTENT_VALUES, URGENCY_VALUES } from "../ai/extraction.ts";
+
 export const NOT_OBSERVED = "Not observed";
 
 type Rel<T> = T | T[] | null | undefined;
@@ -13,10 +16,12 @@ export interface ReportSignal {
   signal_analysis?: Rel<{
     audience?: string | null;
     problem?: string | null;
+    intent?: string | null;
     urgency?: string | null;
     pdf_relevance?: number | null;
   }>;
 }
+
 
 export interface MarketObservations {
   totalSignals: number;
@@ -26,6 +31,8 @@ export interface MarketObservations {
   /** Most frequent extracted problems, with the audience extraction stored beside them. */
   problems: Array<{ problem: string; audience: string | null; count: number }>;
   urgency: { high: number; medium: number; low: number };
+  /** Analysed signals per buyer-intent level. */
+  intent: { very_strong: number; strong: number; medium: number; weak: number };
   /** Mean `pdf_relevance` over analysed signals that carry one; null when none does. */
   avgPdfRelevance: number | null;
 }
@@ -34,6 +41,7 @@ export function observeMarket(signals: ReportSignal[], maxProblems = 5): MarketO
   const sources = new Set<string>();
   const problems = new Map<string, { problem: string; audience: string | null; count: number }>();
   const urgency = { high: 0, medium: 0, low: 0 };
+  const intent = { very_strong: 0, strong: 0, medium: 0, weak: 0 };
   const relevance: number[] = [];
   let analysed = 0;
 
@@ -52,6 +60,8 @@ export function observeMarket(signals: ReportSignal[], maxProblems = 5): MarketO
     }
     const u = a.urgency?.toLowerCase().trim();
     if (u === "high" || u === "medium" || u === "low") urgency[u]++;
+    const i = a.intent?.toLowerCase().trim();
+    if (i && (INTENT_VALUES as readonly string[]).includes(i)) intent[i as keyof typeof intent]++;
     if (typeof a.pdf_relevance === "number") relevance.push(a.pdf_relevance);
   }
 
@@ -61,10 +71,55 @@ export function observeMarket(signals: ReportSignal[], maxProblems = 5): MarketO
     sources: [...sources].sort(),
     problems: [...problems.values()].sort((x, y) => y.count - x.count).slice(0, maxProblems),
     urgency,
+    intent,
     avgPdfRelevance: relevance.length
       ? Math.round((relevance.reduce((n, v) => n + v, 0) / relevance.length) * 100) / 100
       : null,
   };
+}
+
+/**
+ * The strongest level stored on a market's analysed signals and how many carry a level, as one
+ * line ("Very strong, 2 of 6 analysed signals"); "Not observed" when none carries one.
+ */
+function strongestLine<K extends string>(counts: Record<K, number>, order: readonly K[], analysed: number): string {
+  const rated = order.reduce((n, k) => n + counts[k], 0);
+  const top = [...order].reverse().find((k) => counts[k] > 0);
+  if (!top) return NOT_OBSERVED;
+  const label = top.replace("_", " ");
+  return `${label[0].toUpperCase()}${label.slice(1)}, ${counts[top]} of ${analysed} analysed signal${analysed === 1 ? "" : "s"}` +
+    (rated < analysed ? ` (${rated} rated)` : "");
+}
+
+/** Buyer intent and urgency of a market's analysed signals, as the opportunity page and brief state them. */
+export function intentUrgencyLines(o: MarketObservations): { intent: string; urgency: string } {
+  return {
+    intent: strongestLine(o.intent, INTENT_VALUES, o.analysedSignals),
+    urgency: strongestLine(o.urgency, URGENCY_VALUES, o.analysedSignals),
+  };
+}
+
+/**
+ * Every signal linked to a market, read in stable pages (Supabase returns at most 1000 rows per
+ * request), with the analysis fields the report layer needs.
+ */
+export async function loadMarketReportSignals(supabase: SupabaseClient, marketId: string): Promise<ReportSignal[]> {
+  const PAGE = 1000;
+  const out: ReportSignal[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("market_signals")
+      .select("signal_id, signals ( published_at, sources ( type ), signal_analysis ( audience, problem, intent, urgency, pdf_relevance ) )")
+      .eq("market_id", marketId)
+      .order("signal_id")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`market signals: ${error.message}`);
+    for (const r of data ?? []) {
+      const s = one((r as unknown as { signals: Rel<ReportSignal> }).signals);
+      if (s) out.push(s);
+    }
+    if ((data?.length ?? 0) < PAGE) return out;
+  }
 }
 
 /** Stored competitor rows counted per platform, largest first. */

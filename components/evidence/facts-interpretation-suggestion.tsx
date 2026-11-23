@@ -16,6 +16,8 @@ export interface FactsInterpretationSuggestionProps {
     /** Stored score, or null when none is stored ("Not observed"). */
     demandScore: number | null;
     trendLabel: string;
+    /** Strongest buyer intent among the analysed signals, with its count, or "Not observed". */
+    buyerIntent: string;
     urgency: string;
     confidence: number;
     sampleSizeNote?: string;
@@ -99,8 +101,12 @@ export function FactsInterpretationSuggestion({
               <span className="font-semibold capitalize">{interpretation.trendLabel}</span>
             </div>
             <div className="flex justify-between border-b border-amber-200/40 dark:border-amber-800/40 pb-1.5">
+              <span className="text-muted-foreground">Buyer Intent:</span>
+              <span className="font-semibold">{interpretation.buyerIntent}</span>
+            </div>
+            <div className="flex justify-between border-b border-amber-200/40 dark:border-amber-800/40 pb-1.5">
               <span className="text-muted-foreground">Urgency Level:</span>
-              <span className="font-semibold capitalize">{interpretation.urgency}</span>
+              <span className="font-semibold">{interpretation.urgency}</span>
             </div>
             <div className="flex justify-between pt-0.5 items-center">
               <span className="text-muted-foreground">Statistical Confidence:</span>
