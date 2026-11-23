@@ -689,7 +689,6 @@ test("generic-advice signals name no concrete problem and never outrank concrete
     "Needs a three-step method covering common Windows errors.",
     "Wants a method for fixing common Excel issues.",
     "Needs the steps for handling common issues with Mac, Windows and Linux machines.",
-    "Needs a process for handling common payroll errors in QuickBooks.",
     "Common computer issues can be addressed with restarting, updating drivers and checking connections, but users do not know the order.",
   ];
   const concrete = [
@@ -708,6 +707,9 @@ test("generic-advice signals name no concrete problem and never outrank concrete
     "Needs the steps to fix common Windows update errors like 0x80070005.",
     "Blue screen on boot; needs the steps covering driver errors.",
     "Customers place an order but common checkout errors appear.",
+    "Common laptop issues need a method; the screen flickers.",
+    "Users want the steps for common battery issues; laptop dies quickly.",
+    "Needs a process for handling common payroll errors in QuickBooks.",
     "Computer restarts.",
     "Error message on start.",
     "Laptop overheats and shuts down under load; no other problem is mentioned.",
