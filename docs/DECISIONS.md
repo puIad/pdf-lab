@@ -512,3 +512,14 @@ are in git history (`README.md`, "History").
 - Question for user: "Show an honest 'no review text for these N listings' line and stop there, or
   also add a paid review source?"
 - Resolution: _resolved 2026-11-21_ by the owner: (c). Match the stored Reddit and YouTube signals to each market by topic and mine them for gaps, labelled as buyer discussion, not as reviews of these listings. Still show per market which listings have no review text. No paid review source.
+
+
+## DEC-019 — A word-and-regex rule for generic guidance signals, until a stored flag exists (#94, #99)
+
+- Date: 2026-11-23
+- Part: defects #94 and #99 (MVP gate: evidenced opportunities that only advertise generic troubleshooting steps outranked concrete ones)
+- Expected: an opportunity is created only from a signal whose analysed problem names a concrete problem, decided by something sturdier than a word list (for example a stored flag from extraction).
+- Found: stored analyses carry no usable field (`pdf_relevance` is 0.9 for a generic introduction), and a stored flag needs a migration and a changed extraction prompt, which the loop does not apply to the live database.
+- Options: (a) a wording rule at the one shared filter now (`isUndescribedProblem`): admission phrasings, a frame-word residue, and a method/order framing test with a word set built from the `pc troubleshooting` gate rows; no migration, tuned for one niche, can miss or over-drop elsewhere. (b) A stored "concrete problem" flag from extraction, owner-applied migration; sturdy, needs the owner. (c) Merge generic signals into one labelled "general guidance" opportunity ranked last; keeps the rows but still needs a classifier.
+- Recommendation: (a) now, (b) once a second niche shows generic rows.
+- Resolution: _resolved 2026-11-23_ by the loop under the orchestrator's instruction: (a) now, with `shortcut:` markers on `FRAME_WORDS` and `GUIDE_WORDS`. Follow-up #103 replaces the word rule with the stored flag.
