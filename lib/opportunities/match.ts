@@ -108,22 +108,50 @@ const UNDESCRIBED_PATTERNS = [
   new RegExp(`^\\W*(?:the\\s+)?(?:post|text|thread|comment|signal|listing|title|author|user)\\s+(?:does\\s+not|doesn['\u2019]t|did\\s+not|didn['\u2019]t)\\s+(?:say|state|name|specify|mention|describe)\\s+(?:${WHAT_IS}|(?:a|any)\\s+(?:${FILLER}\\s+)?${NOUN}\\b)${END}`, "i"),
 ];
 
-/**
- * True when extraction's problem text names no concrete problem, so the signal is not a problem to
- * build a PDF on, nor evidence for one (issues #88, #94). Two independent tests, either one is enough:
- * the analysis says so itself (the anchored phrasings above), or no content word is left once advice
- * vocabulary, vague qualifiers and generic niche nouns are removed ("guidance on troubleshooting
- * common computer problems"). Dropped once, in generate25Opportunities. A problem noun must precede
- * the verb, so "No clear guide exists for ..." stays a real problem, as does anything with a symptom
- * or a named task left over ("computer will not turn on", "Windows Reset or reinstall").
- */
 // Stock opening advice ("restart the device", "noting error messages"): generic as a phrase, though "restarts" or "error message" alone are symptoms.
 const STOCK_ADVICE = /\b(?:starting\s+with\s+)?restart(?:ing)?\s+the\s+device\b|\bnoting\s+(?:any\s+)?error\s+messages?\b|\bstarting\s+with\b/gi;
 
+// Guidance framing (issue #99): the need is a procedure (a method, steps, an order) ...
+const PROCEDURE = /\b(?:\w+-step|steps?|methods?|process|sequence|procedure|approach|routine)\b|\border\s+(?:of|to)\b|\b(?:know|right|correct|proper)\s+(?:the\s+)?order\b/i;
+// ... applied to a whole class of problems: "common issues", "covering ... errors", "startup, video and sound errors".
+const CLASS = String.raw`(?:problems?|issues?|errors?|faults?|failures?)`;
+const BROAD_SCOPE = new RegExp(
+  String.raw`\b(?:common|typical|various|general|everyday)\s+(?:[\w-]+\s+){0,2}${CLASS}\b|\bcover(?:s|ing)\b[^.;]*\b${CLASS}\b|\b[\w-]+,\s+[\w-]+,?\s+(?:and|or)\s+(?:[\w-]+\s+)?${CLASS}\b`,
+  "i",
+);
+// Words guidance rows are made of besides FRAME_WORDS: the procedure itself, counts, generic remedies, the generic error categories and platform names. Any other word may be a symptom, so it keeps the row.
+// shortcut: built from the gate rows of `pc troubleshooting` (DEC-019); replace with the stored flag.
+const GUIDE_WORDS = new Set(
+  tokens(
+    `method methods process sequence procedure approach routine order three two four five identify identifying test testing complete completing
+    address addressed check checking update updating driver drivers connection connections startup video sound application applications
+    restart restarting error errors but however known way follow following quickly easy handle handling fixing
+    windows mac macos linux excel word office android iphone ios machine machines`,
+  ),
+);
+// "users do not know the order" is a knowledge gap, not a symptom.
+const KNOWLEDGE_GAP = /\b(?:do|does|did)(?:\s+not|n['’]t)\s+(?:know|understand|have)\b|\b(?:unsure|unclear|unknown)\b/gi;
+// Something concrete named in the text: an error code, or a blue screen. A product or platform name alone ("Windows", "Excel") does not count: generic guidance names them too.
+const NAMED_THING = /0x[0-9a-f]+|\b[Ee]rror\s*(?:[Cc]ode\s+)?[a-z]?\d+|\b[Bb]lue\s+[Ss]creen\b|\b[Bb][Ss][Oo][Dd]\b/;
+
+/**
+ * True when extraction's problem text names no concrete problem, so the signal is not a problem to
+ * build a PDF on, nor evidence for one (issues #88, #94, #99). Three tests, any one is enough:
+ * the analysis says so itself (the anchored phrasings above); no content word is left once advice
+ * vocabulary, vague qualifiers and generic niche nouns are removed ("guidance on troubleshooting
+ * common computer problems"); or it is guidance framing: a procedure ("three-step method", "the
+ * order") for a broad class of problems with no symptom of its own ("covering startup, video, sound
+ * and application errors"). Dropped once, in generate25Opportunities. A problem noun must precede
+ * the verb, so "No clear guide exists for ..." stays a real problem, as does anything with a symptom
+ * or a named task left over ("computer will not turn on", "Windows Reset or reinstall").
+ */
 export function isUndescribedProblem(problem: string): boolean {
   if (UNDESCRIBED_PATTERNS.some((re) => re.test(problem))) return true;
   const words = tokens(problem.replace(STOCK_ADVICE, " ")).filter((t) => t.length > 1);
-  return words.length > 0 && words.every((t) => FRAME_WORDS.has(t));
+  if (words.length > 0 && words.every((t) => FRAME_WORDS.has(t))) return true;
+  if (!PROCEDURE.test(problem) || !BROAD_SCOPE.test(problem) || NAMED_THING.test(problem)) return false;
+  // Guidance framing alone is not enough: one word outside the generic set may be a symptom ("the screen flickers"), and the row stays.
+  return tokens(problem.replace(KNOWLEDGE_GAP, " ")).filter((t) => t.length > 1).every((t) => FRAME_WORDS.has(t) || GUIDE_WORDS.has(t));
 }
 
 /**

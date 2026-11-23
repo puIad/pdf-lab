@@ -543,6 +543,15 @@ test("Part 3.8: quick ideas join the Deep-run candidate pool", async (t) => {
     const evidenced = { ...idea, id: "e", opportunityScore: 12, evidence: [{ ...idea.evidence[0], claim: "Reddit post" }] };
     assert.equal(capIdeaOnlyScores([{ ...idea, opportunityScore: 70 }, evidenced])[0].opportunityScore, 11);
     assert.equal(capIdeaOnlyScores([{ ...idea, opportunityScore: 70 }])[0].opportunityScore, 70);
+    // issue #100: its confidence is capped at the lowest evidenced confidence too
+    const capped = capIdeaOnlyScores([{ ...idea, confidence: 1 }, { ...evidenced, confidence: 0.2 }, { ...evidenced, id: "f", confidence: 0.8 }]);
+    assert.equal(capped[0].confidence, 0.2);
+    // a well-covered run (evidenced at 1) still holds the phrase-only row below 100%, rows included
+    const full = capIdeaOnlyScores([{ ...idea, confidence: 1, evidence: idea.evidence.map((e) => ({ ...e, confidence: 1 })) }, { ...evidenced, confidence: 1 }])[0];
+    assert.equal(full.confidence, 0.35);
+    assert.ok(full.evidence.every((e) => e.confidence === 0.35));
+    assert.equal(capIdeaOnlyScores([{ ...idea, confidence: 1 }])[0].confidence, 0.35);
+    assert.deepEqual(capped.slice(1).map((c) => c.confidence), [0.2, 0.8]);
   });
 
   await t.test("ideas join the pool; the count is what the pool supports, all distinct, one traced to a phrase", async () => {
@@ -710,6 +719,12 @@ test("generic-advice signals name no concrete problem and never outrank concrete
     "Asks how to fix their PC's issues without saying what the issue is.",
     "The text introduces a step-by-step guide covering typical hardware and operating system problems encountered by technicians.",
     "Wants solutions to the top 30 desktop PC problems; no single fault is named.",
+    // Gate run 18522c17 (issue #99): a method or an order for a whole class of problems.
+    "They need the three-step method of identifying the problem, testing solutions and completing the process, covering startup, video, sound and application errors.",
+    "Needs a three-step method covering common Windows errors.",
+    "Wants a method for fixing common Excel issues.",
+    "Needs the steps for handling common issues with Mac, Windows and Linux machines.",
+    "Common computer issues can be addressed with restarting, updating drivers and checking connections, but users do not know the order.",
   ];
   const concrete = [
     "The user's computer will not turn on or boot, requiring step-by-step diagnostics.",
@@ -718,6 +733,18 @@ test("generic-advice signals name no concrete problem and never outrank concrete
     "Windows update fails with error 0x80070005.",
     "Seeks a checklist for onboarding new hires.",
     "No specific error code appears, but the laptop shuts down under load.",
+    "A builder made a free PC build troubleshooting flowchart because non-experts lack a way to diagnose build problems.",
+    "Needs a step-by-step method to fix a laptop that will not charge.",
+    "Wants a process for recovering common deleted files from a formatted SD card.",
+    "Does not know the order of the BIOS boot menu keys on a Dell, and the laptop will not boot.",
+    "Needs the steps; the laptop doesn't boot, covering common startup errors.",
+    "Needs the steps; the laptop isn't charging, covering common power issues.",
+    "Needs the steps to fix common Windows update errors like 0x80070005.",
+    "Blue screen on boot; needs the steps covering driver errors.",
+    "Customers place an order but common checkout errors appear.",
+    "Common laptop issues need a method; the screen flickers.",
+    "Users want the steps for common battery issues; laptop dies quickly.",
+    "Needs a process for handling common payroll errors in QuickBooks.",
     "Computer restarts.",
     "Error message on start.",
     "Laptop overheats and shuts down under load; no other problem is mentioned.",

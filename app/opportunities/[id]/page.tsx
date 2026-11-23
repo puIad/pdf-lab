@@ -112,7 +112,10 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   const gapRows = marketRows.filter(
     (e) => e.entity_type === "competition" && parseEvidenceClaim(e.claim).rawClaim.startsWith("Product gap"),
   );
-  const { intent: buyerIntent, urgency } = intentUrgencyLines(observeMarket(marketSignals));
+  const { intent: buyerIntent, urgency } = intentUrgencyLines(
+    observeMarket(marketSignals),
+    isIdeaOnly(directEvidence.map((e) => e.claim)),
+  );
   const platforms = platformCounts(competitors ?? []);
   const competitorTotal = platforms.reduce((n, p) => n + p.count, 0);
 
