@@ -108,7 +108,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ runId: string 
       embedding: null,
       prompt_version: PASTE_PROMPT_VERSION,
     }));
-    const { error: upsertErr } = await supabase.from("signal_analysis").upsert(rows, { onConflict: "signal_id" });
+    const { error: upsertErr } = rows.length ? await supabase.from("signal_analysis").upsert(rows, { onConflict: "signal_id" }) : { error: null }; // every signal already kept: nothing to save
     if (upsertErr) {
       await supabase.from("research_runs").update({ status: "classifying" }).eq("id", run.id); // nothing stored: the reply can be sent again
       throw new Error(`Failed to save the analyses: ${upsertErr.message}`);
