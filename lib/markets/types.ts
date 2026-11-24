@@ -17,6 +17,7 @@ export interface TopOpportunity {
   opportunity_score: number;
   confidence: number;
   format?: string | null;
+  format_basis?: string | null;
   target_audience?: string | null;
 }
 

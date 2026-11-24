@@ -105,6 +105,7 @@ create table opportunities (
   problem text,
   solution text,
   format text,                 -- checklist|guide|planner|workbook|template|...
+  format_basis text,           -- issue #87: set when format is suggested from competitor listings, not named by the wording
   price_range text,
   opportunity_score float,
   matching_signals int,        -- market signals that match this problem (Part 6.8); null = not counted

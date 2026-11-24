@@ -162,7 +162,7 @@ const one = <T>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? nul
 export async function loadOpportunityBriefInput(supabase: SupabaseClient, id: string): Promise<BriefInput> {
   const { data: opp, error } = await supabase
     .from("opportunities")
-    .select("id, market_id, title, target_audience, problem, solution, format, markets ( id, name )")
+    .select("id, market_id, title, target_audience, problem, solution, format, format_basis, markets ( id, name )")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`failed to load opportunity: ${error.message}`);
@@ -265,6 +265,7 @@ export async function loadOpportunityBriefInput(supabase: SupabaseClient, id: st
     source: { kind: "opportunity", id: opp.id },
     title: opp.title,
     format: FORMAT[opp.format] ?? "Guide",
+    formatBasis: opp.format && opp.format_basis ? (opp.format_basis as string) : null,
     mainPhrase,
     mainCites: related[0]?.cites ?? oppCites,
     promise: { text: opp.solution, cites: oppCites },

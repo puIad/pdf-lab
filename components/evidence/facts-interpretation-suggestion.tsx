@@ -135,8 +135,8 @@ export function FactsInterpretationSuggestion({
           <CardContent className="flex flex-col gap-2.5 text-xs text-foreground">
             <div className="flex justify-between border-b border-emerald-200/40 dark:border-emerald-800/40 pb-1.5">
               <span className="text-muted-foreground">Recommended Format:</span>
-              <Badge variant="secondary" className="capitalize text-[11px] font-medium">
-                {suggestion.format.replace("_", " ")}
+              <Badge variant="secondary" className="text-[11px] font-medium">
+                {suggestion.format}
               </Badge>
             </div>
             <div className="flex justify-between border-b border-emerald-200/40 dark:border-emerald-800/40 pb-1.5">

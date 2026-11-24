@@ -299,6 +299,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
         confidence: m.confidence,
         pdfFitScore: m.pdfFitScore,
         priceRange: m.priceRange ?? null,
+        formatShares: m.formatShares,
         signals: m.signals.map((s) => ({
           id: s.id,
           source_id: s.source_id,
@@ -343,6 +344,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
           problem: opp.problem,
           solution: opp.solution,
           format: opp.format,
+          formatBasis: opp.formatBasis,
           priceRange: opp.priceRange,
           opportunityScore: opp.opportunityScore,
           confidence: opp.confidence,
@@ -369,6 +371,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
             problem: opp.problem,
             solution: opp.solution,
             format: opp.format,
+            format_basis: opp.formatBasis ?? null,
             price_range: opp.priceRange ?? null,
             opportunity_score: opp.opportunityScore,
             confidence: opp.confidence,

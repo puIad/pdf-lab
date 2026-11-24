@@ -37,6 +37,7 @@ import { NOT_OBSERVED, intentUrgencyLines, loadMarketReportSignals, observeMarke
 import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
 import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
 import { ideaOnlyNote, isIdeaOnly } from "@/lib/opportunities/from-ideas";
+import { formatBadge } from "@/lib/opportunities/format";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   const { data: opp, error: oppErr } = await supabase
     .from("opportunities")
     .select(`
-      id, market_id, title, target_audience, problem, solution, format,
+      id, market_id, title, target_audience, problem, solution, format, format_basis,
       price_range, opportunity_score, confidence, created_at, matching_signals, market_signal_count,
       markets (
         id, run_id, name, trend, demand_score, pdf_fit_score
@@ -100,7 +101,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
 
   const score = typeof opp.opportunity_score === "number" ? Math.round(opp.opportunity_score) : null;
   const confPct = Math.round(opp.confidence * 100);
-  const formatLabel = opp.format ? opp.format.replace("_", " ") : NOT_OBSERVED;
+  const formatLabel = formatBadge(opp.format, opp.format_basis) ?? NOT_OBSERVED;
   const priceRange = opp.price_range || NOT_OBSERVED;
   const trend = market?.trend || "unknown";
 
@@ -162,9 +163,9 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
             <Badge variant="outline" className="font-mono text-xs uppercase tracking-wide">
               Product Opportunity Spec
             </Badge>
-            <Badge variant="secondary" className="capitalize text-xs font-semibold bg-primary/10 text-primary">
+            <Badge variant="secondary" className="text-xs font-semibold bg-primary/10 text-primary">
               <FileText className="mr-1 size-3" />
-              Format: {formatLabel}
+              Format: {formatBadge(opp.format, opp.format_basis) ?? NOT_OBSERVED}
             </Badge>
             <Badge variant="outline" className="font-mono text-xs">
               <DollarSign className="mr-0.5 size-3 text-emerald-500" />
@@ -299,8 +300,8 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
           </CardHeader>
           <CardContent className="text-xs leading-relaxed text-muted-foreground flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="outline" className="capitalize text-xs font-semibold">
-                Format: {formatLabel}
+              <Badge variant="outline" className="text-xs font-semibold">
+                Format: {formatBadge(opp.format, opp.format_basis) ?? NOT_OBSERVED}
               </Badge>
               <Badge variant="secondary" className="text-xs">
                 Suggestion, not an observation
@@ -443,7 +444,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
               sampleSizeNote: `Calculated from ${directEvidence.length} evidence rows`,
             }}
             suggestion={{
-              format: opp.format || NOT_OBSERVED,
+              format: formatLabel,
               mechanism: opp.solution || NOT_OBSERVED,
               outcome: NOT_OBSERVED,
               priceRange,

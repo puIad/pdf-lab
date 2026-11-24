@@ -1,6 +1,7 @@
 // lib/opportunities/types.ts — Opportunity generation types and diversification constraints.
 // Normative specs: PRD §18, §28–§29; docs/PIPELINE-SCORING.md; docs/EVIDENCE-CONTRACT.md.
 
+import type { LandscapeShare } from "../competition/types.ts";
 import type { EvidenceInput } from "../evidence/types.ts";
 
 export const OPPORTUNITY_PROMPT_VERSION = "2026-11-10.1";
@@ -58,6 +59,8 @@ export interface OpportunityMarketInput {
   pdfFitScore?: number;
   /** Observed paid price range of this market's stored competitors (`observedPriceRange`); null = not observed. */
   priceRange?: string | null;
+  /** Format breakdown of this market's stored competitor listings (`calculateLandscape`); empty = none observed. */
+  formatShares?: LandscapeShare[];
   signals: OpportunitySignalInput[];
 }
 
@@ -68,8 +71,10 @@ export interface GeneratedOpportunity {
   targetAudience: string;
   problem: string;
   solution: string;
-  /** The format the wording names, or null when it names none ("Not observed"). */
+  /** The format the wording names, or the market's most common competitor format when `formatBasis` says so; null = "Not observed". */
   format: OpportunityFormat | null;
+  /** Why `format` is stated when the wording names none ("suggested from 3 of 9 competitor listings"); null otherwise. */
+  formatBasis: string | null;
   /** Observed competitor price range, or null ("Not observed"). Never a format default. */
   priceRange: string | null;
   /** AI interpretation when a model supplied it, else null. */
@@ -100,6 +105,7 @@ export interface OpportunityRow {
   problem: string;
   solution: string;
   format: string | null;
+  format_basis?: string | null;
   price_range: string | null;
   opportunity_score: number;
   confidence: number;

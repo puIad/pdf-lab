@@ -134,6 +134,7 @@ export function ideaCandidates(
       problem: idea.phrase,
       solution: `A ${format.replace("_", " ")} that answers "${idea.phrase}" directly.`,
       format,
+      formatBasis: null,
       priceRange: market.priceRange ?? null,
       sophistication: null,
       mechanism: null,

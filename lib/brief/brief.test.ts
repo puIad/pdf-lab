@@ -9,6 +9,7 @@ import { briefBlocks, plainText } from "./blocks.ts";
 import { noteEvidence, noteValidator, writeBriefNote } from "./notes.ts";
 import { generateBriefDocx, generateBriefMarkdown } from "../export/brief.ts";
 import { docxParagraphs } from "./brief.test-helpers.ts";
+import { suggestedLabel } from "../opportunities/format.ts";
 import type { AIRouter } from "../ai/router.ts";
 
 const c = (id: string, source = "web") => ({ id, source, url: `https://example.com/${id}` });
@@ -229,5 +230,12 @@ describe("verbatim", () => {
     assert.equal(verbatim("My budget never works out. Then I gave up."), "My budget never works out.");
     const v = verbatim("word ".repeat(80));
     assert.ok(v.length <= 221 && v.endsWith("…"));
+  });
+});
+
+describe("brief format label", () => {
+  it("marks a suggested format on the brief page, and leaves a named format alone", () => {
+    assert.equal(suggestedLabel("planner", "suggested from 3 of 9 competitor listings"), "planner · suggested");
+    assert.equal(suggestedLabel("checklist", null), "checklist");
   });
 });

@@ -100,7 +100,7 @@ export async function fetchMarketsData(
   // 2. Fetch opportunities
   const { data: oppsData } = await supabase
     .from("opportunities")
-    .select("id, market_id, title, opportunity_score, confidence, format, target_audience")
+    .select("id, market_id, title, opportunity_score, confidence, format, format_basis, target_audience")
     .in("market_id", marketIds)
     .order("opportunity_score", { ascending: false });
 
@@ -120,6 +120,7 @@ export async function fetchMarketsData(
       opportunity_score: typeof opp.opportunity_score === "number" ? opp.opportunity_score : 0,
       confidence: typeof opp.confidence === "number" ? opp.confidence : 0,
       format: (opp.format as string) || null,
+      format_basis: (opp.format_basis as string) || null,
       target_audience: (opp.target_audience as string) || null,
     });
     oppIdsByMarket[mId].add(opp.id as string);
