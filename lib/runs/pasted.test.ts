@@ -19,6 +19,7 @@ const item = (n: number, market: string, extra: Record<string, unknown> = {}) =>
   intent: "strong",
   urgency: "medium",
   pdf_relevance: 0.7,
+  names_problem: true,
   market,
   ...extra,
 });
@@ -215,5 +216,15 @@ describe("a run in two requests", () => {
     const summary = await executeResearchRun({ query: "budgeting" }, deps(state));
     assert.equal(summary.status, "completed", summary.error ?? "");
     assert.deepEqual(summary.trace.map((t) => t.state).slice(0, 4), ["queued", "collecting", "normalizing", "classifying"]);
+  });
+});
+
+describe("a reply without the names_problem flag (issue #103)", () => {
+  it("lists the item as wrong, so it is never stored as a row without the flag", () => {
+    const noFlag: Record<string, unknown> = item(1, "Budget basics");
+    delete noFlag.names_problem;
+    const parsed = parsePastedReply(JSON.stringify({ items: [noFlag] }), 1);
+    assert.equal(parsed.items.size, 0);
+    assert.match(parsed.problems[0].reason, /names_problem/);
   });
 });

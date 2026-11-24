@@ -712,7 +712,7 @@ test("extraction stores whether a signal names a concrete problem, and the filte
   const base = { audience: "PC users", intent: "strong", urgency: "low", pdf_relevance: 0.5 };
   assert.equal(validateExtraction({ ...base, problem: "x", names_problem: false }).names_problem, false);
   assert.equal(validateExtraction({ ...base, problem: "x", names_problem: true }).names_problem, true);
-  assert.equal(validateExtraction({ ...base, problem: "x" }).names_problem, null);
+  assert.throws(() => validateExtraction({ ...base, problem: "x" }), /names_problem/);
   assert.throws(() => validateExtraction({ ...base, problem: "x", names_problem: "yes" }), /names_problem/);
 
   // The flag decides, whatever the wording: every gate phrase, in both niches.

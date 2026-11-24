@@ -31,8 +31,8 @@ export interface ExtractionResult {
   intent: IntentValue;
   urgency: UrgencyValue;
   pdf_relevance: number;
-  /** true: the text names a concrete problem; false: generic guidance, a definition or a forum blurb. null: not recorded (analysed before issue #103). */
-  names_problem: boolean | null;
+  /** true: the text names a concrete problem; false: generic guidance, a definition or a forum blurb. Always set by a new analysis; rows stored before issue #103 read back as null. */
+  names_problem: boolean;
 }
 
 /** One input signal — must come from the `signals` table (route enforces). */
@@ -114,10 +114,10 @@ export function validateExtraction(raw: unknown): ExtractionResult {
     throw new Error(`extraction.pdf_relevance must be a number 0..1 (got ${JSON.stringify(o.pdf_relevance)?.slice(0, 40)})`);
   }
   const flag = o.names_problem;
-  if (flag !== undefined && typeof flag !== "boolean") {
+  if (typeof flag !== "boolean") {
     throw new Error(`extraction.names_problem must be true or false (got ${JSON.stringify(flag)?.slice(0, 40)})`);
   }
-  const namesProblem = flag ?? null;
+  const namesProblem = flag;
   return {
     audience,
     problem,
