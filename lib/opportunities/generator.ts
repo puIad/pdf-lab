@@ -12,7 +12,7 @@ import {
   enforceRule5_SeparationOfConcerns,
   sourcedEvidenceCount,
 } from "../evidence/qc.ts";
-import { commonWords, isUndescribedProblem, matchSignals, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
+import { commonWords, matchSignals, namesNoProblem, MIN_TOKEN_MATCH, problemOverlap, type SignalMatch } from "./match.ts";
 import { jaccard, matchFormat, tokens } from "../ideas/ideas.ts";
 import { IDEA_FORMAT_MAP, isIdeaOnly } from "./from-ideas.ts";
 import {
@@ -162,9 +162,9 @@ export function observedPriceRange(prices: Array<string | null | undefined>): st
 }
 
 /** `pain_point` only when extraction found a problem on the signal; otherwise the source's own type. */
-export function evidenceSignalType(sig: { source_type?: string; analysis?: { problem?: string | null } | null }): string {
+export function evidenceSignalType(sig: { source_type?: string; analysis?: OpportunitySignalInput["analysis"] }): string {
   const problem = sig.analysis?.problem?.trim();
-  return problem && !isUndescribedProblem(problem) ? "pain_point" : sig.source_type || "general";
+  return problem && !namesNoProblem(sig.analysis) ? "pain_point" : sig.source_type || "general";
 }
 
 function signalEvidence(
@@ -452,7 +452,7 @@ export async function generate25Opportunities(
 ): Promise<GenerationResult> {
   // The one place a signal whose analysed problem names no concrete problem (issues #88, #94) is dropped:
   // pool, model input, own signals, evidence and demand counts below only ever see described ones.
-  const markets = allMarkets.map((m) => ({ ...m, signals: m.signals.filter((s) => !isUndescribedProblem(s.analysis?.problem?.trim() ?? "")) }));
+  const markets = allMarkets.map((m) => ({ ...m, signals: m.signals.filter((s) => !namesNoProblem(s.analysis)) }));
   const targetCount = options.targetCount ?? OPPORTUNITY_TARGET;
   const promptVersion = options.promptVersion ?? OPPORTUNITY_PROMPT_VERSION;
 

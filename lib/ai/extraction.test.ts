@@ -19,6 +19,7 @@ const GOOD = {
   intent: "strong",
   urgency: "high",
   pdf_relevance: 0.9,
+  names_problem: true,
 };
 
 describe("validateExtraction", () => {
@@ -244,7 +245,7 @@ describe("batched extraction (Part 6.9)", () => {
     assert.equal(job.succeeded, 6);
     assert.equal(job.failed, 1);
     assert.equal(log.batch, 2);
-    assert.equal(job.promptVersion, "extract-v2-batch");
+    assert.equal(job.promptVersion, "extract-v3-batch");
   });
 
   it("validateBatchExtraction reads each item on its own", () => {

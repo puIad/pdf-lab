@@ -70,6 +70,7 @@ create table signal_analysis (
   intent text,                 -- weak|medium|strong|very_strong (+ raw label)
   urgency text,                -- low|medium|high
   pdf_relevance float,         -- 0..1
+  names_problem boolean,       -- extraction: the text names a concrete problem (issue #103, migration 20261124000021); null = analysed before the flag, analysed again by the next run
   prompt_version text,         -- extraction prompt that wrote the row (Part 6.9); null = extract-v1
   embedding vector(1536)       -- ADJUST to chosen embedding model; migration if changed
 );

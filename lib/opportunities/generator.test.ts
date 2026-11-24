@@ -19,7 +19,9 @@ import { enforceRule1_OpportunityEvidence, QCViolationError } from "../evidence/
 import { buildIdeas } from "../ideas/ideas.ts";
 import { capIdeaOnlyScores } from "./generator.ts";
 import { marketFor } from "./from-ideas.ts";
-import { isUndescribedProblem } from "./match.ts";
+import { namesNoProblem } from "./match.ts";
+import { needsAnalysis } from "../runs/orchestrator.ts";
+import { validateExtraction } from "../ai/extraction.ts";
 
 function createMockMarkets(): OpportunityMarketInput[] {
   return [
@@ -623,6 +625,8 @@ test("mergeSharedProblems folds one audience and problem across markets and form
 });
 
 test("a signal whose analysed problem says none is described yields no opportunity (issue #88)", async () => {
+  // Rows stored before the flag (names_problem null) fall back to the problem text itself.
+  const isUndescribedProblem = (problem: string) => namesNoProblem({ problem, names_problem: null });
   assert.equal(isUndescribedProblem("No specific PC fault is described; the text only advertises guidance."), true);
   assert.equal(isUndescribedProblem("No PC problem is evidenced; the text is a rig-building subreddit."), true);
   assert.equal(isUndescribedProblem("Users need to restart and update drivers."), false);
@@ -682,6 +686,27 @@ test("a signal whose analysed problem says none is described yields no opportuni
   assert.equal(viaModel.opportunities.some((o) => o.title === "Basic guide"), false);
 });
 
+// Real analysed problems of the gate runs: pc troubleshooting 6c798623, 18522c17, c664724c and home budgeting 10c97b05.
+const GENERIC_GATE = [
+  "The user needs guidance on troubleshooting common computer problems, starting with restarting the device and noting error messages.",
+  "Desktop PC users need repair instructions, manuals, schematics, and DIY troubleshooting resources.",
+  "Looks for simple fixes for common PC issues; no specific fault is named.",
+  "Asks how to fix their PC's issues without saying what the issue is.",
+  "The text introduces a step-by-step guide covering typical hardware and operating system problems encountered by technicians.",
+  "They need the three-step method of identifying the problem, testing solutions and completing the process, covering startup, video, sound and application errors.",
+  "Common computer issues can be addressed with restarting, updating drivers and checking connections, but users do not know the order.",
+  "Wants step-by-step guidance to diagnose and fix common computer problems",
+  "need to write down how much money they make and how they spend it each month",
+  "seeking a framework or rule of thumb for allocating after-tax income across needs, wants, and savings",
+];
+const CONCRETE_GATE = [
+  "The user's computer will not turn on or boot, requiring step-by-step diagnostics.",
+  "The user needs instructions on performing Windows repair, Reset, Refresh, or reinstalling the Windows OS for common troubleshooting.",
+  "A builder made a free PC build troubleshooting flowchart because non-experts lack a way to diagnose build problems.",
+  "A video tutorial covers a new PC build that has no power",
+  "Computer restarts.",
+  "Error message on start.",
+];
 
 test("a format the wording does not name is suggested from the market's competitor listings (issue #87)", async () => {
   const { suggestFormat } = await import("./generator.ts");
@@ -709,58 +734,42 @@ test("a format the wording does not name is suggested from the market's competit
   assert.equal(without.opportunities[0].formatBasis, null);
 });
 
-test("generic-advice signals name no concrete problem and never outrank concrete ones (issue #94)", async () => {
-  // Real analysed problems of gate run 6c798623 (`pc troubleshooting`).
-  const generic = [
-    "The user needs guidance on troubleshooting common computer problems, starting with restarting the device and noting error messages.",
-    "Desktop PC users need repair instructions, manuals, schematics, and DIY troubleshooting resources.",
-    "No specific PC fault is described; the text only advertises basic troubleshooting guidance for common desktop problems.",
-    "Looks for simple fixes for common PC issues; no specific fault is named.",
-    "Asks how to fix their PC's issues without saying what the issue is.",
-    "The text introduces a step-by-step guide covering typical hardware and operating system problems encountered by technicians.",
-    "Wants solutions to the top 30 desktop PC problems; no single fault is named.",
-    // Gate run 18522c17 (issue #99): a method or an order for a whole class of problems.
-    "They need the three-step method of identifying the problem, testing solutions and completing the process, covering startup, video, sound and application errors.",
-    "Needs a three-step method covering common Windows errors.",
-    "Wants a method for fixing common Excel issues.",
-    "Needs the steps for handling common issues with Mac, Windows and Linux machines.",
-    "Common computer issues can be addressed with restarting, updating drivers and checking connections, but users do not know the order.",
-  ];
-  const concrete = [
-    "The user's computer will not turn on or boot, requiring step-by-step diagnostics.",
-    "The user needs instructions on performing Windows repair, Reset, Refresh, or reinstalling the Windows OS for common troubleshooting.",
-    "Laptop overheats and shuts down under load.",
-    "Windows update fails with error 0x80070005.",
-    "Seeks a checklist for onboarding new hires.",
-    "No specific error code appears, but the laptop shuts down under load.",
-    "A builder made a free PC build troubleshooting flowchart because non-experts lack a way to diagnose build problems.",
-    "Needs a step-by-step method to fix a laptop that will not charge.",
-    "Wants a process for recovering common deleted files from a formatted SD card.",
-    "Does not know the order of the BIOS boot menu keys on a Dell, and the laptop will not boot.",
-    "Needs the steps; the laptop doesn't boot, covering common startup errors.",
-    "Needs the steps; the laptop isn't charging, covering common power issues.",
-    "Needs the steps to fix common Windows update errors like 0x80070005.",
-    "Blue screen on boot; needs the steps covering driver errors.",
-    "Customers place an order but common checkout errors appear.",
-    "Common laptop issues need a method; the screen flickers.",
-    "Users want the steps for common battery issues; laptop dies quickly.",
-    "Needs a process for handling common payroll errors in QuickBooks.",
-    "Computer restarts.",
-    "Error message on start.",
-    "Laptop overheats and shuts down under load; no other problem is mentioned.",
-    "Wants to fix BSOD 0x0000007E without saying which driver.",
-  ];
-  for (const p of generic) assert.equal(isUndescribedProblem(p), true, p);
-  for (const p of concrete) assert.equal(isUndescribedProblem(p), false, p);
+test("extraction stores whether a signal names a concrete problem, and the filter reads it (issue #103)", async () => {
+  const base = { audience: "PC users", intent: "strong", urgency: "low", pdf_relevance: 0.5 };
+  assert.equal(validateExtraction({ ...base, problem: "x", names_problem: false }).names_problem, false);
+  assert.equal(validateExtraction({ ...base, problem: "x", names_problem: true }).names_problem, true);
+  assert.throws(() => validateExtraction({ ...base, problem: "x" }), /names_problem/);
+  assert.throws(() => validateExtraction({ ...base, problem: "x", names_problem: "yes" }), /names_problem/);
 
-  const sig = (id: string, problem: string) => ({
+  // The flag decides, whatever the wording: every gate phrase, in both niches.
+  for (const problem of GENERIC_GATE) assert.equal(namesNoProblem({ problem, names_problem: false }), true, problem);
+  for (const problem of CONCRETE_GATE) assert.equal(namesNoProblem({ problem, names_problem: true }), false, problem);
+  // A flagged-true row is kept even if its text mentions a missing detail.
+  assert.equal(namesNoProblem({ problem: "No specific fault is named by the maker, but the fan grinds.", names_problem: true }), false);
+  // Fallback for rows stored before the flag: only an outright admission is dropped; the text is not guessed at.
+  assert.equal(namesNoProblem({ problem: GENERIC_GATE[7], names_problem: null }), false);
+  assert.equal(namesNoProblem({ problem: GENERIC_GATE[2], names_problem: null }), true);
+  assert.equal(namesNoProblem({ problem: GENERIC_GATE[7] }), false);
+  assert.equal(namesNoProblem(null), false);
+  // A row with no flag is analysed again; a flagged one and a missing flag in a fixture are not.
+  assert.equal(needsAnalysis({ analysis: { names_problem: null } }), true);
+  assert.equal(needsAnalysis({ analysis: null }), true);
+  assert.equal(needsAnalysis({ analysis: { names_problem: false } }), false);
+  assert.equal(needsAnalysis({ analysis: {} }), false);
+
+  const sig = (id: string, problem: string, flag: boolean) => ({
     id, source_id: `s${id}`, source_type: "reddit", title: id, content: id, url: `https://x/${id}`, published_at: "2026-10-20T12:00:00Z",
-    analysis: { audience: "PC users", problem, intent: "strong", urgency: null, pdf_relevance: 0.8 },
+    analysis: { audience: "PC users", problem, intent: "strong", urgency: null, pdf_relevance: 0.8, names_problem: flag },
     embedding: null,
   });
-  // The generic signals share the big market (higher demand), as in the gate run.
-  const big = { id: "m1", name: "Basic PC troubleshooting steps", demandScore: 80, confidence: 0.9, signals: generic.map((p, i) => sig(`g${i}`, p)) };
-  const small = { id: "m2", name: "PC won't power on", demandScore: 30, confidence: 0.5, signals: [sig("c0", concrete[0])] };
+  // The generic signals sit in the bigger market, as in the gate runs: they must never outrank or replace concrete ones.
+  const big = { id: "m1", name: "Basic steps", demandScore: 80, confidence: 0.9, signals: GENERIC_GATE.map((p, i) => sig(`g${i}`, p, false)) };
+  const small = { id: "m2", name: "PC won't power on", demandScore: 30, confidence: 0.5, signals: [sig("c0", CONCRETE_GATE[0], true)] };
   const res = await generate25Opportunities([big, small]);
-  assert.deepEqual(res.opportunities.map((o) => o.problem), [concrete[0]]);
+  assert.deepEqual(res.opportunities.map((o) => o.problem), [CONCRETE_GATE[0]]);
+  // The same stored wording gets the same answer in every market (issue #104).
+  const other = { id: "m3", name: "Wi-Fi", demandScore: 10, confidence: 0.5, signals: [sig("w0", GENERIC_GATE[7], false)] };
+  assert.equal((await generate25Opportunities([big, small, other])).opportunities.length, 1);
+  assert.equal(evidenceSignalType({ source_type: "web", analysis: { problem: GENERIC_GATE[7], names_problem: false } }), "web");
+  assert.equal(evidenceSignalType({ source_type: "web", analysis: { problem: CONCRETE_GATE[4], names_problem: true } }), "pain_point");
 });

@@ -53,7 +53,7 @@ export async function POST(req: Request) {
         signals (
           id, source_id, title, content, url, published_at,
           signal_analysis (
-            audience, problem, intent, urgency, pdf_relevance
+            audience, problem, intent, urgency, pdf_relevance, names_problem
           )
         )
       )
@@ -105,6 +105,7 @@ export async function POST(req: Request) {
               intent: sa.intent,
               urgency: sa.urgency,
               pdf_relevance: sa.pdf_relevance,
+              names_problem: sa.names_problem ?? null,
             } : null,
           });
         }

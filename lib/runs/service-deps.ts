@@ -315,6 +315,7 @@ export function createServerOrchestratorDeps(options: ServerDepsOptions = {}): O
             intent: s.analysis.intent,
             urgency: s.analysis.urgency,
             pdf_relevance: s.analysis.pdf_relevance,
+            names_problem: s.analysis.names_problem ?? null,
           } : null,
         })),
       }));
