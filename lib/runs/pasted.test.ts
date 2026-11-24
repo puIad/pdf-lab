@@ -44,7 +44,7 @@ describe("prompt for the chat model", () => {
 
   it("shows the model only stored text, capped per signal", () => {
     const prompt = buildPastePrompt("budgeting", promptSignals([{ id: "a", title: "T", content: "x".repeat(5000) }]));
-    assert.ok(prompt.length < 3500);
+    assert.ok(prompt.length < 4000);
     assert.doesNotMatch(prompt, /https?:\/\//); // no urls, ids or scores leak into the prompt
   });
 });

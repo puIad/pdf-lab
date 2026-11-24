@@ -114,6 +114,8 @@ export interface StoredSignalForRun {
     intent: string;
     urgency: string;
     pdf_relevance: number;
+    /** null: analysed before the flag existed (issue #103), so the signal is analysed again. */
+    names_problem?: boolean | null;
     embedding: number[] | null;
   } | null;
 }
@@ -702,6 +704,10 @@ function extractWithTimeout(signals: StoredSignalForRun[], deps: OrchestratorDep
   );
 }
 
+/** A signal with no analysis, or one stored before the names-a-problem flag existed (issue #103), still needs one. */
+export const needsAnalysis = (s: { analysis?: { names_problem?: boolean | null } | null }): boolean =>
+  !s.analysis || s.analysis.names_problem === null;
+
 /** A Deep run in one request: collect, extract with the AIRouter, analyse, report. */
 export async function executeResearchRun(
   options: ResearchRunOptions,
@@ -711,7 +717,7 @@ export async function executeResearchRun(
   let extraction: ExtractionCounts = { failed: 0, calls: 0 };
   try {
     const { signals } = await collectSignals(frame, options, deps, tracker, "Analyzing signals with AIRouter for intent, urgency, and PDF relevance");
-    const unanalyzedSignals = signals.filter((s) => !s.analysis);
+    const unanalyzedSignals = signals.filter(needsAnalysis);
     if (unanalyzedSignals.length > 0) {
       extraction = await extractWithTimeout(unanalyzedSignals, deps);
     }
@@ -740,7 +746,7 @@ export async function collectRunStep(
   try {
     const { signals } = await collectSignals(frame, options, deps, tracker, "Analyzing signals with AIRouter for intent, urgency, and PDF relevance");
     await deps.recordRunWork?.(frame.runId, { activeMs: activeMsOf(tracker) }).catch(() => undefined);
-    return { failed: null, pendingIds: signals.filter((s) => !s.analysis).map((s) => s.id), signals: signals.length };
+    return { failed: null, pendingIds: signals.filter(needsAnalysis).map((s) => s.id), signals: signals.length };
   } catch (err) {
     return { failed: await failRun(frame, deps, tracker, err, 0), pendingIds: [], signals: 0 };
   }
@@ -756,7 +762,7 @@ export async function extractRunStep(
   const started = Date.now();
   try {
     const wanted = new Set(ids);
-    const todo = (await deps.getSignals(frame.runId)).filter((s) => wanted.has(s.id) && !s.analysis);
+    const todo = (await deps.getSignals(frame.runId)).filter((s) => wanted.has(s.id) && needsAnalysis(s));
     if (todo.length === 0) return { failed: null, failures: 0, calls: 0 };
     const res = await extractWithTimeout(todo, deps);
     await deps.recordRunWork?.(frame.runId, { activeMs: Date.now() - started }).catch(() => undefined);

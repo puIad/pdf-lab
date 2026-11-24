@@ -17,7 +17,7 @@ import { summarizeCostLog } from "./types.ts";
 import type { CostLogSummary } from "./types.ts";
 
 /** Prompt version — bump + record when wording changes (AI-ROUTER). */
-export const EXTRACTION_PROMPT_VERSION = "extract-v2-batch";
+export const EXTRACTION_PROMPT_VERSION = "extract-v3-batch";
 
 export const INTENT_VALUES = ["weak", "medium", "strong", "very_strong"] as const;
 export type IntentValue = (typeof INTENT_VALUES)[number];
@@ -31,6 +31,8 @@ export interface ExtractionResult {
   intent: IntentValue;
   urgency: UrgencyValue;
   pdf_relevance: number;
+  /** true: the text names a concrete problem; false: generic guidance, a definition or a forum blurb. null: not recorded (analysed before issue #103). */
+  names_problem: boolean | null;
 }
 
 /** One input signal — must come from the `signals` table (route enforces). */
@@ -111,12 +113,18 @@ export function validateExtraction(raw: unknown): ExtractionResult {
   if (typeof rel !== "number" || !Number.isFinite(rel) || rel < 0 || rel > 1) {
     throw new Error(`extraction.pdf_relevance must be a number 0..1 (got ${JSON.stringify(o.pdf_relevance)?.slice(0, 40)})`);
   }
+  const flag = o.names_problem;
+  if (flag !== undefined && typeof flag !== "boolean") {
+    throw new Error(`extraction.names_problem must be true or false (got ${JSON.stringify(flag)?.slice(0, 40)})`);
+  }
+  const namesProblem = flag ?? null;
   return {
     audience,
     problem,
     intent: intentRaw as IntentValue,
     urgency: urgencyRaw as UrgencyValue,
     pdf_relevance: rel,
+    names_problem: namesProblem,
   };
 }
 
@@ -128,7 +136,8 @@ export const FIELD_RULES = `- "audience": who has this problem (short noun phras
   - "strong": explicit request for a solution, recommendation, or fix ("I need", "what should I use", "how do I fix", "help please").
   - "very_strong": explicit need PLUS buying/payment language, urgency, or commissioning ("willing to pay", "looking to buy", "need ASAP", hiring someone).
 - "urgency": "low" (no time pressure) | "medium" (wants it resolved soon, recurring annoyance) | "high" (blocked, deadline, data loss, can't work).
-- "pdf_relevance": 0..1 — how well a STATIC PDF (checklist, guide, planner, template, workbook, cheat-sheet, tracker) could solve this. Score HIGH for procedural/learnable problems; score LOW for physical repair, realtime/interactive needs, human services, or complex software.`;
+- "pdf_relevance": 0..1 — how well a STATIC PDF (checklist, guide, planner, template, workbook, cheat-sheet, tracker) could solve this. Score HIGH for procedural/learnable problems; score LOW for physical repair, realtime/interactive needs, human services, or complex software.
+- "names_problem": true or false. true ONLY when the text names a concrete problem someone has (a specific fault, symptom, task or situation). false when it only advertises or summarises generic guidance (steps, methods, tips, "common problems"), defines a term, describes a forum, or states no problem at all.`;
 
 export const GROUNDING_RULE = `Rules: use ONLY the provided text — never invent details, never restate the task. If the text is thin, say what IS evidenced and choose weak/low with pdf_relevance near 0.`;
 

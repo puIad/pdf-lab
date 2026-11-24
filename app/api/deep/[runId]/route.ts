@@ -6,7 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
-import { MIN_ANALYZED_SHARE } from "@/lib/runs/orchestrator";
+import { MIN_ANALYZED_SHARE, needsAnalysis } from "@/lib/runs/orchestrator";
 import { startFinishRun } from "@/lib/runs/start-deep";
 import { marketKey, NO_MARKET, parsePastedReply, PASTE_PROMPT_VERSION } from "@/lib/runs/pasted";
 import { loadPastedRun, pastedRunState } from "@/lib/runs/pasted-run";
@@ -69,7 +69,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ runId: string 
     const noMarket = [...items.values()].filter((i) => marketKey(i.market) === NO_MARKET).length;
     // A signal an earlier run analysed keeps that analysis and its embedding, as it does in a model
     // run; the reply still names its market (issue #40).
-    const kept = [...items.keys()].filter((n) => signals[n - 1].analysis).length;
+    // One stored before the names-a-problem flag existed (issue #103) is analysed again by the reply.
+    const isKept = (n: number) => !needsAnalysis(signals[n - 1]);
+    const kept = [...items.keys()].filter(isKept).length;
     const counts = { analysed: items.size, total: signals.length, noMarket, kept, problems, missing };
 
     // Too little to report on: nothing is stored and the run keeps waiting, so the user can paste again.
@@ -95,17 +97,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ runId: string 
       return NextResponse.json({ error: "This run already has a reply. Open its progress instead." }, { status: 409 });
     }
 
-    const rows = [...items.entries()].map(([n, item]) => ({
+    const rows = [...items.entries()].filter(([n]) => !isKept(n)).map(([n, item]) => ({
       signal_id: signals[n - 1].id,
       audience: item.audience,
       problem: item.problem,
       intent: item.intent,
       urgency: item.urgency,
       pdf_relevance: item.pdf_relevance,
+      names_problem: item.names_problem,
       embedding: null,
       prompt_version: PASTE_PROMPT_VERSION,
     }));
-    const { error: upsertErr } = await supabase.from("signal_analysis").upsert(rows, { onConflict: "signal_id", ignoreDuplicates: true });
+    const { error: upsertErr } = await supabase.from("signal_analysis").upsert(rows, { onConflict: "signal_id" });
     if (upsertErr) {
       await supabase.from("research_runs").update({ status: "classifying" }).eq("id", run.id); // nothing stored: the reply can be sent again
       throw new Error(`Failed to save the analyses: ${upsertErr.message}`);

@@ -7,7 +7,7 @@
 import { FIELD_RULES, GROUNDING_RULE, validateExtraction, type ExtractionResult } from "../ai/extraction.ts";
 import { extractJsonSlice } from "../ai/router.ts";
 
-export const PASTE_PROMPT_VERSION = "extract-v3-paste";
+export const PASTE_PROMPT_VERSION = "extract-v4-paste";
 /** Characters of one signal's text in the prompt. */
 const PASTE_TEXT = 1000;
 const MAX_MARKET_NAME = 80;

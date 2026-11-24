@@ -43,6 +43,8 @@ export interface OpportunitySignalInput {
     intent?: string | null;
     urgency?: string | null;
     pdf_relevance?: number | null;
+    /** Stored extraction flag (issue #103): false = no concrete problem; null or absent = analysed before the flag. */
+    names_problem?: boolean | null;
   } | null;
 }
 

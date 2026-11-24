@@ -68,6 +68,7 @@ interface AnalysisRow {
   intent: string;
   urgency: string;
   pdf_relevance: number;
+  names_problem: boolean | null;
   embedding: unknown;
 }
 interface SignalRow {
@@ -90,7 +91,7 @@ export async function loadRunSignals(supabase: SupabaseClient, runId: string): P
     const { data, error } = await supabase
       .from("run_signals")
       .select(
-        "signal_id, signals ( id, title, content, url, source_id, external_id, published_at, engagement, sources ( type ), signal_analysis ( id, audience, problem, intent, urgency, pdf_relevance, embedding ) )",
+        "signal_id, signals ( id, title, content, url, source_id, external_id, published_at, engagement, sources ( type ), signal_analysis ( id, audience, problem, intent, urgency, pdf_relevance, names_problem, embedding ) )",
       )
       .eq("run_id", runId)
       .order("signal_id")
@@ -123,6 +124,7 @@ export async function loadRunSignals(supabase: SupabaseClient, runId: string): P
             intent: sa.intent,
             urgency: sa.urgency,
             pdf_relevance: sa.pdf_relevance,
+            names_problem: sa.names_problem,
             embedding: parseVector(sa.embedding),
           }
         : null,
