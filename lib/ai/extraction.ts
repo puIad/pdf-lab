@@ -117,14 +117,13 @@ export function validateExtraction(raw: unknown): ExtractionResult {
   if (typeof flag !== "boolean") {
     throw new Error(`extraction.names_problem must be true or false (got ${JSON.stringify(flag)?.slice(0, 40)})`);
   }
-  const namesProblem = flag;
   return {
     audience,
     problem,
     intent: intentRaw as IntentValue,
     urgency: urgencyRaw as UrgencyValue,
     pdf_relevance: rel,
-    names_problem: namesProblem,
+    names_problem: flag,
   };
 }
 
