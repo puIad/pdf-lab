@@ -16,10 +16,12 @@ import {
 } from "../evidence/qc.ts";
 import {
   BUYER_DISCUSSION_LABEL,
+  calculateLandscape,
   discussionForMarket,
   listingFormat,
   mineReviewsAndGaps,
   type CompetitorProduct,
+  type LandscapeShare,
 } from "../competition/index.ts";
 import { placeCompetitor } from "../competition/map.ts";
 import { isDemandOnly, isListing } from "../sources/demand-only.ts";
@@ -128,6 +130,8 @@ export interface OrchestratorMarketItem {
   pdfFitScore: number;
   /** Paid price range of the competitors stored against this market in this run; null = not observed. */
   priceRange?: string | null;
+  /** Format breakdown of those competitors; empty = none observed. */
+  formatShares?: LandscapeShare[];
   signals: StoredSignalForRun[];
 }
 
@@ -140,6 +144,8 @@ export interface OrchestratorOpportunityItem {
   solution: string;
   /** Null when the wording names no format ("Not observed"). */
   format: string | null;
+  /** Set when `format` is a suggestion from competitor listings rather than named by the wording. */
+  formatBasis?: string | null;
   priceRange?: string| null;
   opportunityScore: number;
   confidence: number;
@@ -538,6 +544,7 @@ async function finishRun(
           promises: c.promises || [],
           reviews: c.reviews || [],
         }));
+        market.formatShares = calculateLandscape(competitorProducts).formatShares;
         const { productGaps } = mineReviewsAndGaps(
           competitorProducts,
           // The market's own signals plus the run's Reddit and YouTube discussion on its topic

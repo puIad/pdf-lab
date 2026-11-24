@@ -24,6 +24,8 @@ export interface ExportOpportunity {
   problem: string;
   solution: string;
   format: string;
+  /** Why the format is a suggestion ("suggested from 3 of 9 competitor listings"); null = the wording names it. */
+  formatBasis?: string | null;
   priceRange: string;
   opportunityScore: number;
   confidence: number;

@@ -47,7 +47,7 @@ export function briefBlocks(brief: Brief): Block[] {
     add("note", `AI interpretation (${n.model}): ${n.text}`, links(n.citeIds.map((id) => all.get(id)).filter((c): c is BriefCite => !!c)));
 
   add("h1", brief.title);
-  add("p", `Format: ${brief.format}. ${sourceLine(brief)}. Generated ${brief.generatedAt.slice(0, 10)}.`);
+  add("p", `Format: ${brief.format}${brief.formatBasis ? ` (${brief.formatBasis})` : ""}. ${sourceLine(brief)}. Generated ${brief.generatedAt.slice(0, 10)}.`);
   add(
     "p",
     "How to read this brief: fact lines cite stored evidence; suggestion lines follow fixed rules from cited facts; AI interpretation lines were written by a language model from the cited evidence and need checking.",

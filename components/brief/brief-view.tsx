@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VerdictPanel } from "@/components/research/verdict-panel";
 import { DESCRIPTION_KEY, type Brief, type BriefAiNote, type BriefCite, type BriefFact } from "@/lib/brief/types";
 import { ETSY_TAGS_MAX, ETSY_TITLE_MAX } from "@/lib/brief/etsy";
+import { suggestedLabel } from "@/lib/opportunities/format";
 
 type Layer = "fact" | "suggestion" | "ai";
 const LAYER: Record<Layer, { label: string; className: string }> = {
@@ -188,7 +189,7 @@ export function BriefView({ brief }: { brief: Brief }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="secondary">{brief.format}</Badge>
+            <Badge variant="secondary" title={brief.formatBasis ?? undefined}>{suggestedLabel(brief.format, brief.formatBasis)}</Badge>
             <Badge variant="outline">{brief.source.kind === "opportunity" ? "Deep-run opportunity" : "Validated quick idea"}</Badge>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-balance">{brief.title}</h1>

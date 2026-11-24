@@ -27,6 +27,7 @@ export {
   generateCandidatePool,
   observedPriceRange,
   selectDiversifiedOpportunities,
+  suggestFormat,
 } from "./generator.ts";
 
 export type {
