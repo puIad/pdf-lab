@@ -23,9 +23,10 @@ export interface ValidationVerdict {
   checks: VerdictCheck[];
 }
 
-// shortcut: uncalibrated thresholds. The PDFMinter scan (Part 3.11, docs/research/2026-11-25-pdfminter-calibration.md)
-// has no discussion, intent or competitor counts per phrase, so it cannot test them; they need
-// verdicts paired with marketplace outcomes.
+// shortcut: first-guess thresholds. Tested on 37 stored concepts against competition checks
+// (docs/research/2026-11-26-verdict-calibration.md): 36 WAIT, 1 KILL, no GO, counts uncorrelated
+// with the outcome (rho about 0), so nothing supports a change. Revisit when the counts describe
+// the phrase instead of its stored topic.
 export const VERDICT_THRESHOLDS = {
   demandPass: 10,
   demandKill: 3,
