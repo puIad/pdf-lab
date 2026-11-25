@@ -83,7 +83,8 @@ Part 6.11 (`lib/scoring/scoring.ts`): the score is a rule-based index, not a mea
   stored listing counts (DEC-010), not folded into the score.
 - UI order: the raw counts first, the index second and labeled as rule-based.
 - Weights and thresholds are `shortcut:` guesses until calibrated; see
-  `docs/research/2026-11-13-score-calibration.md`.
+  `docs/research/2026-11-13-score-calibration.md` and, for the PDFMinter cross-check,
+  `docs/research/2026-11-25-pdfminter-calibration.md`.
 
 - Never display as pseudo-science: ALWAYS store/show the triple
   `{ opportunity_score, confidence (0..1), evidence_count }`.

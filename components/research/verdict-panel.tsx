@@ -23,7 +23,7 @@ export function VerdictPanel({ verdict, compact = false }: { verdict: Validation
         <span className="font-mono text-lg font-bold tracking-wide">{verdict.verdict}</span>
         <span className="text-xs text-foreground/80">{verdict.reason}</span>
         {!compact && (
-          <Badge variant="outline" className="ml-auto text-[10px]" title="Fixed thresholds on stored counts, no LLM (QC Rule 4). Uncalibrated until Part 3.11.">
+          <Badge variant="outline" className="ml-auto text-[10px]" title="Fixed thresholds on stored counts, no LLM (QC Rule 4). Thresholds are first guesses, not yet tested against marketplace outcomes.">
             rule-based
           </Badge>
         )}
