@@ -175,6 +175,47 @@ describe("mineReviewsAndGaps (PRD §21)", () => {
     assert.deepEqual(mineReviewsAndGaps([], []).productGaps, []);
   });
 
+  it("quotes a request for missing material from discussion text (#93, DEC-020 b)", () => {
+    // SAMPLE DATA (fixture rule): request phrasings in the words of video comments and posts.
+    const asks = [
+      "Is there a checklist for this? I keep forgetting the order.",
+      "I wish there was a printable cheat sheet for the beep codes.",
+      "Does anyone have a step by step guide for reseating RAM?",
+      "I'm looking for a template to log my fixes.",
+      "I’m looking for a checklist to log my fixes.",
+      "Is there a printable cheat sheet for the beep codes?",
+      "Is there a good simple checklist for this?",
+      "Does anyone have a pdf of the motherboard manual?",
+      "I wish there were some step by step guides for this.",
+      "Where can I find a flowchart for no-POST problems?",
+    ];
+    for (const quote of asks) {
+      const { productGaps } = mineReviewsAndGaps([], [{ content: quote, source_type: "youtube", url: "https://youtube.com/watch?v=x", title: "c" }]);
+      const gap = productGaps.find((g) => g.category === "requested_material");
+      assert.ok(gap, quote);
+      assert.equal(gap.reviewExcerpts[0].origin, "discussion");
+      assert.equal(gap.reviewExcerpts[0].quote, quote);
+    }
+  });
+
+  it("ordinary chatter and a listing's own promise are not a request for material (#93)", () => {
+    const chatter = [
+      "Turn it off and on again!",
+      "Nearly all the problems ive had with PCs is a RAM reseat.",
+      "Great video, I use a checklist like this every time.",
+      "There is a guide in the description.",
+      "Is there a reason the guide skips step 3?",
+      "Is there any way the template could be cheaper?",
+      "Is there a guideline on how long RAM lasts?",
+    ];
+    assert.deepEqual(mineReviewsAndGaps([], chatter.map((content) => ({ content, source_type: "youtube" }))).productGaps, []);
+    const listing = {
+      platform: "etsy", title: "PC Repair Checklist", url: "https://www.etsy.com/listing/1", price: "$5", format: "checklist",
+      rating: 4.5, reviewCount: 3, positioning: "Is there a template you need? This pdf has one.", promises: [], reviews: [],
+    } as CompetitorProduct;
+    assert.deepEqual(mineReviewsAndGaps([listing]).productGaps, []);
+  });
+
   it("a non-PC niche gets gaps with no PC wording; the niche lives in the quotes", () => {
     // SAMPLE DATA (fixture rule): budgeting reviews and one discussion.
     const { productGaps, reviewMining } = mineReviewsAndGaps(

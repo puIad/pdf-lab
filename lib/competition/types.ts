@@ -54,6 +54,7 @@ export interface ProductGap {
     | "overpriced"
     | "offline_access"
     | "confusing"
+    | "requested_material"
     | "other";
   summary: string;
   opportunityTranslation: string; // Plain-English opportunity (PRD §21, e.g. "too technical" -> plain-English opportunity)
