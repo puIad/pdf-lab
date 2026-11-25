@@ -4,9 +4,10 @@
 // suggestions and AI interpretation are labeled apart (QC Rule 5). AI notes are written on click
 // only, and exports rebuild the brief server-side with the notes written here.
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Copy, Download, ExternalLink, FileText, Loader2, Send, ShieldAlert, Sparkles } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { googleErrorText } from "@/lib/google/messages";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,15 +120,40 @@ function NoteSlot({
 }
 
 export function BriefView({ brief, googleConnected }: { brief: Brief; googleConnected: boolean }) {
-  // The Google callback returns here with ?google=connected or ?google_error=<message>.
+  // The Google callback returns here with ?google=connected or ?google_error=<code>; both are read
+  // once, then removed from the URL.
   const params = useSearchParams();
+  const router = useRouter();
   const [connected, setConnected] = useState(googleConnected || params.get("google") === "connected");
   const [docUrl, setDocUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, BriefAiNote>>(brief.notes);
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState<"md" | "docx" | "gdocs" | null>(null);
-  const [exportError, setExportError] = useState<string | null>(params.get("google_error"));
+  const [exportError, setExportError] = useState<string | null>(params.get("google_error") === null ? null : googleErrorText(params.get("google_error")!));
+
+  // Notes written before the redirect to Google survive the round trip in sessionStorage; the server
+  // still filters them through acceptNotes on send and export.
+  const notesKey = `pdflab.briefNotes.${JSON.stringify(brief.source)}`;
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(notesKey);
+      if (saved) {
+        sessionStorage.removeItem(notesKey);
+        setNotes(JSON.parse(saved) as Record<string, BriefAiNote>);
+      }
+    } catch (err) {
+      console.error("could not restore brief notes", err);
+    }
+    if (params.has("google") || params.has("google_error")) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("google");
+      url.searchParams.delete("google_error");
+      router.replace(url.pathname + url.search, { scroll: false });
+    }
+    // Once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const cites = new Map<string, BriefCite>();
   for (const f of [brief.promise, brief.audience, ...brief.buyerLanguage, ...brief.keywords, brief.whereToSell?.fact ?? null, brief.priceAnchor, ...brief.bonusAngles]) {
@@ -198,6 +224,11 @@ export function BriefView({ brief, googleConnected }: { brief: Brief; googleConn
       });
       const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string; connect?: string };
       if (body.connect) {
+        try {
+          sessionStorage.setItem(notesKey, JSON.stringify(notes));
+        } catch (err) {
+          console.error("could not keep brief notes across the Google sign-in", err);
+        }
         window.location.assign(body.connect);
         return;
       }

@@ -189,15 +189,14 @@ interface Ctx {
   fetchFn?: typeof fetch;
 }
 
-/** The person's refresh token, or null when none is saved. A token the vault can no longer read is dropped. */
+/** The person's refresh token, or null when none is saved or the vault cannot read it (the row is kept: a wrong KEY_VAULT_SECRET must not wipe tokens; a reconnect replaces it). */
 async function savedToken(c: Ctx): Promise<string | null> {
   const cipher = await c.store.get(c.userId);
   if (!cipher) return null;
   try {
     return decryptKey(c.secret, c.userId, TOKEN_PURPOSE, cipher);
   } catch {
-    await c.store.remove(c.userId);
-    console.error("a stored Google token could not be decrypted; it was removed");
+    console.error("a stored Google token could not be decrypted; it is kept and ignored");
     return null;
   }
 }

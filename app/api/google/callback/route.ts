@@ -1,7 +1,7 @@
 // GET /api/google/callback: where Google sends the person back (Part 5.4). Registered redirect URIs:
 // http://localhost:3000/api/google/callback and https://pdf-lab-puiads-projects.vercel.app/api/google/callback.
 // The state must be signed for the signed-in person and match this browser's cookie. The result goes
-// back to the page that started the flow as ?google=connected or ?google_error=<message>.
+// back to the page that started the flow as ?google=connected or ?google_error=<code> (text in lib/google/messages.ts).
 
 import { NextResponse, type NextRequest } from "next/server";
 import { vaultSecret } from "@/lib/keys/crypto";
@@ -30,12 +30,12 @@ export async function GET(req: NextRequest) {
   };
 
   const code = q.get("code");
-  if (q.get("error") || !code) return back("google_error", q.get("error") === "access_denied" ? "Google access was not granted." : "Google did not complete the sign-in.");
+  if (q.get("error") || !code) return back("google_error", q.get("error") === "access_denied" ? "denied" : "incomplete");
   try {
     await completeConnect({ store: supabaseGoogleTokenStore(), secret: vaultSecret(), userId, cfg: googleConfig(req.nextUrl.origin) }, code);
     return back("google", "connected");
   } catch (err) {
     if (!(err instanceof GoogleError)) console.error("google connect failed", err instanceof Error ? err.message : err);
-    return back("google_error", err instanceof GoogleError ? err.message : "Could not save the Google connection.");
+    return back("google_error", err instanceof GoogleError ? err.code : "failed");
   }
 }

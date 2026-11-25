@@ -106,10 +106,10 @@ describe("connecting", () => {
     assert.equal(form(calls[0]).get("code"), "code-1");
     const cipher = store.rows.get(USER)!;
     assert.ok(cipher && !cipher.includes(REFRESH));
-    // The same ciphertext under another user's row does not open: sending as OTHER finds the token unreadable.
+    // The same ciphertext under another user's row does not open: sending as OTHER finds the token unreadable and leaves the row alone.
     store.rows.set(OTHER, cipher);
     await assert.rejects(sendDocx(ctx(store, fetchFn, OTHER), "t", new Uint8Array()), (e) => e instanceof GoogleError && e.code === "not_connected");
-    assert.equal(store.rows.has(OTHER), false);
+    assert.equal(store.rows.has(OTHER), true, "an unreadable token is kept, not deleted");
   });
   it("refuses a grant with a missing refresh token and saves nothing", async () => {
     const store = memoryStore();
