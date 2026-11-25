@@ -30,7 +30,8 @@ interface MiningPattern {
 // Up to two adjectives between the article and the material ("a good simple checklist"), never a
 // determiner or possessive: "a reason the guide skips step 3" asks about an existing guide.
 const FILLER = String.raw`(?:(?!(?:the|this|that|these|those|your|my|his|her|their)\b)\w+ ){0,2}`;
-const ASKED_FOR = "(?:checklist|guide|template|cheat ?sheet|printable|pdf|flowchart|workbook|tracker|step.by.step (?:list|guide))";
+// Ends on a word boundary after an optional plural: "guide" must not match "guideline".
+const ASKED_FOR = String.raw`(?:checklist|guide|template|cheat ?sheet|printable|pdf|flowchart|workbook|tracker|step.by.step (?:list|guide))s?\b`;
 
 // Niche-neutral wording only (Part 6.4): the texts describe the pattern, the quoted excerpts carry
 // the niche. A category with no matching excerpt produces no gap.

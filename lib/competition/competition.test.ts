@@ -185,6 +185,8 @@ describe("mineReviewsAndGaps (PRD §21)", () => {
       "I’m looking for a checklist to log my fixes.",
       "Is there a printable cheat sheet for the beep codes?",
       "Is there a good simple checklist for this?",
+      "Does anyone have a pdf of the motherboard manual?",
+      "I wish there were some step by step guides for this.",
       "Where can I find a flowchart for no-POST problems?",
     ];
     for (const quote of asks) {
@@ -204,6 +206,7 @@ describe("mineReviewsAndGaps (PRD §21)", () => {
       "There is a guide in the description.",
       "Is there a reason the guide skips step 3?",
       "Is there any way the template could be cheaper?",
+      "Is there a guideline on how long RAM lasts?",
     ];
     assert.deepEqual(mineReviewsAndGaps([], chatter.map((content) => ({ content, source_type: "youtube" }))).productGaps, []);
     const listing = {
