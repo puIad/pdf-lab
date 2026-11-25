@@ -1,5 +1,7 @@
 # Score calibration from stored competition checks (2026-11-13, Part 6.11)
 
+Follow-up with the PDFMinter scan and 30 rescored phrases: `2026-11-25-pdfminter-calibration.md`.
+
 ## What was measured
 
 Part 3.11 waits for a PDFMinter scan file. This note uses data the project controls instead: the
