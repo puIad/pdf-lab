@@ -216,7 +216,7 @@ const BLOCK_LABEL: Record<string, string> = { paa: "People also ask", related: "
 /**
  * Demand 0-100 from suggestion evidence: share of answering engines that suggested the
  * phrase, and its best list position.
- * shortcut: weights 0.7/0.3 are uncalibrated; refit on the user's PDFMinter CSV exports (DEC-008).
+ * shortcut: weights 0.7/0.3 are uncalibrated; the Part 3.11 cross-check (rho 0.64 against PDFMinter demand on 43 phrases) found no reason to change them.
  */
 export function suggestionDemand(engineCount: number, enginesOk: number, bestPosition: number): number {
   const share = enginesOk > 0 ? Math.min(1, engineCount / enginesOk) : 0;
@@ -224,7 +224,7 @@ export function suggestionDemand(engineCount: number, enginesOk: number, bestPos
   return Math.round(100 * (0.7 * share + 0.3 * rank));
 }
 
-/** shortcut: uncalibrated blend (demand 55%, fit 45%, +10 rising, +15 breakout); refit with DEC-008 CSVs. */
+/** shortcut: uncalibrated blend (demand 55%, fit 45%, +10 rising, +15 breakout); Part 3.11 found it adds nothing over demand (rho 0.23 against 0.20) but no better blend. */
 export function opportunity(demand: number, fit: number, trend: IdeaTrend): number {
   const bonus = trend === "breakout" ? 15 : trend === "rising" ? 10 : 0;
   return Math.min(100, Math.round(0.55 * demand + 0.45 * fit) + bonus);

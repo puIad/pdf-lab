@@ -278,7 +278,7 @@ function IdeaCard({ seed, region, idea, related, initialCheck, saved, onSaved }:
         </div>
 
         <div className="grid grid-cols-[auto_1fr] items-center gap-4">
-          <div className="flex flex-col items-center rounded-lg border border-border px-3 py-2" title="Opportunity = 55% demand + 45% PDF fit, +10 rising / +15 breakout (uncalibrated, DEC-008)">
+          <div className="flex flex-col items-center rounded-lg border border-border px-3 py-2" title="Opportunity = 55% demand + 45% PDF fit, +10 rising / +15 breakout (Part 3.11: adds nothing measurable over demand)">
             <span className="font-mono text-2xl font-bold tabular-nums">{idea.opportunity}</span>
             <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Opportunity</span>
           </div>
