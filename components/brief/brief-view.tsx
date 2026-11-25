@@ -5,7 +5,8 @@
 // only, and exports rebuild the brief server-side with the notes written here.
 
 import React, { useState } from "react";
-import { Copy, Download, ExternalLink, FileText, Loader2, ShieldAlert, Sparkles } from "lucide-react";
+import { Copy, Download, ExternalLink, FileText, Loader2, Send, ShieldAlert, Sparkles } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,12 +118,16 @@ function NoteSlot({
   );
 }
 
-export function BriefView({ brief }: { brief: Brief }) {
+export function BriefView({ brief, googleConnected }: { brief: Brief; googleConnected: boolean }) {
+  // The Google callback returns here with ?google=connected or ?google_error=<message>.
+  const params = useSearchParams();
+  const [connected, setConnected] = useState(googleConnected || params.get("google") === "connected");
+  const [docUrl, setDocUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, BriefAiNote>>(brief.notes);
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [exporting, setExporting] = useState<"md" | "docx" | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<"md" | "docx" | "gdocs" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(params.get("google_error"));
 
   const cites = new Map<string, BriefCite>();
   for (const f of [brief.promise, brief.audience, ...brief.buyerLanguage, ...brief.keywords, brief.whereToSell?.fact ?? null, brief.priceAnchor, ...brief.bonusAngles]) {
@@ -178,6 +183,49 @@ export function BriefView({ brief }: { brief: Brief }) {
     }
   }
 
+  async function sendToGoogleDocs() {
+    setExporting("gdocs");
+    setExportError(null);
+    setDocUrl(null);
+    try {
+      const here = new URL(window.location.href);
+      here.searchParams.delete("google");
+      here.searchParams.delete("google_error");
+      const res = await fetch("/api/google/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: brief.source, notes, next: here.pathname + here.search }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string; connect?: string };
+      if (body.connect) {
+        window.location.assign(body.connect);
+        return;
+      }
+      if (!res.ok || !body.url) throw new Error(body.error ?? `Send failed (${res.status})`);
+      setConnected(true);
+      setDocUrl(body.url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function disconnectGoogle() {
+    setExporting("gdocs");
+    setExportError(null);
+    try {
+      const res = await fetch("/api/google", { method: "DELETE" });
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? `Disconnect failed (${res.status})`);
+      setConnected(false);
+      setDocUrl(null);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Disconnect failed");
+    } finally {
+      setExporting(null);
+    }
+  }
+
   const slot = (k: string, label: string) => (
     <NoteSlot note={notes[k]} label={label} busy={busy} me={k} error={errors[k]} cites={cites} onWrite={() => writeNote(k)} />
   );
@@ -206,8 +254,22 @@ export function BriefView({ brief }: { brief: Brief }) {
             {exporting === "docx" ? <Loader2 className="animate-spin" /> : <FileText />}
             DOCX
           </Button>
+          <Button size="sm" variant="outline" className="cursor-pointer" disabled={exporting !== null} onClick={sendToGoogleDocs}>
+            {exporting === "gdocs" ? <Loader2 className="animate-spin" /> : <Send />}
+            Send to Google Docs
+          </Button>
         </div>
       </div>
+      {docUrl && (
+        <p className="text-xs">
+          Sent. <a href={docUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">Open the Google Doc</a>
+        </p>
+      )}
+      {connected && (
+        <Button size="xs" variant="link" className="cursor-pointer px-0 text-muted-foreground" disabled={exporting !== null} onClick={disconnectGoogle}>
+          Disconnect Google Docs
+        </Button>
+      )}
       {exportError && <p className="text-xs text-rose-600 dark:text-rose-400">{exportError}</p>}
 
       {brief.verdict && <VerdictPanel verdict={brief.verdict} compact />}

@@ -15,6 +15,8 @@ export const EXPORT_TABLES = {
   alerts: "kind, seed, region, title, detail, created_at, read_at",
   // Key metadata only. Never `ciphertext`: the export must not carry key material, even encrypted.
   user_provider_keys: "provider, last4, options, status, created_at, rotated_at",
+  // Only that a Google Docs connection exists and since when. Never `ciphertext` (Part 5.4).
+  user_google_tokens: "created_at",
 } as const;
 
 export type ExportTable = keyof typeof EXPORT_TABLES;

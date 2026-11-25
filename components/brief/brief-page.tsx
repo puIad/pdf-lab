@@ -3,10 +3,24 @@
 
 import React from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { ArrowLeft } from "lucide-react";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { BriefUnavailable, loadBrief, type Brief, type BriefSource } from "@/lib/brief";
+import { supabaseGoogleTokenStore } from "@/lib/google/server";
+import { resolveCaller } from "@/lib/quotas/guard";
 import { BriefView } from "./brief-view";
+
+/** Whether the signed-in person already connected Google Docs. A failed lookup only hides the disconnect link. */
+async function googleConnected(): Promise<boolean> {
+  try {
+    const { userId } = await resolveCaller(await headers());
+    return userId ? (await supabaseGoogleTokenStore().get(userId)) !== null : false;
+  } catch (err) {
+    console.error("could not read the Google connection", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
 
 export async function BriefPage({ source, back }: { source: BriefSource; back: { href: string; label: string } }) {
   let brief: Brief | null = null;
@@ -18,7 +32,7 @@ export async function BriefPage({ source, back }: { source: BriefSource; back: {
     unavailable = err.message;
   }
   const content = brief ? (
-    <BriefView brief={brief} />
+    <BriefView brief={brief} googleConnected={await googleConnected()} />
   ) : (
     <div className="space-y-3 rounded-lg border border-border p-5">
       <h1 className="text-lg font-semibold">No brief for this {source.kind === "idea" ? "idea" : "opportunity"}</h1>
