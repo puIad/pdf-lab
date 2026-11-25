@@ -27,6 +27,9 @@ interface MiningPattern {
   opportunityTranslation: string;
 }
 
+// Up to two adjectives between the article and the material ("a good simple checklist"), never a
+// determiner or possessive: "a reason the guide skips step 3" asks about an existing guide.
+const FILLER = String.raw`(?:(?!(?:the|this|that|these|those|your|my|his|her|their)\b)\w+ ){0,2}`;
 const ASKED_FOR = "(?:checklist|guide|template|cheat ?sheet|printable|pdf|flowchart|workbook|tracker|step.by.step (?:list|guide))";
 
 // Niche-neutral wording only (Part 6.4): the texts describe the pattern, the quoted excerpts carry
@@ -51,7 +54,7 @@ const MINING_PATTERNS: MiningPattern[] = [
   {
     category: "missing_feature",
     sentiment: "missing",
-    regex: /\b(missing|lacks|wish it had|did not include|didn't cover|needs more (?:diagrams|examples|detail))\b/i,
+    regex: /\b(missing|lacks|wish it had|did not include|didn['’]t cover|needs more (?:diagrams|examples|detail))\b/i,
     gapTitle: "Something users expected is missing",
     gapSummary: "Quoted users name content they expected and did not find.",
     opportunityTranslation: "Cover the missing content named in the quotes.",
@@ -79,11 +82,11 @@ const MINING_PATTERNS: MiningPattern[] = [
     sentiment: "request",
     regex: new RegExp(
       String.raw`\b(?:${[
-        String.raw`is there (?:a|an|any) (?:\w+ ){0,2}${ASKED_FOR}`,
-        String.raw`does anyone (?:have|know (?:of|where to find)) (?:a|an|any) (?:\w+ ){0,2}${ASKED_FOR}`,
-        String.raw`(?:i|we) wish (?:there (?:was|were)|someone (?:made|had)) (?:a|an|some) (?:\w+ ){0,2}${ASKED_FOR}`,
-        String.raw`(?:i(?:'m| am)|we(?:'re| are)) looking for (?:a|an|some) (?:\w+ ){0,2}${ASKED_FOR}`,
-        String.raw`where can (?:i|we) (?:find|get) (?:a|an) (?:\w+ ){0,2}${ASKED_FOR}`,
+        String.raw`is there (?:a|an|any) ${FILLER}${ASKED_FOR}`,
+        String.raw`does anyone (?:have|know (?:of|where to find)) (?:a|an|any) ${FILLER}${ASKED_FOR}`,
+        String.raw`(?:i|we) wish (?:there (?:was|were)|someone (?:made|had)) (?:a|an|some) ${FILLER}${ASKED_FOR}`,
+        String.raw`(?:i(?:['’]m| am)|we(?:['’]re| are)) looking for (?:a|an|some) ${FILLER}${ASKED_FOR}`,
+        String.raw`where can (?:i|we) (?:find|get) (?:a|an) ${FILLER}${ASKED_FOR}`,
       ].join("|")})`,
       "i",
     ),
