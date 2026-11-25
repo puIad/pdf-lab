@@ -20,10 +20,14 @@ interface MiningPattern {
   category: ProductGap["category"];
   sentiment: "dislike" | "missing" | "confusing" | "request" | "like";
   regex: RegExp;
+  /** Request wording only means something in a person's own words, never in a listing's marketing text. */
+  discussionOnly?: boolean;
   gapTitle: string;
   gapSummary: string;
   opportunityTranslation: string;
 }
+
+const ASKED_FOR = "(?:checklist|guide|template|cheat ?sheet|printable|pdf|flowchart|workbook|tracker|step.by.step (?:list|guide))";
 
 // Niche-neutral wording only (Part 6.4): the texts describe the pattern, the quoted excerpts carry
 // the niche. A category with no matching excerpt produces no gap.
@@ -67,6 +71,26 @@ const MINING_PATTERNS: MiningPattern[] = [
     gapTitle: "Out of date",
     gapSummary: "Quoted users say existing material no longer matches the current situation.",
     opportunityTranslation: "An up-to-date version, checked against how things work now.",
+  },
+  {
+    // Issue #93 (DEC-020 b): video comments and forum posts rarely complain about existing material;
+    // they ask whether some exists. A request for a checklist, guide or template is a gap only as quoted.
+    category: "requested_material",
+    sentiment: "request",
+    regex: new RegExp(
+      String.raw`\b(?:${[
+        String.raw`is there (?:a|an|any) (?:\w+ ){0,2}${ASKED_FOR}`,
+        String.raw`does anyone (?:have|know (?:of|where to find)) (?:a|an|any) (?:\w+ ){0,2}${ASKED_FOR}`,
+        String.raw`(?:i|we) wish (?:there (?:was|were)|someone (?:made|had)) (?:a|an|some) (?:\w+ ){0,2}${ASKED_FOR}`,
+        String.raw`(?:i(?:'m| am)|we(?:'re| are)) looking for (?:a|an|some) (?:\w+ ){0,2}${ASKED_FOR}`,
+        String.raw`where can (?:i|we) (?:find|get) (?:a|an) (?:\w+ ){0,2}${ASKED_FOR}`,
+      ].join("|")})`,
+      "i",
+    ),
+    discussionOnly: true,
+    gapTitle: "Asked for, not found",
+    gapSummary: "Quoted people ask whether a checklist, guide or template exists, or wish for one.",
+    opportunityTranslation: "The checklist, guide or template the quotes ask for.",
   },
 ];
 
@@ -147,6 +171,7 @@ export function mineReviewsAndGaps(
   // Scan against mining patterns
   for (const candidate of textCandidates) {
     for (const pat of MINING_PATTERNS) {
+      if (pat.discussionOnly && candidate.origin !== "discussion") continue;
       if (pat.regex.test(candidate.text)) {
         const sentence = extractQuotedSentence(candidate.text, pat.regex);
         if (sentence) {
