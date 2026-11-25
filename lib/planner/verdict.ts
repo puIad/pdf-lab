@@ -23,7 +23,9 @@ export interface ValidationVerdict {
   checks: VerdictCheck[];
 }
 
-// shortcut: uncalibrated thresholds; refit in Part 3.11 against the user's PDFMinter scan file.
+// shortcut: uncalibrated thresholds. The PDFMinter scan (Part 3.11, docs/research/2026-11-25-pdfminter-calibration.md)
+// has no discussion, intent or competitor counts per phrase, so it cannot test them; they need
+// verdicts paired with marketplace outcomes.
 export const VERDICT_THRESHOLDS = {
   demandPass: 10,
   demandKill: 3,
