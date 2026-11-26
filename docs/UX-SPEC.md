@@ -84,6 +84,10 @@ positioning, search keywords, customer language, evidence sources.
   each showing its threshold and count; competition stays blank until "Check competition" ran.
   Card actions: Validate, Deep research, Check competition, save, outline. Scan → CSV.
 - Validate ends in GO / WAIT / KILL, with every rule listed beside the count that decided it.
+  Validate counts only stored rows that hold every content word of the concept (question words such as
+  "what" and "how" do not count as content); Explore, search and the brief keep topic-wide matching
+  (DEC-021). A concept with no matching stored row gets WAIT, "No stored rows for this phrase; scan
+  the topic first", never KILL.
 - Brief (from an opportunity or a GO / WAIT idea): facts, AI interpretation and suggestions stay in
   separate, labelled layers (QC Rule 5); export Markdown / DOCX, Google Docs after 5.4.
 - Never show a number without its basis. PDFMakerHub's random "live" metrics are the
