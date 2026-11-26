@@ -113,6 +113,11 @@ describe("writeEvidence (injected deps)", () => {
     assert.equal(distinctEvidenceRows([r, { ...r }, { ...r, url: "u" }]).length, 2);
   });
 
+  it("distinctEvidenceRows ignores the stored confidence prefix of the claim", () => {
+    const row = (conf: string) => ({ entity_id: "o", claim: `[type: frequency | conf: ${conf}] Quick-idea phrase "p"`, url: "https://x.test/1" });
+    assert.equal(distinctEvidenceRows([row("0.40"), row("0.60")]).length, 1);
+  });
+
   it("rejects invalid items missing required fields", async () => {
     const deps = {
       insertEvidence: async (rows: Omit<EvidenceRow, "id">[]) =>

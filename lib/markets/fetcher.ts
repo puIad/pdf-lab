@@ -129,8 +129,10 @@ export async function fetchMarketsData(
 
   // 3. Fetch evidence rows
   const rawEvidence = distinctEvidenceRows(
-    await readAll<{ entity_id: string; claim: string; url: string | null }>("evidence", () =>
-      supabase.from("evidence").select("id, entity_id, claim, url").order("id"),
+    await readAllIn<{ entity_id: string; claim: string; url: string | null }>(
+      "evidence",
+      [...marketIds, ...rawOpps.map((o) => o.id as string)],
+      (chunk) => supabase.from("evidence").select("id, entity_id, claim, url").in("entity_id", chunk).order("id"),
     ),
   );
   const evidenceCountByMarket: Record<string, number> = {};

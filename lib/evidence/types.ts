@@ -85,7 +85,7 @@ export function distinctEvidence<T>(rows: T[], key: (row: T) => [entityId: strin
   });
 }
 
-/** `distinctEvidence` for stored rows. */
+/** `distinctEvidence` for stored rows: the claim is keyed without its "[type | conf]" prefix, as `writeEvidence` keys it. */
 export function distinctEvidenceRows<T extends { entity_id: string; claim: string; url: string | null }>(rows: T[]): T[] {
-  return distinctEvidence(rows, (r) => [r.entity_id, r.claim, r.url]);
+  return distinctEvidence(rows, (r) => [r.entity_id, parseEvidenceClaim(r.claim).rawClaim, r.url]);
 }
