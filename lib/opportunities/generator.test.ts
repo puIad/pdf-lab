@@ -17,7 +17,7 @@ import {
 import type { AIRouter } from "../ai/router.ts";
 import { enforceRule1_OpportunityEvidence, QCViolationError } from "../evidence/qc.ts";
 import { buildIdeas } from "../ideas/ideas.ts";
-import { capIdeaOnlyScores } from "./generator.ts";
+import { capIdeaOnlyScores, marketProblemWords, mergeSharedProblems } from "./generator.ts";
 import { marketFor } from "./from-ideas.ts";
 import { namesNoProblem } from "./match.ts";
 import { needsAnalysis } from "../runs/orchestrator.ts";
@@ -639,7 +639,6 @@ test("a phrase joins a market only when it is about that market's problem (issue
 });
 
 test("mergeSharedProblems folds one audience and problem across markets and formats (issue #70)", async () => {
-  const { mergeSharedProblems } = await import("./generator.ts");
   const { isIdeaOnly } = await import("./from-ideas.ts");
   const base = {
     solution: "s", formatBasis: null, priceRange: null, sophistication: null, mechanism: null, outcome: null, urgency: null,
@@ -648,17 +647,80 @@ test("mergeSharedProblems folds one audience and problem across markets and form
   const a = { ...base, id: "a", marketId: "m1", title: "a", targetAudience: "People with computer problems", problem: "PDF for people with computer problems that will not boot", format: null, opportunityScore: 60 };
   const b = { ...a, id: "b", marketId: "m2", problem: "Guide for people with computer problems that will not boot", format: "guide" as const, opportunityScore: 55 };
   const c = { ...a, id: "c", marketId: "m2", targetAudience: "Gamers", problem: "Slow frame rate on old laptops", opportunityScore: 40 };
-  const { kept, merged } = mergeSharedProblems([a, b, c]);
+  const { kept, merged } = mergeSharedProblems([a, b, c], new Map());
   assert.equal(merged, 1);
   assert.deepEqual(kept.map((k) => k.id), ["a", "c"]);
   assert.equal(kept[0].format, "guide");
   // Two audiences with the same problem text stay two opportunities (only idea-only candidates merge on text).
   const d = { ...a, id: "d", marketId: "m3", targetAudience: "Students", problem: a.problem, opportunityScore: 50 };
-  assert.deepEqual(mergeSharedProblems([a, d]).kept.map((k) => k.id), ["a", "d"]);
+  assert.deepEqual(mergeSharedProblems([a, d], new Map()).kept.map((k) => k.id), ["a", "d"]);
   assert.equal(isIdeaOnly([`${IDEA_CLAIM_PREFIX} "x"`]), true);
   assert.equal(isIdeaOnly([`${IDEA_CLAIM_PREFIX} "x"`, "Reddit post"]), false);
   assert.equal(isIdeaOnly([`[type: frequency | conf: 0.80] ${IDEA_CLAIM_PREFIX} "x"`]), true);
   assert.equal(isIdeaOnly([]), false);
+});
+
+// Issue #121, from the 2026-11-26 gate run on "pc troubleshooting" (market names, audiences and problems as stored).
+test("one problem in one market is one opportunity whatever the audience label (issue #121)", async () => {
+  const sig = (id: string, audience: string, problem: string): OpportunitySignalInput => ({
+    id, source_id: `src-${id}`, source_type: "web", title: problem, content: problem, url: `https://example.com/${id}`,
+    analysis: { audience, problem, intent: "strong", urgency: "high", pdf_relevance: 0.8, names_problem: true },
+  });
+  const market = (id: string, name: string, signals: OpportunitySignalInput[]): OpportunityMarketInput => ({
+    id, name, demandScore: 40, confidence: 0.2, signals,
+  });
+  const markets = [
+    market("ram", "RAM seating faults", [
+      sig("r1", "First-time PC builders", "PC did not POST after a build because the RAM was not seated in the Asus board clips."),
+      sig("r2", "PC users", "Most PC problems the commenter had were fixed by reseating the RAM."),
+    ]),
+    market("power", "PC won't power on", [
+      sig("p1", "PC users", "PC does not power on; power button connector to the motherboard may be loose."),
+      sig("p2", "Lab computer users", "Computer stopped working after a lab cleaning; the power cord was unplugged on one end."),
+    ]),
+    market("lag", "PC stuttering and lag", [sig("l1", "PC gamers with Corsair fans", "Lag, low frame rates and stuttering fixed by uninstalling the iCUE software.")]),
+    market("bsod", "Windows blue screen errors", [sig("b1", "PC users with blue screens", "Blue screen of death errors (BSODs), most fixable without professional help.")]),
+  ];
+  const res = await generate25Opportunities(markets, { targetCount: 25 });
+  const byMarket = (id: string) => res.opportunities.filter((o) => o.marketId === id);
+  assert.equal(byMarket("ram").length, 1);
+  assert.equal(byMarket("power").length, 1);
+  assert.equal(byMarket("lag").length, 1);
+  assert.equal(byMarket("bsod").length, 1);
+  assert.equal(res.mergedSimilar, 2);
+  // Nothing is lost: both signals' evidence rows stay, once each, under the kept opportunity.
+  for (const [id, urls] of [["ram", ["r1", "r2"]], ["power", ["p1", "p2"]]] as const) {
+    const [opp] = byMarket(id);
+    assert.deepEqual(opp.evidence.map((e) => e.url).sort(), urls.map((u) => `https://example.com/${u}`));
+    assert.ok(opp.evidence.every((e) => e.entityId === opp.id && e.claim.startsWith(`Opportunity "${opp.title}"`)));
+    assert.deepEqual([...opp.evidenceSignalIds!].sort(), [...urls]);
+    assert.equal(opp.matchingSignals, 2);
+  }
+});
+
+test("mergeSharedProblems keeps different problems of one market apart (issue #121)", () => {
+  const base = {
+    solution: "s", formatBasis: null, priceRange: null, sophistication: null, mechanism: null, outcome: null, urgency: null,
+    confidence: 0.5, evidence: [], matchingSignals: 1, marketSignals: null, format: null, opportunityScore: 50,
+  };
+  const cand = (id: string, marketId: string, audience: string, problem: string) => ({ ...base, id, marketId, title: id, targetAudience: audience, problem });
+  const names = marketProblemWords(
+    [["m1", "RAM seating faults"], ["m2", "PC won't power on"], ["m3", "PC stuttering and lag"]].map(([id, name]) => ({ id, name, demandScore: 1, confidence: 0.5, signals: [] })),
+  );
+  // Same market, different audience, a word only this market's name has in both: one problem.
+  const ram1 = cand("a", "m1", "Builders", "PC did not POST because the RAM was not seated.");
+  const ram2 = cand("b", "m1", "PC users", "Most problems were fixed by reseating the RAM.");
+  assert.deepEqual(mergeSharedProblems([ram1, ram2], names).kept.map((k) => k.id), ["a"]);
+  // Same market, no such word in one of them: two problems.
+  const other = cand("c", "m1", "Gamers", "Memory errors only appear after the BIOS update.");
+  assert.deepEqual(mergeSharedProblems([ram1, other], names).kept.map((k) => k.id), ["a", "c"]);
+  // A word that several market names share ("pc") never merges.
+  const pc1 = cand("d", "m2", "Lab users", "PC shut down after the lab cleaning.");
+  const pc2 = cand("e", "m2", "Gamers", "PC restarts by itself under load.");
+  assert.deepEqual(mergeSharedProblems([pc1, pc2], names).kept.map((k) => k.id), ["d", "e"]);
+  // The same words in another market do not merge across markets.
+  const ramElsewhere = cand("f", "m3", "Gamers", "Most problems were fixed by reseating the RAM.");
+  assert.deepEqual(mergeSharedProblems([ram2, ramElsewhere], names).kept.map((k) => k.id), ["b", "f"]);
 });
 
 test("a signal whose analysed problem says none is described yields no opportunity (issue #88)", async () => {

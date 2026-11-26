@@ -646,7 +646,7 @@ async function finishRun(
       message:
         `Saved ${savedOppsCount} of ${OPPORTUNITY_TARGET} target opportunities` +
         (savedOppsCount < OPPORTUNITY_TARGET ? ", limited by evidence" : "") +
-        (generatedPairs.mergedSimilar ? `; ${generatedPairs.mergedSimilar} merged into another with the same audience and problem` : "") +
+        (generatedPairs.mergedSimilar ? `; ${generatedPairs.mergedSimilar} merged into another for the same problem` : "") +
         (generatedPairs.ideasInNoMarket ? `; ${generatedPairs.ideasInNoMarket} quick ideas fit no market and were left out` : "") +
         `; assembling research completeness panel and reconciling database counts`,
     });
