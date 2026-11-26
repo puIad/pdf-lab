@@ -536,6 +536,11 @@ describe("Validate matches a concept on all its content words (issue #109, DEC-0
     assert.equal((await run("budgeting couples")).matchedSignalsCount, 2);
   });
 
+  test("a word matches at a word start, not inside another word; plurals still match", async () => {
+    const rows = [row("d", "how i said goodbye to my resume template"), row("e", "ai resume templates for teachers")];
+    assert.equal((await run("ai resume template", true, rows)).matchedSignalsCount, 1);
+  });
+
   test("question words are not content words on the all-words path", async () => {
     // The unrelated row says "what": any-word matching on the raw words would keep it.
     const rows = [...signals, row("c", "what to cook tonight")];

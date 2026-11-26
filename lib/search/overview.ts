@@ -129,9 +129,14 @@ export async function generateMarketOverview(
     .split(/\s+/)
     .filter((w) => w.length >= 2 && !stopWords.has(w));
   // One rule for every table: any word (Explore, search, brief) or all words (Validate, DEC-021).
+  // All-words matches at a word start ("ai" is not in "said", "template" still hits "templates");
+  // tokens are \w only, so they need no regex escaping. The any-word path keeps its substring test.
+  const wordStarts = tokens.map((t) => new RegExp(`\\b${t}`));
   const hasTokens = (...fields: string[]) =>
     tokens.length > 0 &&
-    (options?.allWords ? tokens.every((t) => fields.some((f) => f.includes(t))) : tokens.some((t) => fields.some((f) => f.includes(t))));
+    (options?.allWords
+      ? wordStarts.every((r) => fields.some((f) => r.test(f)))
+      : tokens.some((t) => fields.some((f) => f.includes(t))));
 
   // Rows of a run that a newer run of the same seed replaced are left out (Part 6.7).
   // If the run list cannot be read, nothing is filtered.
