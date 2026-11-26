@@ -71,3 +71,21 @@ export function parseEvidenceClaim(claim: string): {
   }
   return { rawClaim, signalType, confidence };
 }
+
+/**
+ * One evidence row per distinct (entity, claim, url): the first one stays. The write path
+ * (`writeEvidence`) applies it so no new run stores a repeat; readers apply it to rows an older
+ * run already stored, so a count says how many distinct citations there are, never how many repeats.
+ */
+export function distinctEvidence<T>(rows: T[], key: (row: T) => [entityId: string, claim: string, url: string | null | undefined]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const k = JSON.stringify(key(row).map((p) => p ?? null));
+    return !seen.has(k) && !!seen.add(k);
+  });
+}
+
+/** `distinctEvidence` for stored rows: the claim is keyed without its "[type | conf]" prefix, as `writeEvidence` keys it. */
+export function distinctEvidenceRows<T extends { entity_id: string; claim: string; url: string | null }>(rows: T[]): T[] {
+  return distinctEvidence(rows, (r) => [r.entity_id, parseEvidenceClaim(r.claim).rawClaim, r.url]);
+}

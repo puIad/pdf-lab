@@ -102,10 +102,10 @@ describe("Market Explorer Fetcher (PRD §7, §40)", () => {
         },
       ],
       evidence: [
-        { id: "ev-1", entity_id: "m-1", entity_type: "market" },
-        { id: "ev-2", entity_id: "m-1", entity_type: "market" },
-        { id: "ev-3", entity_id: "opp-1", entity_type: "opportunity" },
-        { id: "ev-4", entity_id: "m-2", entity_type: "market" },
+        { id: "ev-1", claim: "claim 1", url: null, entity_id: "m-1", entity_type: "market" },
+        { id: "ev-2", claim: "claim 2", url: null, entity_id: "m-1", entity_type: "market" },
+        { id: "ev-3", claim: "claim 3", url: null, entity_id: "opp-1", entity_type: "opportunity" },
+        { id: "ev-4", claim: "claim 4", url: null, entity_id: "m-2", entity_type: "market" },
       ],
       marketSignals: [
         {
@@ -163,7 +163,7 @@ describe("Market Explorer reads past the 1000-row cap (#112)", () => {
   const market = { id: "m-1", run_id: null, name: "Big", trend: "stable", demand_score: 1, competition_score: 1, pdf_fit_score: 1, confidence: 0.5, created_at: "2026-01-01T00:00:00Z" };
 
   it("counts every evidence and market_signals row, not the first 1000", async () => {
-    const evidence = Array.from({ length: 2500 }, (_, i) => ({ id: `e-${i}`, entity_type: "market", entity_id: "m-1" }));
+    const evidence = Array.from({ length: 2500 }, (_, i) => ({ id: `e-${i}`, claim: `c${i}`, url: null, entity_type: "market", entity_id: "m-1" }));
     const marketSignals = Array.from({ length: 1500 }, (_, i) => ({ market_id: "m-1", signal_id: `s-${i}`, signals: null }));
     const result = await fetchMarketsData(createMockSupabase({ markets: [market], evidence, marketSignals }));
     assert.equal(result.markets[0].evidence_count, 2500);

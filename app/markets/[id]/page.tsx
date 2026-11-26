@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EvidenceList, EvidenceDialog } from "@/components/evidence";
-import type { EvidenceRow } from "@/lib/evidence/types";
+import { distinctEvidenceRows, type EvidenceRow } from "@/lib/evidence/types";
 import { calculateLandscape, listingFormat, mineReviewsAndGaps, type CompetitorProduct } from "@/lib/competition";
 import { parsePrice } from "@/lib/sources/marketplace-helper";
 import { QualityPanel } from "@/components/quality-panel";
@@ -110,7 +110,7 @@ export default async function MarketPage(props: MarketPageProps) {
     .select("id, platform, title, url, price, rating, review_count")
     .eq("market_id", id);
 
-  const evidenceRows = (marketEvidence ?? []) as EvidenceRow[];
+  const evidenceRows = distinctEvidenceRows((marketEvidence ?? []) as EvidenceRow[]);
   const oppList = opportunities ?? [];
   const compList = competitors ?? [];
   const signalsList = (marketSignals ?? []).flatMap((ms) => {
@@ -175,7 +175,7 @@ export default async function MarketPage(props: MarketPageProps) {
     claimsByOpp.set(e.entity_id, [...(claimsByOpp.get(e.entity_id) ?? []), e.claim ?? ""]);
   }
 
-  const allEvidence = (oppEvidenceData ?? []) as QcEvidenceRow[];
+  const allEvidence = distinctEvidenceRows((oppEvidenceData ?? []) as Array<QcEvidenceRow & { claim: string; url: string | null }>);
   // QC lines R1 to R5 are results on these rows, and they score the panel's 15% rules slot (#52).
   const qcRules = marketQcRules({
     market,

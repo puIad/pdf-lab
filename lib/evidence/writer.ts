@@ -3,7 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EntityType, EvidenceInput, EvidenceRow } from "./types.ts";
-import { formatEvidenceClaim } from "./types.ts";
+import { distinctEvidence, formatEvidenceClaim } from "./types.ts";
 
 export interface EvidenceWriterDeps {
   insertEvidence: (rows: Omit<EvidenceRow, "id">[]) => Promise<EvidenceRow[]>;
@@ -12,6 +12,8 @@ export interface EvidenceWriterDeps {
 /**
  * Writes one or more evidence records to the evidence table.
  * Formats the claim with signalType and confidence metadata when provided.
+ * The one entry point of every evidence write: a repeat of an entity's (claim, url) in the batch is
+ * written once (issue #122).
  */
 export async function writeEvidence(
   items: EvidenceInput[],
@@ -19,7 +21,7 @@ export async function writeEvidence(
 ): Promise<EvidenceRow[]> {
   if (items.length === 0) return [];
 
-  const rowsToInsert: Omit<EvidenceRow, "id">[] = items.map((item) => {
+  const rowsToInsert: Omit<EvidenceRow, "id">[] = distinctEvidence(items, (i) => [i.entityId, i.claim, i.url]).map((item) => {
     if (!item.entityType || !item.entityId) {
       throw new Error("Evidence item missing entityType or entityId");
     }

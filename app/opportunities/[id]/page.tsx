@@ -32,7 +32,7 @@ import {
   EvidenceDialog,
   FactsInterpretationSuggestion,
 } from "@/components/evidence";
-import { parseEvidenceClaim, type EvidenceRow } from "@/lib/evidence/types";
+import { distinctEvidenceRows, parseEvidenceClaim, type EvidenceRow } from "@/lib/evidence/types";
 import { NOT_OBSERVED, intentUrgencyLines, loadMarketReportSignals, observeMarket, platformCounts } from "@/lib/report/observed";
 import { fetchNicheTrendOfRun } from "@/lib/trends/niche";
 import { NicheTrendNote } from "@/components/markets-table/niche-trend-note";
@@ -97,7 +97,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   const market = Array.isArray(opp.markets) ? opp.markets[0] : opp.markets;
   const caller = await resolveCaller(await headers()).catch(() => null);
   const nicheTrend = await fetchNicheTrendOfRun(supabase, (market?.run_id as string | null | undefined) ?? null, caller);
-  const directEvidence = (evidenceRows ?? []) as EvidenceRow[];
+  const directEvidence = distinctEvidenceRows((evidenceRows ?? []) as EvidenceRow[]);
   const marketRows = (marketEvidence ?? []) as EvidenceRow[];
 
   const score = typeof opp.opportunity_score === "number" ? Math.round(opp.opportunity_score) : null;

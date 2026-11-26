@@ -282,7 +282,7 @@ test("fetchReportExportData reads past the 1000-row response cap", async () => {
       signals: { id: `s${i}`, title: `t${i}`, content: `quote ${i}`, url: null, published_at: null, sources: { type: "reddit", name: "r" }, signal_analysis: null },
     })),
     opportunities: n(3, (i) => ({ id: `o${i}`, market_id: "m1", title: `opp ${i}`, opportunity_score: 50 - i, confidence: 0.5 })),
-    evidence: n(1500, (i) => ({ id: `e${i}`, entity_type: "opportunity", entity_id: `o${i % 3}`, claim: "c", excerpt: null, url: null, created_at: "2026-11-01T00:00:00Z", sources: null })),
+    evidence: n(1500, (i) => ({ id: `e${i}`, entity_type: "opportunity", entity_id: `o${i % 3}`, claim: `c${i}`, excerpt: null, url: null, created_at: "2026-11-01T00:00:00Z", sources: null })),
     competitors: n(1200, (i) => ({ id: `c${i}`, market_id: "m1", platform: "etsy", title: `p${i}`, url: null, price: null, rating: null, review_count: null })),
   });
   const data = await fetchReportExportData(db, { marketId: "m1" });

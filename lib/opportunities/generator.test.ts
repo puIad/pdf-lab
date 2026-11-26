@@ -540,6 +540,14 @@ test("Part 3.8: quick ideas join the Deep-run candidate pool", async (t) => {
     assert.equal(cands[0].evidence.length, 2);
   });
 
+  await t.test("a phrase seen twice at one url is one evidence row and one demand count (issue #122)", () => {
+    const one = buildIdeas("pc troubleshooting", [phrase("why does my gpu crash", 3)]).ideas;
+    const doubled = one.map((i) => ({ ...i, evidence: [...i.evidence, ...i.evidence] }));
+    const [c] = ideaCandidates("pc troubleshooting", doubled, markets, refs);
+    assert.equal(c.evidence.length, one[0].evidence.length);
+    assert.equal(c.matchingSignals, c.evidence.length);
+  });
+
   await t.test("a phrase-only candidate is capped one below the lowest evidenced score (issue #85)", () => {
     const [idea] = ideaCandidates("pc troubleshooting", ideas, markets, refs);
     const evidenced = { ...idea, id: "e", opportunityScore: 12, evidence: [{ ...idea.evidence[0], claim: "Reddit post" }] };

@@ -1,5 +1,6 @@
 // lib/export/fetcher.ts — Fetches and prepares full ReportExportData from database per PRD §46 & §55.
 
+import { distinctEvidenceRows } from "../evidence/types.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   ReportExportData,
@@ -132,7 +133,7 @@ export async function fetchReportExportData(
 
   // 5. Fetch evidence for opportunities and market
   const entityIdsToCheck = [targetMarketId, ...oppIds];
-  const evRows = await readAll<EvidenceRead>("evidence", () =>
+  const evRows = distinctEvidenceRows(await readAll<EvidenceRead>("evidence", () =>
     supabase
       .from("evidence")
       .select(`
@@ -141,7 +142,7 @@ export async function fetchReportExportData(
     `)
       .in("entity_id", entityIdsToCheck)
       .order("id"),
-  );
+  ));
 
   const evidenceMap = new Map<string, ExportEvidenceItem[]>();
   for (const ev of evRows) {

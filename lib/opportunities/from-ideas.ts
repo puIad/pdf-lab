@@ -3,7 +3,7 @@
 // Each candidate's evidence is the stored phrase rows behind its idea, so it traces back to a search
 // phrase (QC Rule 1) and its demand cites how the phrase was observed (QC Rule 4).
 
-import type { EvidenceInput } from "../evidence/types.ts";
+import { distinctEvidence, type EvidenceInput } from "../evidence/types.ts";
 import { jaccard, tokens, type IdeaFormat, type QuickIdea } from "../ideas/ideas.ts";
 import { namesNoProblem } from "./match.ts";
 import type { GeneratedOpportunity, OpportunityFormat, OpportunityMarketInput } from "./types.ts";
@@ -128,7 +128,8 @@ export function ideaCandidates(
     const idea = group[0];
     const id = crypto.randomUUID();
     const format = IDEA_FORMAT_MAP[idea.format];
-    const evidence: EvidenceInput[] = group.flatMap((g) =>
+    // Once per distinct (claim, url): phrase rows repeat, and the count below is the demand count.
+    const evidence: EvidenceInput[] = distinctEvidence(group.flatMap((g) =>
       g.evidence.map((e) => ({
         entityType: "opportunity" as const,
         entityId: id,
@@ -139,7 +140,7 @@ export function ideaCandidates(
         signalType: "frequency" as const,
         confidence: g.confidence,
       })),
-    );
+    ), (e) => [e.entityId, e.claim, e.url]);
     return {
       id,
       marketId: market.id,
