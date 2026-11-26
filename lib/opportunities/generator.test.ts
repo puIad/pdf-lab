@@ -740,11 +740,14 @@ test("a merge never leaves two different problems on the identical signal set (i
   const x = cand("x", "Builders", "Reseat the RAM stick after a no POST", ["s1", "s3"], ["s1", "s3"], 90);
   const y = cand("y", "PC users", "Most faults were fixed by reseating the RAM", ["s2", "s4"], ["s2", "s4"], 80);
   const z = cand("z", "Movers", "Memory clicks loose after moving the case", ["s3", "s1", "s2", "s4"], ["s3"], 70);
-  const res = await generate25Opportunities([market], { targetCount: 25, extraCandidates: [x, y, z] });
-  const sets = res.opportunities.map((o) => [...(o.evidenceSignalIds ?? [])].sort().join(","));
-  assert.equal(new Set(sets).size, sets.length);
-  assert.ok(sets.includes("s1,s2,s3,s4")); // X and Y, merged
-  assert.ok(res.opportunities.some((o) => o.id === "x" && !res.opportunities.some((p) => p.id === "y")));
+  // Whatever the input order, the stronger candidate (X, 90) takes the set: Z never keeps it by coming first.
+  for (const extraCandidates of [[x, y, z], [z, x, y]]) {
+    const res = await generate25Opportunities([market], { targetCount: 25, extraCandidates });
+    const sets = res.opportunities.map((o) => [...(o.evidenceSignalIds ?? [])].sort().join(","));
+    assert.equal(new Set(sets).size, sets.length);
+    assert.ok(res.opportunities.some((o) => o.id === "x" && o.evidenceSignalIds!.length === 4)); // X and Y, merged
+    assert.ok(!res.opportunities.some((o) => o.id === "y"));
+  }
 });
 
 test("a signal whose analysed problem says none is described yields no opportunity (issue #88)", async () => {

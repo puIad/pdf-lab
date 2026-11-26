@@ -112,7 +112,8 @@ function absorbEvidence(kept: GeneratedOpportunity, folded: GeneratedOpportunity
 }
 
 /**
- * One opportunity per problem, best score first. A later candidate is folded into the kept one when
+ * One opportunity per problem, returned best score first, so the stronger candidate is the first to
+ * take a signal set in `distinctEvidenceSets` (every reader lists by score anyway). A later candidate is folded into the kept one when
  * (a) its problem is near-identical (token overlap SAME_PROBLEM) and the audience is the same, across
  * markets and formats (issue #70), or (b) it is in the same market and both problems use a word that
  * names this market's own fault (`marketProblemWords`, issue #121), with no overlap bar and whatever
@@ -157,8 +158,7 @@ export function mergeSharedProblems(
     }
     kept.push({ c, aud, toks });
   }
-  const byId = new Map(kept.map((k) => [k.c.id, k.c]));
-  return { kept: candidates.filter((c) => byId.has(c.id)).map((c) => byId.get(c.id)!), merged };
+  return { kept: kept.map((k) => k.c), merged };
 }
 
 function normalizeKey(str: string): string {
