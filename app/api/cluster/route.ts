@@ -105,7 +105,7 @@ export async function POST(req: Request) {
       signal_analysis!inner (
         id, audience, problem, intent, urgency, pdf_relevance, embedding
       )
-    `);
+    `, { count: "exact" });
 
   if (Array.isArray(body.signal_ids) && body.signal_ids.length > 0) {
     query = query.in("id", body.signal_ids as string[]);
@@ -118,7 +118,9 @@ export async function POST(req: Request) {
 
   // shortcut: clustering holds every row and its embedding in memory, so it takes the latest
   // MAX_CLUSTER_SIGNALS signals, and the response says when that cap cut rows; split the work by `query` or `signal_ids` to cover more.
-  const { data: rawRows, error: fetchErr } = await query
+  // The exact count tells a cut from an exact fit (asking for one extra row would not: PostgREST
+  // never returns more than 1000).
+  const { data: rawRows, error: fetchErr, count } = await query
     .order("collected_at", { ascending: false })
     .order("id")
     .limit(MAX_CLUSTER_SIGNALS);
@@ -127,7 +129,7 @@ export async function POST(req: Request) {
   }
 
   const rows = (rawRows || []) as unknown as RawSignalWithAnalysis[];
-  const capped = rows.length === MAX_CLUSTER_SIGNALS;
+  const capped = (count ?? 0) > MAX_CLUSTER_SIGNALS;
   if (rows.length === 0) {
     return NextResponse.json({
       clustersCount: 0,
