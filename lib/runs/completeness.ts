@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResearchCompleteness } from "./types.ts";
-import { readAllIn } from "../db/read-all.ts";
+import { readAll, readAllIn } from "../db/read-all.ts";
 import { isDemandOnly, isListing } from "../sources/demand-only.ts";
 
 export interface CompletenessRawCounts {
@@ -81,17 +81,9 @@ export async function fetchRunCompleteness(
   supabase: SupabaseClient,
   runId: string,
 ): Promise<ResearchCompleteness> {
-  const { data: links, error: sigErr } = await supabase
-    .from("run_signals")
-    .select("signals ( id, source_id, external_id, sources ( type ), signal_analysis ( id ) )")
-    .eq("run_id", runId);
-  if (sigErr) {
-    throw new Error(`Failed to count signals for completeness: ${sigErr.message}`);
-  }
-
   type Rel<T> = T | T[] | null | undefined;
   const one = <T>(v: Rel<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
-  const allRows = ((links ?? []) as unknown as Array<{
+  const links = await readAll<{
     signals: Rel<{
       id: string;
       source_id: string;
@@ -99,7 +91,14 @@ export async function fetchRunCompleteness(
       sources: Rel<{ type?: string }>;
       signal_analysis: Rel<{ id: string }>;
     }>;
-  }>).flatMap((l) => one(l.signals) ?? []);
+  }>("signals for completeness", () =>
+    supabase
+      .from("run_signals")
+      .select("signals ( id, source_id, external_id, sources ( type ), signal_analysis ( id ) )")
+      .eq("run_id", runId)
+      .order("signal_id"),
+  );
+  const allRows = links.flatMap((l) => one(l.signals) ?? []);
   // Every source that answered counts as covered; only discussion rows count as signals to analyze
   // (demand-only rows and marketplace listings are never extracted, so they would read as
   // permanently unanalyzed).
@@ -110,12 +109,12 @@ export async function fetchRunCompleteness(
   });
   const analyzedCount = signalRows.filter((s) => one(s.signal_analysis)).length;
 
-  const [{ data: markets }, { data: opps }] = await Promise.all([
-    supabase.from("markets").select("id").eq("run_id", runId),
-    supabase.from("opportunities").select("id").eq("run_id", runId),
+  const [markets, opps] = await Promise.all([
+    readAll<{ id: string }>("markets for completeness", () => supabase.from("markets").select("id").eq("run_id", runId).order("id")),
+    readAll<{ id: string }>("opportunities for completeness", () => supabase.from("opportunities").select("id").eq("run_id", runId).order("id")),
   ]);
-  const marketIds = (markets ?? []).map((m) => m.id as string);
-  const oppIds = (opps ?? []).map((o) => o.id as string);
+  const marketIds = markets.map((m) => m.id);
+  const oppIds = opps.map((o) => o.id);
 
   // Evidence of the run: its markets, its opportunities, and competitors attached to the run only.
   let evidenceCount = 0;
