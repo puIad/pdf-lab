@@ -531,10 +531,10 @@ test("Part 3.8: quick ideas join the Deep-run candidate pool", async (t) => {
   });
 
   await t.test("phrases of one market merge into one candidate that cites each (issue #85)", () => {
-    const two = buildIdeas("pc troubleshooting", [phrase("why does my gpu crash", 3), phrase("gpu driver crash fix", 4)]).ideas;
+    const two = buildIdeas("pc troubleshooting", [phrase("why does my gpu crash", 3), phrase("gpu driver crash under load", 4)]).ideas;
     const twoRefs = new Map(two.flatMap((i) => i.evidence).map((e) => [e.source_id, { sourceUuid: "src-web", excerpt: e.title }]));
     const gpu = marketFor("why does my gpu crash", markets, "pc troubleshooting");
-    assert.equal(marketFor("gpu driver crash fix", markets, "pc troubleshooting")?.id, gpu?.id);
+    assert.equal(marketFor("gpu driver crash under load", markets, "pc troubleshooting")?.id, gpu?.id);
     const cands = ideaCandidates("pc troubleshooting", two, markets, twoRefs).filter((c) => c.marketId === gpu?.id);
     assert.equal(cands.length, 1);
     assert.equal(cands[0].evidence.length, 2);
@@ -599,6 +599,43 @@ test("a quick idea goes to the market holding its own words, not to the one with
   assert.equal(marketFor("vegetarian meal prep", markets, "meal prep")?.id, "small");
   // A word in a market's name beats the same word in another market's snippet.
   assert.equal(marketFor("is meal prep healthy", markets, "meal prep")?.id, "healthy");
+});
+
+// Issue #120, from the 2026-11-26 gate run on "pc troubleshooting" (market names and problems as stored).
+test("a phrase joins a market only when it is about that market's problem (issue #120)", () => {
+  const market = (id: string, name: string, demandScore: number, problems: Array<[string, boolean]>): OpportunityMarketInput => ({
+    id,
+    name,
+    demandScore,
+    confidence: 0.2,
+    signals: problems.map(([problem, names_problem], i) => ({
+      id: `${id}-${i}`,
+      source_id: "src",
+      source_type: "web",
+      title: problem,
+      content: problem,
+      url: null,
+      analysis: { audience: "pc users", problem, names_problem },
+    })),
+  });
+  const markets = [
+    market("basic", "Basic PC troubleshooting steps", 40, [
+      ["A guide on diagnosing common PC issues and early warning signs; no specific fault is described.", false],
+      ["Windows repair, reset or reinstall as a last resort when nothing else has helped; the original fault is not named.", false],
+    ]),
+    market("cmos", "CMOS reset and onboard video", 20, [["No specific problem is described; generic or off-topic comment or guidance.", false]]),
+    market("bsod", "Windows blue screen errors", 20, [["Blue screen of death errors (BSODs), most fixable without professional help, otherwise needing hardware swaps.", true]]),
+    market("compat", "Windows program compatibility", 20, [["Running the Windows Program Compatibility troubleshooter through the Get Help app for a program that does not run correctly.", true]]),
+  ];
+  const seed = "pc troubleshooting";
+  // One shared word is not about the problem: "reset" (CMOS is not a Windows reset), "help", "troubleshoot".
+  assert.equal(marketFor("how to reset a pc?", markets, seed), null);
+  assert.equal(marketFor("how can i find someone to help me with my computer?", markets, seed), null);
+  assert.equal(marketFor("how do i run a troubleshoot on my pc?", markets, seed), null);
+  // A phrase that is about the market still joins it.
+  assert.equal(marketFor("pc troubleshooting guide", markets, seed)?.id, "basic");
+  assert.equal(marketFor("windows blue screen errors", markets, seed)?.id, "bsod");
+  assert.equal(marketFor("blue screen of death fix", markets, seed), null); // "fix" is in no problem: less, never padded
 });
 
 test("mergeSharedProblems folds one audience and problem across markets and formats (issue #70)", async () => {
