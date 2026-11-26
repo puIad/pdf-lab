@@ -9,12 +9,12 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/db/client";
 import { generateMarketOverview } from "@/lib/search";
 import { fetchMarketsData } from "@/lib/markets/fetcher";
-import { detectTopicTrend, type SignalRecord } from "@/lib/trends";
+import { detectTopicTrend } from "@/lib/trends";
+import { loadMonitorSignals } from "@/lib/monitor/signals";
 import { startModelRun } from "@/lib/runs/start-deep";
 import { pastedModeResponse } from "@/lib/settings/pasted-gate";
 import { EXTRACTION_PROMPT_VERSION } from "@/lib/ai/index";
 import { OPPORTUNITY_PROMPT_VERSION } from "@/lib/opportunities";
-import { isDemandOnly } from "@/lib/sources/demand-only";
 import { enforceQuota, refund } from "@/lib/quotas/guard";
 import {
   RESEARCH_MODES,
@@ -24,7 +24,6 @@ import {
   planResearch,
   searchTextOf,
   seedOf,
-  tokenize,
   type ResearchMode,
 } from "@/lib/planner";
 
@@ -38,21 +37,6 @@ interface ResearchBody {
   prompt?: unknown;
   mode?: unknown;
   user_id?: unknown;
-}
-
-interface MonitorSignalRow {
-  id: string;
-  title: string | null;
-  content: string | null;
-  published_at: string | null;
-  external_id: string | null;
-  engagement: Record<string, unknown> | null;
-  sources: { type?: string } | { type?: string }[] | null;
-  signal_analysis: { intent?: string | null; urgency?: string | null } | { intent?: string | null; urgency?: string | null }[] | null;
-}
-
-function one<T>(v: T | T[] | null): T | null {
-  return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
 export async function POST(req: Request) {
@@ -152,31 +136,7 @@ export async function POST(req: Request) {
           await refund(guard);
           return NextResponse.json({ error: "Monitor needs a niche, e.g. `monitor: pc troubleshooting`", plan }, { status: 400 });
         }
-        const { data, error } = await supabase
-          .from("signals")
-          .select("id, title, content, published_at, external_id, engagement, sources ( type ), signal_analysis ( intent, urgency )")
-          .not("published_at", "is", null) // QC Rule 2: collection time is not temporal evidence
-          .order("published_at", { ascending: false })
-          .limit(1000);
-        if (error) throw new Error(error.message);
-
-        const tokens = tokenize(text).map((t) => t.replace(/s$/, ""));
-        const signals: SignalRecord[] = ((data ?? []) as MonitorSignalRow[])
-          .filter((s) => {
-            if (isDemandOnly({ source_type: one(s.sources)?.type, external_id: s.external_id })) return false; // not discussions
-            const hay = `${s.title ?? ""} ${s.content ?? ""}`.toLowerCase();
-            return tokens.some((t) => hay.includes(t));
-          })
-          .map((s) => ({
-            id: s.id,
-            sourceType: one(s.sources)?.type ?? "unknown",
-            title: s.title,
-            content: s.content,
-            publishedAt: s.published_at as string,
-            engagement: s.engagement as SignalRecord["engagement"],
-            intent: one(s.signal_analysis)?.intent ?? null,
-            urgency: one(s.signal_analysis)?.urgency ?? null,
-          }));
+        const signals = await loadMonitorSignals(supabase, text);
 
         result = {
           mode: "monitor",
