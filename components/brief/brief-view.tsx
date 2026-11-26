@@ -4,8 +4,10 @@
 // suggestions and AI interpretation are labeled apart (QC Rule 5). AI notes are written on click
 // only, and exports rebuild the brief server-side with the notes written here.
 
-import React, { useState } from "react";
-import { Copy, Download, ExternalLink, FileText, Loader2, ShieldAlert, Sparkles } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Copy, Download, ExternalLink, FileText, Loader2, Send, ShieldAlert, Sparkles } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { googleErrorText } from "@/lib/google/messages";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,12 +119,41 @@ function NoteSlot({
   );
 }
 
-export function BriefView({ brief }: { brief: Brief }) {
+export function BriefView({ brief, googleConnected }: { brief: Brief; googleConnected: boolean }) {
+  // The Google callback returns here with ?google=connected or ?google_error=<code>; both are read
+  // once, then removed from the URL.
+  const params = useSearchParams();
+  const router = useRouter();
+  const [connected, setConnected] = useState(googleConnected || params.get("google") === "connected");
+  const [docUrl, setDocUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, BriefAiNote>>(brief.notes);
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [exporting, setExporting] = useState<"md" | "docx" | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<"md" | "docx" | "gdocs" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(params.get("google_error") === null ? null : googleErrorText(params.get("google_error")!));
+
+  // Notes written before the redirect to Google survive the round trip in sessionStorage; the server
+  // still filters them through acceptNotes on send and export.
+  const notesKey = `pdflab.briefNotes.${JSON.stringify(brief.source)}`;
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(notesKey);
+      if (saved) {
+        sessionStorage.removeItem(notesKey);
+        setNotes(JSON.parse(saved) as Record<string, BriefAiNote>);
+      }
+    } catch (err) {
+      console.error("could not restore brief notes", err);
+    }
+    if (params.has("google") || params.has("google_error")) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("google");
+      url.searchParams.delete("google_error");
+      router.replace(url.pathname + url.search, { scroll: false });
+    }
+    // Once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const cites = new Map<string, BriefCite>();
   for (const f of [brief.promise, brief.audience, ...brief.buyerLanguage, ...brief.keywords, brief.whereToSell?.fact ?? null, brief.priceAnchor, ...brief.bonusAngles]) {
@@ -178,6 +209,54 @@ export function BriefView({ brief }: { brief: Brief }) {
     }
   }
 
+  async function sendToGoogleDocs() {
+    setExporting("gdocs");
+    setExportError(null);
+    setDocUrl(null);
+    try {
+      const here = new URL(window.location.href);
+      here.searchParams.delete("google");
+      here.searchParams.delete("google_error");
+      const res = await fetch("/api/google/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: brief.source, notes, next: here.pathname + here.search }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string; connect?: string };
+      if (body.connect) {
+        try {
+          sessionStorage.setItem(notesKey, JSON.stringify(notes));
+        } catch (err) {
+          console.error("could not keep brief notes across the Google sign-in", err);
+        }
+        window.location.assign(body.connect);
+        return;
+      }
+      if (!res.ok || !body.url) throw new Error(body.error ?? `Send failed (${res.status})`);
+      setConnected(true);
+      setDocUrl(body.url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function disconnectGoogle() {
+    setExporting("gdocs");
+    setExportError(null);
+    try {
+      const res = await fetch("/api/google", { method: "DELETE" });
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? `Disconnect failed (${res.status})`);
+      setConnected(false);
+      setDocUrl(null);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Disconnect failed");
+    } finally {
+      setExporting(null);
+    }
+  }
+
   const slot = (k: string, label: string) => (
     <NoteSlot note={notes[k]} label={label} busy={busy} me={k} error={errors[k]} cites={cites} onWrite={() => writeNote(k)} />
   );
@@ -206,8 +285,22 @@ export function BriefView({ brief }: { brief: Brief }) {
             {exporting === "docx" ? <Loader2 className="animate-spin" /> : <FileText />}
             DOCX
           </Button>
+          <Button size="sm" variant="outline" className="cursor-pointer" disabled={exporting !== null} onClick={sendToGoogleDocs}>
+            {exporting === "gdocs" ? <Loader2 className="animate-spin" /> : <Send />}
+            Send to Google Docs
+          </Button>
         </div>
       </div>
+      {docUrl && (
+        <p className="text-xs">
+          Sent. <a href={docUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">Open the Google Doc</a>
+        </p>
+      )}
+      {connected && (
+        <Button size="xs" variant="link" className="cursor-pointer px-0 text-muted-foreground" disabled={exporting !== null} onClick={disconnectGoogle}>
+          Disconnect Google Docs
+        </Button>
+      )}
       {exportError && <p className="text-xs text-rose-600 dark:text-rose-400">{exportError}</p>}
 
       {brief.verdict && <VerdictPanel verdict={brief.verdict} compact />}

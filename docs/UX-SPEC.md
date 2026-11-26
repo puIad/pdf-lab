@@ -89,7 +89,7 @@ positioning, search keywords, customer language, evidence sources.
   (DEC-021). A concept with no matching stored row gets WAIT, "No stored rows for this phrase; scan
   the topic first", never KILL.
 - Brief (from an opportunity or a GO / WAIT idea): facts, AI interpretation and suggestions stay in
-  separate, labelled layers (QC Rule 5); export Markdown / DOCX, Google Docs after 5.4.
+  separate, labelled layers (QC Rule 5); export Markdown / DOCX, or "Send to Google Docs" (signed in; first use goes through Google's consent screen, `drive.file` only; a "Disconnect Google Docs" link revokes it).
 - Never show a number without its basis. PDFMakerHub's random "live" metrics are the
   anti-example (`docs/research/2026-10-24-competitor-sweep.md`).
 

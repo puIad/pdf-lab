@@ -18,12 +18,14 @@ export const EXPORT_TABLES = {
   alerts: "kind, seed, region, title, detail, created_at, read_at",
   // Key metadata only. Never `ciphertext`: the export must not carry key material, even encrypted.
   user_provider_keys: "provider, last4, options, status, created_at, rotated_at",
+  // Only that a Google Docs connection exists and since when. Never `ciphertext` (Part 5.4).
+  user_google_tokens: "created_at",
 } as const;
 
 export type ExportTable = keyof typeof EXPORT_TABLES;
 
 /** The unique column that orders each table's rows for paging, within one user's rows. Every other table has `id`. */
-export const EXPORT_ORDER: Partial<Record<ExportTable, string>> = { alert_settings: "watch_id", user_provider_keys: "provider" };
+export const EXPORT_ORDER: Partial<Record<ExportTable, string>> = { alert_settings: "watch_id", user_provider_keys: "provider", user_google_tokens: "user_id" };
 
 /**
  * Every row of the person's own tables, paged past the 1000-row response cap and scoped by `user_id`.

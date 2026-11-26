@@ -262,6 +262,24 @@ create table ai_usage_ledger (
   `lib/usage/ledger.ts`), or `unpriced` (tokens counted, cost 0).
 - Migration: `supabase/migrations/20261120000013_byok_keys_ledger.sql`.
 
+## Google Docs connection (Part 5.4)
+
+```sql
+create table user_google_tokens (
+  user_id uuid primary key references users(id) on delete cascade,
+  ciphertext text not null,   -- the Google refresh token, AES-256-GCM, bound to (user_id, 'google-drive')
+  created_at timestamptz not null default now()
+);
+```
+
+- Service-role only, like `user_provider_keys` (RLS on, grants revoked, no policy). One row per person;
+  reconnecting replaces it (one upsert), disconnecting revokes the grant at Google and deletes it. A
+  refresh token Google rejects (`invalid_grant`, or a 401 from Drive) is deleted so the next send reconnects.
+- Only the refresh token is stored. An access token lives for one request. The scope is
+  `drive.file` only, asserted on the consent URL and on the grant Google returns. The account export
+  carries `created_at` only, never the ciphertext.
+- Migration: `supabase/migrations/20261125000022_google_tokens.sql`.
+
 ## Success metrics (Part 6.2, PRD §58 to §59)
 
 ```sql
@@ -336,7 +354,7 @@ create table takedowns (
 
 - Public read: `markets`, `opportunities`, `competitors`, `evidence`, `sources` (anon can
   browse explorer within free-tier limits enforced app-side).
-- Private: `takedowns` (service role only), `user_provider_keys` (service role only, Part 5.2), `ai_usage_ledger` (owner reads), `users` (owner only), `watchlists` (owner only, Part 4.1), `research_runs` + `signals`/`signal_analysis`/
+- Private: `takedowns` (service role only), `user_provider_keys` (service role only, Part 5.2), `user_google_tokens` (service role only, Part 5.4), `ai_usage_ledger` (owner reads), `users` (owner only), `watchlists` (owner only, Part 4.1), `research_runs` + `signals`/`signal_analysis`/
   `market_signals`/`run_signals` (owner's runs + linked rows, or service-role only in MVP; tighten in Phase 5).
 - Enforce with policies + tests in Phase 0 Part 0.2; service-role key NEVER ships to client.
 
