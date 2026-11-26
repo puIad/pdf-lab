@@ -25,7 +25,7 @@ export const EXPORT_TABLES = {
 export type ExportTable = keyof typeof EXPORT_TABLES;
 
 /** The unique column that orders each table's rows for paging, within one user's rows. Every other table has `id`. */
-export const EXPORT_ORDER: Partial<Record<ExportTable, string>> = { alert_settings: "watch_id", user_provider_keys: "provider" };
+export const EXPORT_ORDER: Partial<Record<ExportTable, string>> = { alert_settings: "watch_id", user_provider_keys: "provider", user_google_tokens: "user_id" };
 
 /**
  * Every row of the person's own tables, paged past the 1000-row response cap and scoped by `user_id`.

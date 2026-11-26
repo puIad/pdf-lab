@@ -1,7 +1,7 @@
 // lib/privacy/account-data.test.ts — export shape and the delete confirmation.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildExport, EXPORT_TABLES, isDeleteConfirmed, loadExportRows } from "./account-data.ts";
+import { buildExport, EXPORT_ORDER, EXPORT_TABLES, isDeleteConfirmed, loadExportRows } from "./account-data.ts";
 import { cappedSupabase } from "../db/capped-supabase.test-helpers.ts";
 
 describe("account export", () => {
@@ -17,6 +17,13 @@ describe("account export", () => {
       assert.ok(!columns.split(",").map((c) => c.trim()).includes("ciphertext"), `${table} exports ciphertext`);
     }
     assert.equal(EXPORT_TABLES.user_provider_keys, "provider, last4, options, status, created_at, rotated_at");
+  });
+  it("pages tables without an id column by their own key", () => {
+    // These tables have no `id`; ordering by the default would fail the whole export.
+    assert.deepEqual(
+      { alert_settings: EXPORT_ORDER.alert_settings, user_provider_keys: EXPORT_ORDER.user_provider_keys, user_google_tokens: EXPORT_ORDER.user_google_tokens },
+      { alert_settings: "watch_id", user_provider_keys: "provider", user_google_tokens: "user_id" },
+    );
   });
 });
 
