@@ -44,7 +44,8 @@ export function pickDistinctIdeas(ideas: QuickIdea[], max = IDEA_CANDIDATES): Qu
 }
 
 /**
- * The market that holds the most of the phrase's own words. The seed's words are left out: every
+ * Among the markets that hold all of the phrase's own words, the one whose name holds the most of
+ * them. The seed's words are left out: every
  * market of the run has them. Containment, not jaccard: jaccard divides by all of a market's text,
  * so the market with the fewest signals won every general idea (Part 6.16). A phrase belongs to a
  * market only when it is about that market's problem: every word of its own is in the market, and
@@ -69,12 +70,12 @@ export function marketFor(phrase: string, markets: OpportunityMarketInput[], see
     const hay = new Set([...name, ...tokens(m.signals.map((s) => s.analysis?.problem ?? s.title ?? "").join(" "))]);
     const named = new Set(tokens(m.signals.filter((s) => !namesNoProblem(s.analysis)).map((s) => s.analysis?.problem ?? s.title ?? "").join(" ")));
     const share = (set: Set<string>) => (toks.length ? toks.filter((t) => set.has(t)).length / toks.length : 0);
-    // A word in the market's name counts twice: "is meal prep healthy" belongs to "Healthy meal prep
-    // plans", not to a market where one snippet says "healthy". Ties go to the stronger market.
-    if (toks.length === 0 || share(hay) < 1) continue; // a word of the phrase's own is not in this market
+    if (share(hay) < 1) continue; // a word of the phrase's own is not in this market (empty phrase: share 0)
     // Neither the name nor a named problem is about the phrase: the market is about something else.
     if (nameWords.filter((t) => all.has(t)).length * 2 < nameWords.length && share(named) < 1) continue;
-    const score = share(hay) + share(name) + m.demandScore / 1000;
+    // The name decides: "is meal prep healthy" belongs to "Healthy meal prep plans", not to a market
+    // where one snippet says "healthy". Ties go to the stronger market.
+    const score = share(name) + m.demandScore / 1000;
     if (score > bestScore) {
       best = m;
       bestScore = score;
