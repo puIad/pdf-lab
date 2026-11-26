@@ -1,4 +1,4 @@
-﻿// lib/search/search.test.ts â€” Unit and acceptance tests for Market Search & PRD Â§8 Overview.
+// lib/search/search.test.ts — Unit and acceptance tests for Market Search & PRD §8 Overview.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -62,7 +62,7 @@ function createMockSupabase(dataset: {
   } as unknown as import("@supabase/supabase-js").SupabaseClient;
 }
 
-describe("PRD Â§8 Market Overview Aggregator", () => {
+describe("PRD §8 Market Overview Aggregator", () => {
   test("createEmptyOverview returns unobserved for all 9 dimensions with zero confidence", () => {
     const empty = createEmptyOverview("quantum farming", "explore", new Date().toISOString());
 

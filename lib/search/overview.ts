@@ -137,14 +137,12 @@ export async function generateMarketOverview(
         .order("id"),
     );
 
-    if (allMarkets.length > 0) {
-      matchedMarkets = allMarkets.filter(current).filter((m) => {
-        const name = (m.name || "").toLowerCase();
-        const desc = (m.description || "").toLowerCase();
-        if (name.includes(cleanQ) || desc.includes(cleanQ)) return true;
-        return tokens.some((t) => name.includes(t) || desc.includes(t));
-      });
-    }
+    matchedMarkets = allMarkets.filter(current).filter((m) => {
+      const name = (m.name || "").toLowerCase();
+      const desc = (m.description || "").toLowerCase();
+      if (name.includes(cleanQ) || desc.includes(cleanQ)) return true;
+      return tokens.some((t) => name.includes(t) || desc.includes(t));
+    });
   } catch (err) {
     console.error("Error fetching markets:", err);
   }
@@ -166,33 +164,31 @@ export async function generateMarketOverview(
         .order("id"),
     );
 
-    if (allSignals.length > 0) {
-      matchedSignals = allSignals.filter((s) => {
-        const title = (s.title || "").toLowerCase();
-        const content = (s.content || "").toLowerCase();
-        const problem = (s.signal_analysis?.problem || "").toLowerCase();
-        const audience = (s.signal_analysis?.audience || "").toLowerCase();
+    matchedSignals = allSignals.filter((s) => {
+      const title = (s.title || "").toLowerCase();
+      const content = (s.content || "").toLowerCase();
+      const problem = (s.signal_analysis?.problem || "").toLowerCase();
+      const audience = (s.signal_analysis?.audience || "").toLowerCase();
 
-        // Exact query substring match
-        if (
-          title.includes(cleanQ) ||
-          content.includes(cleanQ) ||
-          problem.includes(cleanQ) ||
-          audience.includes(cleanQ)
-        ) {
-          return true;
-        }
+      // Exact query substring match
+      if (
+        title.includes(cleanQ) ||
+        content.includes(cleanQ) ||
+        problem.includes(cleanQ) ||
+        audience.includes(cleanQ)
+      ) {
+        return true;
+      }
 
-        // Token match
-        return tokens.some(
-          (t) =>
-            title.includes(t) ||
-            content.includes(t) ||
-            problem.includes(t) ||
-            audience.includes(t)
-        );
-      });
-    }
+      // Token match
+      return tokens.some(
+        (t) =>
+          title.includes(t) ||
+          content.includes(t) ||
+          problem.includes(t) ||
+          audience.includes(t)
+      );
+    });
   } catch (err) {
     console.error("Error fetching signals:", err);
   }
@@ -200,7 +196,7 @@ export async function generateMarketOverview(
   // Also include signals linked to matched markets via market_signals if any
   if (matchedMarketIds.size > 0) {
     try {
-      const marketSignals = await readAll<unknown>("market signals", () =>
+      const marketSignals = await readAll<{ signals: RawSignalRow | null }>("market signals", () =>
         supabase
         .from("market_signals")
         .select(`
@@ -218,7 +214,7 @@ export async function generateMarketOverview(
 
       const existingSignalIds = new Set(matchedSignals.map((s) => s.id));
       for (const ms of marketSignals) {
-        const s = (ms as unknown as { signals: RawSignalRow }).signals;
+        const s = ms.signals;
         if (s && !existingSignalIds.has(s.id)) {
           matchedSignals.push(s);
           existingSignalIds.add(s.id);
