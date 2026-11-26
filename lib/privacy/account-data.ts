@@ -1,5 +1,8 @@
 // lib/privacy/account-data.ts — what a person can take out of PDF Lab and the words that confirm
-// deleting it (Phase 6 Part 6.3). Pure: the route reads the rows, this shapes and checks them.
+// deleting it (Phase 6 Part 6.3). Reads one person's rows, shapes them, and checks the delete phrase.
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { readAll } from "../db/read-all.ts";
 
 export const DELETE_CONFIRMATION = "delete my account";
 
@@ -18,6 +21,21 @@ export const EXPORT_TABLES = {
 } as const;
 
 export type ExportTable = keyof typeof EXPORT_TABLES;
+
+/** The unique column that orders each table's rows for paging, within one user's rows. Every other table has `id`. */
+export const EXPORT_ORDER: Partial<Record<ExportTable, string>> = { alert_settings: "watch_id", user_provider_keys: "provider" };
+
+/**
+ * Every row of the person's own tables, paged past the 1000-row response cap and scoped by `user_id`.
+ * An unreadable table fails the whole export, never a partial file.
+ */
+export async function loadExportRows(db: SupabaseClient, userId: string): Promise<Partial<Record<ExportTable, unknown[]>>> {
+  const rows: Partial<Record<ExportTable, unknown[]>> = {};
+  for (const table of Object.keys(EXPORT_TABLES) as ExportTable[]) {
+    rows[table] = await readAll(table, () => db.from(table).select(EXPORT_TABLES[table]).eq("user_id", userId).order(EXPORT_ORDER[table] ?? "id"));
+  }
+  return rows;
+}
 
 export interface AccountExport {
   exportedAt: string;

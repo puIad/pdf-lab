@@ -7,6 +7,7 @@
 
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readAll, readAllIn } from "../db/read-all.ts";
 import { runIngest, type IngestDeps, type IngestSourceStatus } from "../ingest/pipeline.ts";
 import type { MarketSignal } from "../sources/types.ts";
 
@@ -178,13 +179,14 @@ export interface StoredCheck {
 export async function loadStoredChecks(supabase: SupabaseClient, phrases: string[]): Promise<Record<string, StoredCheck>> {
   const byId = new Map(phrases.map((p) => [checkEntityId(p), normalizePhrase(p)]));
   if (byId.size === 0) return {};
-  const { data: ev, error } = await supabase
-    .from("evidence")
-    .select("id, entity_id, claim, excerpt, url, created_at, sources ( type )")
-    .eq("entity_type", "competition")
-    .in("entity_id", [...byId.keys()]);
-  if (error) throw new Error(`failed to load competition checks: ${error.message}`);
-  const evidence = (ev ?? []) as EvidenceRead[];
+  const evidence = await readAllIn<EvidenceRead>("competition checks", [...byId.keys()], (chunk) =>
+    supabase
+      .from("evidence")
+      .select("id, entity_id, claim, excerpt, url, created_at, sources ( type )")
+      .eq("entity_type", "competition")
+      .in("entity_id", chunk)
+      .order("id"),
+  );
   if (evidence.length === 0) return {};
 
   const urls = [...new Set(evidence.map((e) => e.url).filter((u): u is string => !!u))];
@@ -192,12 +194,10 @@ export async function loadStoredChecks(supabase: SupabaseClient, phrases: string
   // Listing signals use the listing url as external_id (marketplace adapters). The filter goes in the
   // GET query string and Google redirect urls run to ~400 chars, so batch by length, not count.
   for (const batch of batchByLength(urls, 4000)) {
-    const { data, error: sErr } = await supabase
-      .from("signals")
-      .select("external_id, engagement, sources ( type )")
-      .in("external_id", batch);
-    if (sErr) throw new Error(`failed to load competition listings: ${sErr.message}`);
-    for (const r of (data ?? []) as SignalRead[]) signals.set(`${typeOf(r.sources)}|${r.external_id}`, r);
+    const data = await readAll<SignalRead>("competition listings", () =>
+      supabase.from("signals").select("id, external_id, engagement, sources ( type )").in("external_id", batch).order("id"),
+    );
+    for (const r of data) signals.set(`${typeOf(r.sources)}|${r.external_id}`, r);
   }
 
   const out: Record<string, StoredCheck> = {};

@@ -36,6 +36,8 @@ test("a seed is shown only to the run's owner", async () => {
         select: () => b,
         eq: () => b,
         in: () => b,
+        order: () => b,
+        range: () => b,
         maybeSingle: async () => ({ data: { query: "secret seed", user_id: "owner" } }),
         then: (resolve: (v: unknown) => void) =>
           resolve({ data: table === "run_signals" ? [{ run_id: "r1", signals: { url: "u", engagement: iot, sources: { type: "gtrends" } } }] : [], error: null }),

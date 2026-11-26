@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResearchCompleteness } from "./types.ts";
+import { readAllIn } from "../db/read-all.ts";
 import { isDemandOnly, isListing } from "../sources/demand-only.ts";
 
 export interface CompletenessRawCounts {
@@ -119,24 +120,23 @@ export async function fetchRunCompleteness(
   // Evidence of the run: its markets, its opportunities, and competitors attached to the run only.
   let evidenceCount = 0;
   let evidenceBackedOpportunitiesCount = 0;
-  const { data: evRows } = await supabase
-    .from("evidence")
-    .select("id, entity_type, entity_id")
-    .in("entity_id", [runId, ...marketIds, ...oppIds]);
-  if (evRows) {
-    evidenceCount = evRows.length;
-    evidenceBackedOpportunitiesCount = new Set(
-      evRows.filter((e) => e.entity_type === "opportunity").map((e) => e.entity_id),
-    ).size;
-  }
+  const evRows = await readAllIn<{ id: string; entity_type: string; entity_id: string }>(
+    "evidence",
+    [runId, ...marketIds, ...oppIds],
+    (chunk) => supabase.from("evidence").select("id, entity_type, entity_id").in("entity_id", chunk).order("id"),
+  );
+  evidenceCount = evRows.length;
+  evidenceBackedOpportunitiesCount = new Set(
+    evRows.filter((e) => e.entity_type === "opportunity").map((e) => e.entity_id),
+  ).size;
 
   // Analysed signals of the run that are linked to none of its markets. With no market at all,
   // that is every analysed signal.
   const inMarket = new Set<string>();
-  if (marketIds.length > 0) {
-    const { data: linked } = await supabase.from("market_signals").select("signal_id").in("market_id", marketIds);
-    for (const l of linked ?? []) inMarket.add(l.signal_id as string);
-  }
+  const linked = await readAllIn<{ signal_id: string }>("market signals", marketIds, (chunk) =>
+    supabase.from("market_signals").select("market_id, signal_id").in("market_id", chunk).order("market_id").order("signal_id"),
+  );
+  for (const l of linked) inMarket.add(l.signal_id);
   const notClustered = signalRows.filter((s) => one(s.signal_analysis) && !inMarket.has(s.id)).length;
 
   return {

@@ -4,6 +4,7 @@
 // niche, read from the run's own rows (`run_signals`) and always labelled as the niche's (QC Rule 2).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readAllIn } from "../db/read-all.ts";
 import { ownsRun, type RunViewer } from "../runs/scope.ts";
 
 type Rel<T> = T | T[] | null | undefined;
@@ -57,16 +58,22 @@ export function summarizeNicheTrend(runId: string, seed: string, rows: NicheRow[
 /** The niche trend of each run given, read from its own `run_signals` in one query. Never throws. */
 export async function fetchNicheTrends(supabase: SupabaseClient, runs: Array<{ id: string; query: string }>): Promise<NicheTrend[]> {
   if (runs.length === 0) return [];
-  const { data, error } = await supabase
-    .from("run_signals")
-    .select("run_id, signals ( url, engagement, sources ( type ) )")
-    .in("run_id", runs.map((r) => r.id));
-  if (error) {
-    console.error(`Could not load the niche trend: ${error.message}`);
+  let links: Array<{ run_id: string; signals: Rel<NicheRow> }>;
+  try {
+    links = await readAllIn("run signals", runs.map((r) => r.id), (chunk) =>
+      supabase
+        .from("run_signals")
+        .select("run_id, signal_id, signals ( url, engagement, sources ( type ) )")
+        .in("run_id", chunk)
+        .order("run_id")
+        .order("signal_id"),
+    );
+  } catch (err) {
+    console.error(`Could not load the niche trend: ${err instanceof Error ? err.message : String(err)}`);
     return [];
   }
   const byRun = new Map<string, NicheRow[]>();
-  for (const l of (data ?? []) as unknown as Array<{ run_id: string; signals: Rel<NicheRow> }>) {
+  for (const l of links) {
     const row = one(l.signals);
     if (row) byRun.set(l.run_id, [...(byRun.get(l.run_id) ?? []), row]);
   }

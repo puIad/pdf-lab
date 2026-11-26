@@ -19,3 +19,13 @@ export async function readAll<T>(label: string, query: () => Pageable): Promise<
     if ((data?.length ?? 0) < PAGE) return rows;
   }
 }
+
+/** Ids per request for an `.in()` filter: the list travels in the URL of a GET, so it stays short. */
+const IN_CHUNK = 100;
+
+/** `readAll` for a query filtered by an id list: one paged read per chunk of ids, results merged. */
+export async function readAllIn<T>(label: string, ids: string[], query: (chunk: string[]) => Pageable): Promise<T[]> {
+  const rows: T[] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) rows.push(...(await readAll<T>(label, () => query(ids.slice(i, i + IN_CHUNK)))));
+  return rows;
+}

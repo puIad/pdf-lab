@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, createServiceSupabaseClient } from "@/lib/db/client";
 import { resolveCaller } from "@/lib/quotas/guard";
-import { buildExport, EXPORT_TABLES, isDeleteConfirmed, type ExportTable } from "@/lib/privacy/account-data";
+import { buildExport, isDeleteConfirmed, loadExportRows } from "@/lib/privacy/account-data";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +18,8 @@ export async function GET(req: Request) {
     const caller = await resolveCaller(req.headers);
     if (!caller.userId) return signIn();
     const db = createServiceSupabaseClient();
-    const rows: Partial<Record<ExportTable, unknown[]>> = {};
-    for (const table of Object.keys(EXPORT_TABLES) as ExportTable[]) {
-      // Service role reads, scoped by user_id; an unreadable table fails the whole export, never a partial file.
-      const { data, error } = await db.from(table).select(EXPORT_TABLES[table]).eq("user_id", caller.userId);
-      if (error) throw new Error(`${table}: ${error.message}`);
-      rows[table] = data ?? [];
-    }
+    // Service role reads, scoped by user_id.
+    const rows = await loadExportRows(db, caller.userId);
     const { data: me } = await db.from("users").select("email, plan, created_at").eq("id", caller.userId).maybeSingle();
     const body = buildExport(new Date(), { email: me?.email ?? caller.email, plan: me?.plan ?? null, createdAt: me?.created_at ?? null }, rows);
     return new NextResponse(JSON.stringify(body, null, 2), {

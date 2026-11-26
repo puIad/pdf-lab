@@ -10,7 +10,7 @@ import type {
   BuyerIntentLevel,
 } from "./types.ts";
 import { fetchNicheTrends } from "../trends/niche.ts";
-import { readAll } from "../db/read-all.ts";
+import { readAll, readAllIn } from "../db/read-all.ts";
 import { isCurrent, listCompletedRuns, listedRuns, type RunViewer } from "../runs/scope.ts";
 
 /**
@@ -97,11 +97,11 @@ export async function fetchMarketsData(
   );
 
   // 2. Fetch opportunities
-  const rawOpps = await readAll<Record<string, unknown>>("opportunities", () =>
+  const rawOpps = await readAllIn<Record<string, unknown>>("opportunities", marketIds, (chunk) =>
     supabase
       .from("opportunities")
       .select("id, market_id, title, opportunity_score, confidence, format, format_basis, target_audience")
-      .in("market_id", marketIds)
+      .in("market_id", chunk)
       .order("opportunity_score", { ascending: false })
       .order("id"),
   );
@@ -149,7 +149,7 @@ export async function fetchMarketsData(
   }
 
   // 4. Fetch linked signals with analysis
-  const rawMarketSignals = await readAll<{ market_id: string }>("market signals", () =>
+  const rawMarketSignals = await readAllIn<{ market_id: string }>("market signals", marketIds, (chunk) =>
     supabase
     .from("market_signals")
     .select(`
@@ -163,7 +163,7 @@ export async function fetchMarketsData(
         )
       )
     `)
-    .in("market_id", marketIds)
+    .in("market_id", chunk)
     .order("market_id")
     .order("signal_id"),
   );

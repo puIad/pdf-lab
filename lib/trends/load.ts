@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SignalRecord } from "./detector.ts";
 import { TrendingRadarService, type MarketTopicData } from "./service.ts";
 import { isDemandOnly } from "../sources/demand-only.ts";
-import { readAll } from "../db/read-all.ts";
+import { readAll, readAllIn } from "../db/read-all.ts";
 import { isCurrent, latestRunIds } from "../runs/scope.ts";
 
 type Rel<T> = T | T[] | null | undefined;
@@ -29,27 +29,29 @@ interface LinkRow {
 }
 
 export async function loadStoredMarketTopics(supabase: SupabaseClient): Promise<MarketTopicData[]> {
-  const { data: allMarkets, error } = await supabase.from("markets").select("id, run_id, name, description");
-  if (error) throw new Error(`Failed to load markets: ${error.message}`);
+  const allMarkets = await readAll<Record<string, unknown>>("markets", () =>
+    supabase.from("markets").select("id, run_id, name, description").order("id"),
+  );
   // One run per seed: a market of a run that a newer run replaced is not plotted twice (Part 6.7).
   const latest = await latestRunIds(supabase);
-  const markets = (allMarkets ?? []).filter((m) => isCurrent(m.run_id as string | null, latest));
+  const markets = allMarkets.filter((m) => isCurrent(m.run_id as string | null, latest));
   if (!markets.length) return [];
   const ids = markets.map((m) => m.id as string);
 
-  const links = await readAll<LinkRow>("market signals", () =>
+  const links = await readAllIn<LinkRow>("market signals", ids, (chunk) =>
     supabase
       .from("market_signals")
       .select(
         "market_id, signal_id, signals(id, external_id, url, title, content, published_at, engagement, sources(type), signal_analysis(intent, urgency))",
       )
-      .in("market_id", ids)
+      .in("market_id", chunk)
       .order("market_id")
       .order("signal_id"),
   );
 
-  const { data: comps, error: compErr } = await supabase.from("competitors").select("market_id").in("market_id", ids);
-  if (compErr) throw new Error(`Failed to load competitors: ${compErr.message}`);
+  const comps = await readAllIn<{ market_id: string }>("competitors", ids, (chunk) =>
+    supabase.from("competitors").select("id, market_id").in("market_id", chunk).order("id"),
+  );
 
   const signalsByMarket = new Map<string, SignalRecord[]>();
   for (const link of links) {
@@ -73,7 +75,7 @@ export async function loadStoredMarketTopics(supabase: SupabaseClient): Promise<
   }
 
   const compCount = new Map<string, number>();
-  for (const c of comps ?? []) compCount.set(c.market_id as string, (compCount.get(c.market_id as string) ?? 0) + 1);
+  for (const c of comps) compCount.set(c.market_id as string, (compCount.get(c.market_id as string) ?? 0) + 1);
 
   // markets has no category column; "general" keeps the filter shape without inventing one.
   return markets

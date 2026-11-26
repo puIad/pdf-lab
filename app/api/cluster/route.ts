@@ -19,6 +19,7 @@ import { buildSearchFilter } from "@/lib/db/search";
 export const dynamic = "force-dynamic";
 
 const EXPECTED_EMBEDDING_DIM = 1536;
+const MAX_CLUSTER_SIGNALS = 1000;
 
 interface ClusterBody {
   signal_ids?: unknown;
@@ -115,12 +116,18 @@ export async function POST(req: Request) {
     }
   }
 
-  const { data: rawRows, error: fetchErr } = await query.limit(1000);
+  // shortcut: clustering holds every row and its embedding in memory, so it takes the latest
+  // MAX_CLUSTER_SIGNALS signals, and the response says when that cap cut rows; split the work by `query` or `signal_ids` to cover more.
+  const { data: rawRows, error: fetchErr } = await query
+    .order("collected_at", { ascending: false })
+    .order("id")
+    .limit(MAX_CLUSTER_SIGNALS);
   if (fetchErr) {
     return NextResponse.json({ error: `signals query failed: ${fetchErr.message}` }, { status: 500 });
   }
 
   const rows = (rawRows || []) as unknown as RawSignalWithAnalysis[];
+  const capped = rows.length === MAX_CLUSTER_SIGNALS;
   if (rows.length === 0) {
     return NextResponse.json({
       clustersCount: 0,
@@ -295,6 +302,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     clustersCount: clusters.length,
     signalsCount: clusterInputSignals.length,
+    ...(capped && { capped: `Only the latest ${MAX_CLUSTER_SIGNALS} matching signals were clustered; narrow the request to cover the rest.` }),
     similarityThreshold,
     markets: savedMarkets,
     clusters: clusters.map((c) => ({
