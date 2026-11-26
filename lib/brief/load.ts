@@ -13,6 +13,7 @@ import { IDEA_CLAIM_PREFIX } from "../opportunities/from-ideas.ts";
 import { generateMarketOverview } from "../search/overview.ts";
 import type { EvidenceCitation, MarketOverview } from "../search/types.ts";
 import { buildVerdict } from "../planner/verdict.ts";
+import { distinctEvidenceRows } from "../evidence/types.ts";
 import { verbatim, type BriefInput, type BriefPhrase, type BriefPrice } from "./build.ts";
 import { BriefUnavailable, type BriefCite, type BriefFact, type BriefMarketplace } from "./types.ts";
 
@@ -141,6 +142,7 @@ export async function loadIdeaBriefInput(supabase: SupabaseClient, seed: string,
 
 interface EvidenceRowRead {
   id: string;
+  entity_id: string;
   claim: string;
   excerpt: string | null;
   url: string | null;
@@ -170,7 +172,7 @@ export async function loadOpportunityBriefInput(supabase: SupabaseClient, id: st
   const market = one(opp.markets as { id: string; name: string } | { id: string; name: string }[] | null);
 
   const [{ data: ev, error: evErr }, { data: ms, error: msErr }, { data: comps, error: cErr }] = await Promise.all([
-    supabase.from("evidence").select("id, claim, excerpt, url, sources ( type )").eq("entity_id", id),
+    supabase.from("evidence").select("id, entity_id, claim, excerpt, url, sources ( type )").eq("entity_id", id),
     supabase
       .from("market_signals")
       .select("signals ( id, title, content, url, external_id, sources ( type ), signal_analysis ( problem ) )")
@@ -180,7 +182,8 @@ export async function loadOpportunityBriefInput(supabase: SupabaseClient, id: st
   ]);
   if (evErr || msErr || cErr) throw new Error(`failed to load brief rows: ${(evErr ?? msErr ?? cErr)!.message}`);
 
-  const evidence = (ev ?? []) as EvidenceRowRead[];
+  // Runs stored before #122 hold repeated rows; the brief cites each distinct one once, as the opportunity page counts them.
+  const evidence = distinctEvidenceRows((ev ?? []) as EvidenceRowRead[]);
   if (evidence.length === 0) throw new BriefUnavailable(`Opportunity ${id} has no stored evidence (QC Rule 1): no brief.`, 409);
   const evCite = (e: EvidenceRowRead): BriefCite => ({ id: e.id, source: one(e.sources)?.type ?? "evidence", url: e.url });
   const oppCites = evidence.map(evCite);
