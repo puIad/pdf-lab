@@ -10,6 +10,8 @@ import {
   escapeCsvField,
   type ReportExportData,
 } from "./index.ts";
+import { fetchReportExportData } from "./fetcher.ts";
+import { cappedSupabase } from "../db/capped-supabase.test-helpers.ts";
 
 function createMockReportData(oppCount = 25): ReportExportData {
   const opportunities = Array.from({ length: oppCount }, (_, i) => {
@@ -268,4 +270,23 @@ test("validateAndRecountJson flags schema violations and count mismatches", () =
   assert.equal(result.recounted.opportunitiesCount, 2);
   assert.equal(result.recounted.evidenceCount, 1);
   assert.equal(result.recounted.evidenceBackedOpportunitiesCount, 1);
+});
+
+test("fetchReportExportData reads past the 1000-row response cap", async () => {
+  const n = (count: number, make: (i: number) => Record<string, unknown>) => Array.from({ length: count }, (_, i) => make(i));
+  const db = cappedSupabase({
+    markets: [{ id: "m1", run_id: null, name: "Meal prep", description: null, trend: "stable", created_at: "2026-11-01T00:00:00Z" }],
+    market_signals: n(1200, (i) => ({
+      market_id: "m1",
+      signal_id: `s${i}`,
+      signals: { id: `s${i}`, title: `t${i}`, content: `quote ${i}`, url: null, published_at: null, sources: { type: "reddit", name: "r" }, signal_analysis: null },
+    })),
+    opportunities: n(3, (i) => ({ id: `o${i}`, market_id: "m1", title: `opp ${i}`, opportunity_score: 50 - i, confidence: 0.5 })),
+    evidence: n(1500, (i) => ({ id: `e${i}`, entity_type: "opportunity", entity_id: `o${i % 3}`, claim: "c", excerpt: null, url: null, created_at: "2026-11-01T00:00:00Z", sources: null })),
+    competitors: n(1200, (i) => ({ id: `c${i}`, market_id: "m1", platform: "etsy", title: `p${i}`, url: null, price: null, rating: null, review_count: null })),
+  });
+  const data = await fetchReportExportData(db, { marketId: "m1" });
+  assert.equal(data.customerQuotes.length, 1200);
+  assert.equal(data.competitors.length, 1200);
+  assert.equal(data.opportunities.reduce((sum, o) => sum + o.evidenceCount, 0), 1500);
 });

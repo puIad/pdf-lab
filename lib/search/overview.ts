@@ -11,6 +11,7 @@
 // 9. Underserved submarkets
 // Each backed by concrete evidence citations or explicitly labeled "Not observed".
 
+import { readAll, readAllIn } from "../db/read-all.ts";
 import { isCurrent, latestRunIds } from "../runs/scope.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
@@ -26,6 +27,8 @@ export interface GenerateOverviewOptions {
   userId?: string | null;
   mode?: "explore" | "validate";
   persistRun?: boolean;
+  /** Validate: a row matches a concept only when it holds every content word (DEC-021). Default: any word. */
+  allWords?: boolean;
 }
 
 interface RawSignalRow {
@@ -99,6 +102,9 @@ interface RawEvidenceRow {
   sources?: { type?: string; name?: string } | null;
 }
 
+// shortcut: a hand-picked list of English question and auxiliary words, not a language model; extend when a Validate phrase shows another.
+const QUESTION_WORDS = ["what", "is", "are", "how", "why", "who", "which", "do", "does", "can", "should", "my", "you", "your", "it", "be"];
+
 export async function generateMarketOverview(
   query: string,
   supabase: SupabaseClient,
@@ -116,10 +122,22 @@ export async function generateMarketOverview(
   // 1. Sanitize & extract tokens for flexible matching
   const cleanQ = q.toLowerCase();
   const stopWords = new Set(["in", "for", "the", "and", "a", "an", "of", "to", "with", "on", "at", "by"]);
+  // Question words are function words, not part of the concept; dropped only when every word must match.
+  if (options?.allWords) for (const w of QUESTION_WORDS) stopWords.add(w);
   const tokens = cleanQ
     .replace(/[^\w\s]/g, " ")
     .split(/\s+/)
     .filter((w) => w.length >= 2 && !stopWords.has(w));
+  // One rule for every table: any word (Explore, search, brief) or all words (Validate, DEC-021).
+  // All-words matches at a word start ("ai" is not in "said", "template" still hits "templates");
+  // tokens are \w only, so they need no regex escaping. The any-word path keeps its substring test.
+  const wordStarts = tokens.map((t) => new RegExp(`\\b${t}`));
+  // The any-word side also keeps the whole-phrase substring test; Validate has no such shortcut,
+  // or a one-word concept would match inside other words.
+  const hasTokens = (...fields: string[]) =>
+    options?.allWords
+      ? tokens.length > 0 && wordStarts.every((r) => fields.some((f) => r.test(f)))
+      : fields.some((f) => f.includes(cleanQ)) || tokens.some((t) => fields.some((f) => f.includes(t)));
 
   // Rows of a run that a newer run of the same seed replaced are left out (Part 6.7).
   // If the run list cannot be read, nothing is filtered.
@@ -129,18 +147,18 @@ export async function generateMarketOverview(
   // 2. Fetch matched Markets
   let matchedMarkets: RawMarketRow[] = [];
   try {
-    const { data: allMarkets } = await supabase
-      .from("markets")
-      .select("id, run_id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at");
+    const allMarkets = await readAll<RawMarketRow>("markets", () =>
+      supabase
+        .from("markets")
+        .select("id, run_id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at")
+        .order("id"),
+    );
 
-    if (allMarkets && allMarkets.length > 0) {
-      matchedMarkets = (allMarkets as RawMarketRow[]).filter(current).filter((m) => {
-        const name = (m.name || "").toLowerCase();
-        const desc = (m.description || "").toLowerCase();
-        if (name.includes(cleanQ) || desc.includes(cleanQ)) return true;
-        return tokens.some((t) => name.includes(t) || desc.includes(t));
-      });
-    }
+    matchedMarkets = allMarkets.filter(current).filter((m) => {
+      const name = (m.name || "").toLowerCase();
+      const desc = (m.description || "").toLowerCase();
+      return hasTokens(name, desc);
+    });
   } catch (err) {
     console.error("Error fetching markets:", err);
   }
@@ -150,42 +168,26 @@ export async function generateMarketOverview(
   // 3. Fetch Signals with Analysis and Sources
   let matchedSignals: RawSignalRow[] = [];
   try {
-    const { data: allSignals } = await supabase
-      .from("signals")
-      .select(`
-        id, source_id, external_id, url, title, content, published_at, engagement, collected_at,
-        sources ( type, name ),
-        signal_analysis ( audience, problem, intent, urgency, pdf_relevance )
-      `)
-      .order("collected_at", { ascending: false });
+    const allSignals = await readAll<RawSignalRow>("signals", () =>
+      supabase
+        .from("signals")
+        .select(`
+          id, source_id, external_id, url, title, content, published_at, engagement, collected_at,
+          sources ( type, name ),
+          signal_analysis ( audience, problem, intent, urgency, pdf_relevance )
+        `)
+        .order("collected_at", { ascending: false })
+        .order("id"),
+    );
 
-    if (allSignals && allSignals.length > 0) {
-      matchedSignals = (allSignals as unknown as RawSignalRow[]).filter((s) => {
-        const title = (s.title || "").toLowerCase();
-        const content = (s.content || "").toLowerCase();
-        const problem = (s.signal_analysis?.problem || "").toLowerCase();
-        const audience = (s.signal_analysis?.audience || "").toLowerCase();
+    matchedSignals = allSignals.filter((s) => {
+      const title = (s.title || "").toLowerCase();
+      const content = (s.content || "").toLowerCase();
+      const problem = (s.signal_analysis?.problem || "").toLowerCase();
+      const audience = (s.signal_analysis?.audience || "").toLowerCase();
 
-        // Exact query substring match
-        if (
-          title.includes(cleanQ) ||
-          content.includes(cleanQ) ||
-          problem.includes(cleanQ) ||
-          audience.includes(cleanQ)
-        ) {
-          return true;
-        }
-
-        // Token match
-        return tokens.some(
-          (t) =>
-            title.includes(t) ||
-            content.includes(t) ||
-            problem.includes(t) ||
-            audience.includes(t)
-        );
-      });
-    }
+      return hasTokens(title, content, problem, audience);
+    });
   } catch (err) {
     console.error("Error fetching signals:", err);
   }
@@ -193,7 +195,8 @@ export async function generateMarketOverview(
   // Also include signals linked to matched markets via market_signals if any
   if (matchedMarketIds.size > 0) {
     try {
-      const { data: marketSignals } = await supabase
+      const marketSignals = await readAllIn<{ signals: RawSignalRow | null }>("market signals", Array.from(matchedMarketIds), (chunk) =>
+        supabase
         .from("market_signals")
         .select(`
           signal_id,
@@ -203,16 +206,17 @@ export async function generateMarketOverview(
             signal_analysis ( audience, problem, intent, urgency, pdf_relevance )
           )
         `)
-        .in("market_id", Array.from(matchedMarketIds));
+        .in("market_id", chunk)
+        .order("market_id")
+        .order("signal_id"),
+      );
 
-      if (marketSignals) {
-        const existingSignalIds = new Set(matchedSignals.map((s) => s.id));
-        for (const ms of marketSignals) {
-          const s = (ms as unknown as { signals: RawSignalRow }).signals;
-          if (s && !existingSignalIds.has(s.id)) {
-            matchedSignals.push(s);
-            existingSignalIds.add(s.id);
-          }
+      const existingSignalIds = new Set(matchedSignals.map((s) => s.id));
+      for (const ms of marketSignals) {
+        const s = ms.signals;
+        if (s && !existingSignalIds.has(s.id)) {
+          matchedSignals.push(s);
+          existingSignalIds.add(s.id);
         }
       }
     } catch (err) {
@@ -228,22 +232,22 @@ export async function generateMarketOverview(
   // 4. Fetch Evidence Rows
   let matchedEvidence: RawEvidenceRow[] = [];
   try {
-    const { data: allEvidence } = await supabase
-      .from("evidence")
-      .select("id, entity_type, entity_id, source_id, claim, excerpt, url, created_at, sources ( type, name )")
-      .order("created_at", { ascending: false });
+    const allEvidence = await readAll<RawEvidenceRow>("evidence", () =>
+      supabase
+        .from("evidence")
+        .select("id, entity_type, entity_id, source_id, claim, excerpt, url, created_at, sources ( type, name )")
+        .order("created_at", { ascending: false })
+        .order("id"),
+    );
 
-    if (allEvidence) {
-      matchedEvidence = (allEvidence as unknown as RawEvidenceRow[]).filter((e) => {
-        // Linked to matched market or matched signal
-        if (matchedMarketIds.has(e.entity_id) || matchedSignalIds.has(e.entity_id)) return true;
-        // Or text match
-        const claim = (e.claim || "").toLowerCase();
-        const excerpt = (e.excerpt || "").toLowerCase();
-        if (claim.includes(cleanQ) || excerpt.includes(cleanQ)) return true;
-        return tokens.some((t) => claim.includes(t) || excerpt.includes(t));
-      });
-    }
+    matchedEvidence = allEvidence.filter((e) => {
+      // Linked to matched market or matched signal
+      if (matchedMarketIds.has(e.entity_id) || matchedSignalIds.has(e.entity_id)) return true;
+      // Or text match
+      const claim = (e.claim || "").toLowerCase();
+      const excerpt = (e.excerpt || "").toLowerCase();
+      return hasTokens(claim, excerpt);
+    });
   } catch (err) {
     console.error("Error fetching evidence:", err);
   }
@@ -251,21 +255,21 @@ export async function generateMarketOverview(
   // 5. Fetch Opportunities
   let matchedOpportunities: RawOpportunityRow[] = [];
   try {
-    const { data: allOpps } = await supabase
-      .from("opportunities")
-      .select("id, run_id, market_id, title, target_audience, problem, solution, format, price_range, opportunity_score, confidence")
-      .order("opportunity_score", { ascending: false });
+    const allOpps = await readAll<RawOpportunityRow>("opportunities", () =>
+      supabase
+        .from("opportunities")
+        .select("id, run_id, market_id, title, target_audience, problem, solution, format, price_range, opportunity_score, confidence")
+        .order("opportunity_score", { ascending: false })
+        .order("id"),
+    );
 
-    if (allOpps) {
-      matchedOpportunities = (allOpps as RawOpportunityRow[]).filter(current).filter((o) => {
-        if (matchedMarketIds.has(o.market_id)) return true;
-        const title = (o.title || "").toLowerCase();
-        const audience = (o.target_audience || "").toLowerCase();
-        const prob = (o.problem || "").toLowerCase();
-        if (title.includes(cleanQ) || audience.includes(cleanQ) || prob.includes(cleanQ)) return true;
-        return tokens.some((t) => title.includes(t) || audience.includes(t) || prob.includes(t));
-      });
-    }
+    matchedOpportunities = allOpps.filter(current).filter((o) => {
+      if (matchedMarketIds.has(o.market_id)) return true;
+      const title = (o.title || "").toLowerCase();
+      const audience = (o.target_audience || "").toLowerCase();
+      const prob = (o.problem || "").toLowerCase();
+      return hasTokens(title, audience, prob);
+    });
   } catch (err) {
     console.error("Error fetching opportunities:", err);
   }
@@ -273,18 +277,18 @@ export async function generateMarketOverview(
   // 6. Fetch Competitors
   let matchedCompetitors: RawCompetitorRow[] = [];
   try {
-    const { data: allComps } = await supabase
-      .from("competitors")
-      .select("id, run_id, market_id, platform, title, url, price, rating, review_count");
+    const allComps = await readAll<RawCompetitorRow>("competitors", () =>
+      supabase
+        .from("competitors")
+        .select("id, run_id, market_id, platform, title, url, price, rating, review_count")
+        .order("id"),
+    );
 
-    if (allComps) {
-      matchedCompetitors = (allComps as RawCompetitorRow[]).filter(current).filter((c) => {
-        if (c.market_id && matchedMarketIds.has(c.market_id)) return true;
-        const title = (c.title || "").toLowerCase();
-        if (title.includes(cleanQ)) return true;
-        return tokens.some((t) => title.includes(t));
-      });
-    }
+    matchedCompetitors = allComps.filter(current).filter((c) => {
+      if (c.market_id && matchedMarketIds.has(c.market_id)) return true;
+      const title = (c.title || "").toLowerCase();
+      return hasTokens(title);
+    });
   } catch (err) {
     console.error("Error fetching competitors:", err);
   }
@@ -902,6 +906,14 @@ export async function generateMarketOverview(
     searchedAt,
     matchedMarketsCount: matchedMarkets.length,
     matchedSignalsCount: matchedSignals.length,
+    // Evidence is left out: a stored competition check quotes its own phrase, so it would always match.
+    ...(options?.allWords &&
+    !matchedMarkets.length &&
+    !matchedSignals.length &&
+    !matchedOpportunities.length &&
+    !matchedCompetitors.length
+      ? { notScanned: true }
+      : {}),
     confidence,
     sizeProxy,
     searchInterest,

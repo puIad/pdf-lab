@@ -23,9 +23,11 @@ export interface ValidationVerdict {
   checks: VerdictCheck[];
 }
 
-// shortcut: uncalibrated thresholds. The PDFMinter scan (Part 3.11, docs/research/2026-11-25-pdfminter-calibration.md)
-// has no discussion, intent or competitor counts per phrase, so it cannot test them; they need
-// verdicts paired with marketplace outcomes.
+// shortcut: first-guess thresholds. Tested on 37 stored concepts against competition checks
+// (docs/research/2026-11-26-verdict-calibration.md): 36 WAIT, 1 KILL, no GO, counts uncorrelated
+// with the outcome (rho about 0), so nothing supports a change. Revisit when the counts describe
+// the phrase instead of its stored topic: Validate now matches on all content words (#109, DEC-021),
+// so re-measure on the same 37 concepts before changing any number.
 export const VERDICT_THRESHOLDS = {
   demandPass: 10,
   demandKill: 3,
@@ -87,6 +89,8 @@ export function buildVerdict(ov: MarketOverview): ValidationVerdict {
   };
 
   const checks = [demand, intent, competition, trend];
+  // Nothing stored matches the phrase: the topic was never scanned, which says nothing about the market.
+  if (ov.notScanned) return { verdict: "WAIT", reason: "No stored rows for this phrase; scan the topic first.", checks };
   const fails = checks.filter((c) => c.status === "fail");
   const passes = checks.filter((c) => c.status === "pass");
 

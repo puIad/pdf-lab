@@ -10,6 +10,7 @@ import type {
   BuyerIntentLevel,
 } from "./types.ts";
 import { fetchNicheTrends } from "../trends/niche.ts";
+import { readAll, readAllIn } from "../db/read-all.ts";
 import { isCurrent, listCompletedRuns, listedRuns, type RunViewer } from "../runs/scope.ts";
 
 /**
@@ -54,16 +55,14 @@ export async function fetchMarketsData(
   viewer: RunViewer | null = null,
 ): Promise<FetchMarketsResult> {
   // 1. Fetch markets, then keep the ones in scope
-  const { data: marketsData, error: marketsErr } = await supabase
-    .from("markets")
-    .select("id, run_id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at")
-    .order("created_at", { ascending: false });
-
-  if (marketsErr) {
-    throw new Error(`Failed to fetch markets: ${marketsErr.message}`);
-  }
-
-  const allMarkets = marketsData ?? [];
+  // Every read below goes in ordered pages: PostgREST caps one response at 1000 rows.
+  const allMarkets = await readAll<Record<string, unknown>>("markets", () =>
+    supabase
+      .from("markets")
+      .select("id, run_id, name, description, trend, demand_score, competition_score, pdf_fit_score, confidence, created_at")
+      .order("created_at", { ascending: false })
+      .order("id"),
+  );
   const allRuns = await listCompletedRuns(supabase);
   const latest = new Set(allRuns.filter((r) => r.latest).map((r) => r.id));
   const runs = listedRuns(allRuns, viewer);
@@ -98,13 +97,14 @@ export async function fetchMarketsData(
   );
 
   // 2. Fetch opportunities
-  const { data: oppsData } = await supabase
-    .from("opportunities")
-    .select("id, market_id, title, opportunity_score, confidence, format, format_basis, target_audience")
-    .in("market_id", marketIds)
-    .order("opportunity_score", { ascending: false });
-
-  const rawOpps = oppsData ?? [];
+  const rawOpps = await readAllIn<Record<string, unknown>>("opportunities", marketIds, (chunk) =>
+    supabase
+      .from("opportunities")
+      .select("id, market_id, title, opportunity_score, confidence, format, format_basis, target_audience")
+      .in("market_id", chunk)
+      .order("opportunity_score", { ascending: false })
+      .order("id"),
+  );
   const oppsByMarket: Record<string, TopOpportunity[]> = {};
   const oppIdsByMarket: Record<string, Set<string>> = {};
 
@@ -127,11 +127,9 @@ export async function fetchMarketsData(
   }
 
   // 3. Fetch evidence rows
-  const { data: evData } = await supabase
-    .from("evidence")
-    .select("id, entity_type, entity_id");
-
-  const rawEvidence = evData ?? [];
+  const rawEvidence = await readAll<Record<string, unknown>>("evidence", () =>
+    supabase.from("evidence").select("id, entity_type, entity_id").order("id"),
+  );
   const evidenceCountByMarket: Record<string, number> = {};
 
   for (const ev of rawEvidence) {
@@ -151,7 +149,8 @@ export async function fetchMarketsData(
   }
 
   // 4. Fetch linked signals with analysis
-  const { data: marketSignalsData } = await supabase
+  const rawMarketSignals = await readAllIn<{ market_id: string }>("market signals", marketIds, (chunk) =>
+    supabase
     .from("market_signals")
     .select(`
       market_id,
@@ -164,9 +163,10 @@ export async function fetchMarketsData(
         )
       )
     `)
-    .in("market_id", marketIds);
-
-  const rawMarketSignals = marketSignalsData ?? [];
+    .in("market_id", chunk)
+    .order("market_id")
+    .order("signal_id"),
+  );
   const signalsCountByMarket: Record<string, number> = {};
   const intentScoresByMarket: Record<string, number[]> = {};
 
@@ -198,7 +198,7 @@ export async function fetchMarketsData(
     const marketOpps = oppsByMarket[id] || [];
     const topOpp = marketOpps.length > 0 ? marketOpps[0] : null;
 
-    const trendRaw = (m.trend || "unknown").toLowerCase().trim() as MarketTrend;
+    const trendRaw = ((m.trend as string | null) || "unknown").toLowerCase().trim() as MarketTrend;
     const trend: MarketTrend = VALID_TRENDS.has(trendRaw) ? trendRaw : "unknown";
 
     const intentList = intentScoresByMarket[id] || [];

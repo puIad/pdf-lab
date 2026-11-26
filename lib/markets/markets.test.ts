@@ -20,13 +20,22 @@ function createMockSupabase(overrides: {
       if (table === "evidence") currentData = overrides.evidence ?? [];
       if (table === "market_signals") currentData = overrides.marketSignals ?? [];
 
+      // Like PostgREST: a request without a range gets at most 1000 rows.
+      let page: [number, number] = [0, 999];
       const queryBuilder: Record<string, unknown> = {
         select: () => queryBuilder,
         order: () => queryBuilder,
-        in: () => queryBuilder,
+        range: (from: number, to: number) => {
+          page = [from, Math.min(to, from + 999)];
+          return queryBuilder;
+        },
+        in: (col: string, vs: unknown[]) => {
+          currentData = currentData.filter((r) => vs.includes(r[col]));
+          return queryBuilder;
+        },
         eq: () => queryBuilder,
         then: (resolve: (val: { data: Record<string, unknown>[]; error: null }) => void) =>
-          Promise.resolve(resolve({ data: currentData, error: null })),
+          Promise.resolve(resolve({ data: currentData.slice(page[0], page[1] + 1), error: null })),
       };
 
       return queryBuilder;
@@ -147,6 +156,27 @@ describe("Market Explorer Fetcher (PRD §7, §40)", () => {
     assert.equal(m2.buyer_intent, "weak");
     assert.equal(m2.top_opportunity, null);
     assert.equal(m2.opportunity_count, 0);
+  });
+});
+
+describe("Market Explorer reads past the 1000-row cap (#112)", () => {
+  const market = { id: "m-1", run_id: null, name: "Big", trend: "stable", demand_score: 1, competition_score: 1, pdf_fit_score: 1, confidence: 0.5, created_at: "2026-01-01T00:00:00Z" };
+
+  it("counts every evidence and market_signals row, not the first 1000", async () => {
+    const evidence = Array.from({ length: 2500 }, (_, i) => ({ id: `e-${i}`, entity_type: "market", entity_id: "m-1" }));
+    const marketSignals = Array.from({ length: 1500 }, (_, i) => ({ market_id: "m-1", signal_id: `s-${i}`, signals: null }));
+    const result = await fetchMarketsData(createMockSupabase({ markets: [market], evidence, marketSignals }));
+    assert.equal(result.markets[0].evidence_count, 2500);
+    assert.equal(result.markets[0].signal_count, 1500);
+    assert.equal(result.stats.totalEvidence, 2500);
+  });
+
+  it("keeps every market and opportunity past the first 1000", async () => {
+    const markets = Array.from({ length: 1200 }, (_, i) => ({ ...market, id: `m-${i}`, name: `M ${i}` }));
+    const opportunities = Array.from({ length: 1100 }, (_, i) => ({ id: `o-${i}`, market_id: "m-1", title: `O ${i}`, opportunity_score: 50, confidence: 0.5 }));
+    const result = await fetchMarketsData(createMockSupabase({ markets, opportunities }));
+    assert.equal(result.stats.totalMarkets, 1200);
+    assert.equal(result.stats.totalOpportunities, 1100);
   });
 });
 
@@ -339,7 +369,7 @@ describe("niche trend note visibility (issue #39 rule)", () => {
               : table === "run_signals"
                 ? [{ run_id: "r1", signals: { url: "u", engagement: { avg_interest: 40, direction: "rising", points: 5, window_days: 90 }, sources: { type: "gtrends" } } }]
                 : [];
-        const b: Record<string, unknown> = { select: () => b, order: () => b, in: () => b, eq: () => b, then: (r: (v: unknown) => void) => r({ data, error: null }) };
+        const b: Record<string, unknown> = { select: () => b, order: () => b, range: () => b, in: () => b, eq: () => b, then: (r: (v: unknown) => void) => r({ data, error: null }) };
         return b;
       },
     } as unknown as SupabaseClient;

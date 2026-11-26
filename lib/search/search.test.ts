@@ -21,8 +21,14 @@ function createMockSupabase(dataset: {
     from(table: string) {
       return {
         select() {
+          // Like PostgREST: a request without a range gets at most 1000 rows.
+          let page: [number, number] = [0, 999];
           return {
             order() {
+              return this;
+            },
+            range(from: number, to: number) {
+              page = [from, Math.min(to, from + 999)];
               return this;
             },
             limit() {
@@ -35,14 +41,8 @@ function createMockSupabase(dataset: {
               return this;
             },
             async then(resolve: (result: { data: unknown[]; error: null }) => unknown) {
-              if (table === "markets") return resolve({ data: dataset.markets || [], error: null });
-              if (table === "signals") return resolve({ data: dataset.signals || [], error: null });
-              if (table === "market_signals") return resolve({ data: dataset.market_signals || [], error: null });
-              if (table === "evidence") return resolve({ data: dataset.evidence || [], error: null });
-              if (table === "opportunities") return resolve({ data: dataset.opportunities || [], error: null });
-              if (table === "competitors") return resolve({ data: dataset.competitors || [], error: null });
-              if (table === "research_runs") return resolve({ data: researchRuns, error: null });
-              return resolve({ data: [], error: null });
+              const rows = table === "research_runs" ? researchRuns : ((dataset as Record<string, unknown[] | undefined>)[table] ?? []);
+              return resolve({ data: rows.slice(page[0], page[1] + 1), error: null });
             },
           };
         },
@@ -468,5 +468,90 @@ describe("Marketplace activity counts each listing once (issue #48)", () => {
     assert.equal(value.productsCount, 2);
     assert.deepEqual(value.platforms, { etsy: 1, amazon_kdp: 1 });
     assert.equal(Object.values(value.platforms).reduce((a, n) => a + n, 0), value.productsCount);
+  });
+});
+
+describe("Overview reads past Supabase's 1000-row cap (issue #111)", () => {
+  // SAMPLE DATA (fixture rule). 2500 rows per table, newest first; only the 3 oldest mention "origami".
+  const N = 2500;
+  const ids = Array.from({ length: N }, (_, i) => i);
+  const old = (i: number) => i >= N - 3;
+
+  const signals = ids.map((i) => ({
+    id: `s-${i}`,
+    source_id: "src-1",
+    external_id: `ext-${i}`,
+    url: `https://example.com/${i}`,
+    title: old(i) ? "origami for beginners" : "unrelated chatter",
+    content: null,
+    published_at: null,
+    collected_at: "2026-11-01T10:00:00Z",
+    engagement: {},
+    sources: { type: "reddit", name: "Reddit" },
+    signal_analysis: null,
+  }));
+  const evidence = ids.map((i) => ({
+    id: `e-${i}`,
+    entity_type: "signal",
+    entity_id: `x-${i}`,
+    source_id: "src-1",
+    claim: old(i) ? "origami folding is popular" : "something else",
+    excerpt: null,
+    url: null,
+    created_at: "2026-11-01T10:00:00Z",
+    sources: { type: "reddit", name: "Reddit" },
+  }));
+  const competitors = ids.map((i) => ({ id: `c-${i}`, market_id: null, platform: "etsy", title: old(i) ? "origami kit" : "mug", url: `https://etsy.com/${i}` }));
+
+  test("rows beyond the first 1000 of signals, evidence and competitors still match", async () => {
+    const overview = await generateMarketOverview("origami", createMockSupabase({ signals, evidence, competitors }), { persistRun: false });
+    assert.equal(overview.matchedSignalsCount, 3);
+    assert.equal(overview.discussionCounts.value?.total, 3);
+    assert.equal(overview.competitiveDensity.value?.competitorsObserved, 3);
+    assert.ok(overview.sizeProxy.evidence.some((c) => c.claim?.includes("origami folding")));
+  });
+});
+
+describe("Validate matches a concept on all its content words (issue #109, DEC-021)", () => {
+  // SAMPLE DATA (fixture rule): two budgeting rows, only one about couples.
+  const row = (id: string, title: string) => ({
+    id,
+    source_id: "src-1",
+    external_id: `ext-${id}`,
+    url: `https://example.com/${id}`,
+    title,
+    content: null,
+    published_at: null,
+    collected_at: "2026-11-01T10:00:00Z",
+    engagement: {},
+    sources: { type: "reddit", name: "Reddit" },
+    signal_analysis: null,
+  });
+  const signals = [row("a", "budgeting for couples"), row("b", "budgeting apps")];
+  const run = (q: string, allWords?: boolean, rows = signals) =>
+    generateMarketOverview(q, createMockSupabase({ signals: rows }), { persistRun: false, allWords });
+
+  test("every content word must appear; the default keeps any-word matching", async () => {
+    assert.equal((await run("budgeting couples", true)).matchedSignalsCount, 1);
+    assert.equal((await run("budgeting couples")).matchedSignalsCount, 2);
+  });
+
+  test("a word matches at a word start, not inside another word; plurals still match", async () => {
+    const rows = [row("d", "how i said goodbye to my resume template"), row("e", "ai resume templates for teachers")];
+    assert.equal((await run("ai resume template", true, rows)).matchedSignalsCount, 1);
+    // A one-word concept gets no whole-phrase shortcut either.
+    assert.equal((await run("ai", true, [row("d", "how i said goodbye")])).matchedSignalsCount, 0);
+  });
+
+  test("question words are not content words on the all-words path", async () => {
+    // The unrelated row says "what": any-word matching on the raw words would keep it.
+    const rows = [...signals, row("c", "what to cook tonight")];
+    assert.equal((await run("what is budgeting", true, rows)).matchedSignalsCount, 2);
+  });
+
+  test("no matching row marks the concept as not scanned; Explore never does", async () => {
+    assert.equal((await run("origami cranes", true)).notScanned, true);
+    assert.equal((await run("origami cranes")).notScanned, undefined);
+    assert.equal((await run("budgeting couples", true)).notScanned, undefined);
   });
 });

@@ -3,6 +3,7 @@
 // of each seed; rows with `run_id` null are legacy data from before run scoping.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readAll } from "../db/read-all.ts";
 
 export interface CompletedRun {
   id: string;
@@ -46,15 +47,17 @@ export const seedKey = normalizeSeed;
  * last good run of its seed.
  */
 export async function listCompletedRuns(supabase: SupabaseClient): Promise<CompletedRun[]> {
-  const { data, error } = await supabase
-    .from("research_runs")
-    .select("id, query, completed_at, started_at, user_id, markets ( id )")
-    .eq("mode", "deep")
-    .eq("status", "completed")
-    .order("started_at", { ascending: false });
-  if (error) throw new Error(`Failed to list runs: ${error.message}`);
+  const data = await readAll<{ id: string; query: string; completed_at: string | null; user_id: string | null; markets: unknown }>("runs", () =>
+    supabase
+      .from("research_runs")
+      .select("id, query, completed_at, started_at, user_id, markets ( id )")
+      .eq("mode", "deep")
+      .eq("status", "completed")
+      .order("started_at", { ascending: false })
+      .order("id"),
+  );
   const seen = new Set<string>();
-  const withMarkets = (data ?? []).filter((r) => Array.isArray(r.markets) && r.markets.length > 0);
+  const withMarkets = data.filter((r) => Array.isArray(r.markets) && r.markets.length > 0);
   return withMarkets.map((r) => {
     const key = seedKey(r.query as string);
     const latest = !seen.has(key);

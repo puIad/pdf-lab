@@ -250,6 +250,12 @@ describe("buildVerdict (Part 3.8)", () => {
     assert.equal(v.verdict, "WAIT");
   });
 
+  test("not scanned: WAIT with the scan-first reason, not KILL on zero demand (DEC-021)", () => {
+    const v = buildVerdict({ ...createEmptyOverview("x", "validate", new Date().toISOString()), notScanned: true });
+    assert.equal(v.verdict, "WAIT");
+    assert.match(v.reason, /no stored rows for this phrase; scan the topic first/i);
+  });
+
   test("empty overview → KILL on zero demand", () => {
     assert.equal(buildVerdict(createEmptyOverview("x", "validate", new Date().toISOString())).verdict, "KILL");
   });

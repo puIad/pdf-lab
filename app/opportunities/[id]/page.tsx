@@ -80,6 +80,7 @@ export default async function OpportunityDetailPage(props: OpportunityPageProps)
   }
 
   // 2. Evidence of this opportunity, evidence of its market, and the market's stored competitors
+  // Per one opportunity or market: a handful of rows, far under the 1000-row response cap, so one request each.
   const [{ data: evidenceRows }, { data: marketEvidence }, { data: competitors }, marketSignals] = await Promise.all([
     supabase
       .from("evidence")

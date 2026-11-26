@@ -2,6 +2,7 @@
 // A run reads its own rows through this join, never a text match over the whole `signals` table.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readAll } from "../db/read-all.ts";
 import type { StoredSignalForRun } from "./orchestrator.ts";
 
 const ID_CHUNK = 25; // external ids travel in the URL of a GET
@@ -85,24 +86,16 @@ interface SignalRow {
 }
 
 export async function loadRunSignals(supabase: SupabaseClient, runId: string): Promise<StoredSignalForRun[]> {
-  const PAGE = 1000; // PostgREST max_rows
-  const rows: SignalRow[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
+  const links = await readAll<{ signals: Rel<SignalRow> }>("signals for run", () =>
+    supabase
       .from("run_signals")
       .select(
         "signal_id, signals ( id, title, content, url, source_id, external_id, published_at, engagement, sources ( type ), signal_analysis ( id, audience, problem, intent, urgency, pdf_relevance, names_problem, embedding ) )",
       )
       .eq("run_id", runId)
-      .order("signal_id")
-      .range(from, from + PAGE - 1);
-    if (error) throw new Error(`Failed to fetch signals for run: ${error.message}`);
-    for (const link of (data ?? []) as unknown as Array<{ signals: Rel<SignalRow> }>) {
-      const s = one(link.signals);
-      if (s) rows.push(s);
-    }
-    if ((data?.length ?? 0) < PAGE) break;
-  }
+      .order("signal_id"),
+  );
+  const rows = links.flatMap((link) => one(link.signals) ?? []);
 
   return rows.map((r) => {
     const sa = one(r.signal_analysis);
