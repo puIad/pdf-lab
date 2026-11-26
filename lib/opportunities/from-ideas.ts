@@ -5,6 +5,7 @@
 
 import type { EvidenceInput } from "../evidence/types.ts";
 import { jaccard, tokens, type IdeaFormat, type QuickIdea } from "../ideas/ideas.ts";
+import { namesNoProblem } from "./match.ts";
 import type { GeneratedOpportunity, OpportunityFormat, OpportunityMarketInput } from "./types.ts";
 
 export const IDEA_CANDIDATES = 20;
@@ -43,25 +44,38 @@ export function pickDistinctIdeas(ideas: QuickIdea[], max = IDEA_CANDIDATES): Qu
 }
 
 /**
- * The market that holds the most of the phrase's own words. The seed's words are left out: every
+ * Among the markets that hold all of the phrase's own words, the one whose name holds the most of
+ * them. The seed's words are left out: every
  * market of the run has them. Containment, not jaccard: jaccard divides by all of a market's text,
- * so the market with the fewest signals won every general idea (Part 6.16). A phrase with no word
- * of its own in any market belongs to none: null, never the strongest market as a stand-in
- * (issue #42).
+ * so the market with the fewest signals won every general idea (Part 6.16). A phrase belongs to a
+ * market only when it is about that market's problem: every word of its own is in the market, and
+ * either the phrase names at least half of the words of the market's name, or all its own words
+ * are in a problem one of the market's signals names (a signal that names none says nothing about
+ * the market's problem). One shared word is not enough
+ * ("help" put "find someone to help me with my computer" in a blue-screen market; "reset" put
+ * "how to reset a pc" in "CMOS reset and onboard video", issue #120). A phrase that fits no market
+ * belongs to none: null, never the strongest market as a stand-in (issue #42).
+ * shortcut: the half-of-the-name bar was set from one run (2026-11-26), tune it against more
+ * hand-checked runs.
  */
 export function marketFor(phrase: string, markets: OpportunityMarketInput[], seed: string): OpportunityMarketInput | null {
   const seedToks = new Set(tokens(seed));
-  const toks = [...new Set(tokens(phrase))].filter((t) => !seedToks.has(t));
+  const all = new Set(tokens(phrase));
+  const toks = [...all].filter((t) => !seedToks.has(t));
   let best: OpportunityMarketInput | null = null;
   let bestScore = -1;
   for (const m of markets) {
-    const name = new Set(tokens(m.name));
+    const nameWords = tokens(m.name);
+    const name = new Set(nameWords);
     const hay = new Set([...name, ...tokens(m.signals.map((s) => s.analysis?.problem ?? s.title ?? "").join(" "))]);
+    const named = new Set(tokens(m.signals.filter((s) => !namesNoProblem(s.analysis)).map((s) => s.analysis?.problem ?? s.title ?? "").join(" ")));
     const share = (set: Set<string>) => (toks.length ? toks.filter((t) => set.has(t)).length / toks.length : 0);
-    // A word in the market's name counts twice: "is meal prep healthy" belongs to "Healthy meal prep
-    // plans", not to a market where one snippet says "healthy". Ties go to the stronger market.
-    if (share(hay) === 0) continue; // none of the phrase's own words is in this market
-    const score = share(hay) + share(name) + m.demandScore / 1000;
+    if (share(hay) < 1) continue; // a word of the phrase's own is not in this market (empty phrase: share 0)
+    // Neither the name nor a named problem is about the phrase: the market is about something else.
+    if (nameWords.filter((t) => all.has(t)).length * 2 < nameWords.length && share(named) < 1) continue;
+    // The name decides: "is meal prep healthy" belongs to "Healthy meal prep plans", not to a market
+    // where one snippet says "healthy". Ties go to the stronger market.
+    const score = share(name) + m.demandScore / 1000;
     if (score > bestScore) {
       best = m;
       bestScore = score;
