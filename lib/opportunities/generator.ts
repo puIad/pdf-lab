@@ -47,7 +47,7 @@ export interface GenerationResult {
   totalCandidatesGenerated: number;
   /** Candidates removed before selection because no evidence row had a source and a url or excerpt. */
   droppedUnsourced: number;
-  /** Candidates folded into another one that shares audience and problem, across markets and formats. */
+  /** Candidates folded into another one for the same problem: same audience across markets and formats, or any audience within one market. */
   mergedSimilar: number;
 }
 
@@ -82,12 +82,56 @@ export function capIdeaOnlyScores(candidates: GeneratedOpportunity[]): Generated
 }
 
 /**
- * One opportunity per (audience, problem), across markets and formats (issue #70). Best score
- * first; a later candidate with the same audience and a near-identical problem is folded into the
- * kept one, which takes its format when it names none. An idea-only candidate has an audience of
- * its own ("People searching ..."), so it only merges when the problem is the same text.
+ * Per market, the words of its name that say which fault it is about: no other market's name has
+ * them ("ram" in "RAM seating faults"; "pc" is in many names) and its signals do not all use them
+ * (`commonWords`: "meal prep" in a meal prep market is the theme, not one problem).
  */
-export function mergeSharedProblems(candidates: GeneratedOpportunity[]): { kept: GeneratedOpportunity[]; merged: number } {
+export function marketProblemWords(markets: OpportunityMarketInput[]): Map<string, Set<string>> {
+  const named = markets.map((m) => ({ id: m.id, words: new Set(tokens(m.name).filter((t) => t.length > 2)), common: commonWords(m.signals) }));
+  const holders = new Map<string, number>();
+  for (const { words } of named) for (const t of words) holders.set(t, (holders.get(t) ?? 0) + 1);
+  return new Map(named.map(({ id, words, common }) => [id, new Set([...words].filter((t) => holders.get(t) === 1 && !common.has(t)))]));
+}
+
+/** The kept candidate also holds the evidence rows (and signals) of the one folded into it, once each. */
+function absorbEvidence(kept: GeneratedOpportunity, folded: GeneratedOpportunity): GeneratedOpportunity {
+  if (!kept.evidenceSignalIds || !folded.evidenceSignalIds) return kept; // a phrase-only candidate has no signal rows to move
+  const ids = kept.evidenceSignalIds;
+  const have = new Set(ids);
+  const extra = folded.evidenceSignalIds.flatMap((id, i) => (have.has(id) ? [] : [{ id, row: folded.evidence[i] }]));
+  return {
+    ...kept,
+    evidence: [
+      ...kept.evidence,
+      ...extra.map(({ row }) => ({ ...row, entityId: kept.id, claim: row.claim.replace(`Opportunity "${folded.title}"`, `Opportunity "${kept.title}"`) })),
+    ],
+    evidenceSignalIds: [...ids, ...extra.map((e) => e.id)],
+    ownSignalIds: [...new Set([...(kept.ownSignalIds ?? []), ...(folded.ownSignalIds ?? [])])],
+    matchingSignals: Math.max(kept.matchingSignals ?? 0, folded.matchingSignals ?? 0, ids.length + extra.length),
+  };
+}
+
+/**
+ * One opportunity per problem, returned best score first, so the stronger candidate is the first to
+ * take a signal set in `distinctEvidenceSets` (every reader lists by score anyway). A later candidate is folded into the kept one when
+ * (a) its problem is near-identical (token overlap SAME_PROBLEM) and the audience is the same, across
+ * markets and formats (issue #70), or (b) it is in the same market and both problems use a word that
+ * names this market's own fault (`marketProblemWords`, issue #121), with no overlap bar and whatever
+ * the audience: "RAM was not seated" and "fixed by reseating the RAM" in "RAM seating faults" are one
+ * fix. A fold in one market keeps every evidence row of both; the kept row keeps its wording and takes
+ * the format when it names none. An idea-only candidate has an audience of its own ("People
+ * searching ..."), so it only merges when the problem is the same text.
+ * shortcut: (b) trusts the market's name. A word of it shared by two different faults merges them
+ * ("power" in "PC won't power on": no power at all vs powers on, no display). `commonWords` ignores
+ * markets of 3 signals or fewer, so in one of those named after its theme ("Meal prep containers")
+ * every problem using "containers" merges into one; gate-run pairs sit in exactly such markets (2 and
+ * 3 signals), so a stricter small-market bar would undo them. Split on embeddings once Deep runs
+ * always store them.
+ */
+export function mergeSharedProblems(
+  candidates: GeneratedOpportunity[],
+  problemWords: Map<string, Set<string>>,
+): { kept: GeneratedOpportunity[]; merged: number } {
   const kept: Array<{ c: GeneratedOpportunity; aud: string; toks: string[] }> = [];
   let merged = 0;
   const order = [...candidates].sort(
@@ -97,20 +141,24 @@ export function mergeSharedProblems(candidates: GeneratedOpportunity[]): { kept:
     const aud = normalizeKey(c.targetAudience);
     const toks = tokens(c.problem);
     const twin = kept.find((k) => {
+      const ideaOnly = [k.c, c].some((x) => isIdeaOnly(x.evidence.map((e) => e.claim)));
+      if (k.c.marketId === c.marketId && !ideaOnly) {
+        const names = problemWords.get(c.marketId) ?? new Set<string>();
+        if (toks.some((t) => names.has(t) && k.toks.includes(t))) return true;
+      }
       const sim = jaccard(k.toks, toks);
       if (sim < SAME_PROBLEM) return false;
-      const ideaOnly = [k.c, c].some((x) => isIdeaOnly(x.evidence.map((e) => e.claim)));
       return k.aud === aud || (sim === 1 && ideaOnly);
     });
     if (twin) {
       if (!twin.c.format && c.format) twin.c = { ...twin.c, format: c.format };
+      if (twin.c.marketId === c.marketId) twin.c = absorbEvidence(twin.c, c);
       merged++;
       continue;
     }
     kept.push({ c, aud, toks });
   }
-  const byId = new Map(kept.map((k) => [k.c.id, k.c]));
-  return { kept: candidates.filter((c) => byId.has(c.id)).map((c) => byId.get(c.id)!), merged };
+  return { kept: kept.map((k) => k.c), merged };
 }
 
 function normalizeKey(str: string): string {
@@ -478,9 +526,9 @@ export async function generate25Opportunities(
   // A candidate without a sourced evidence row is dropped here, not saved (QC Rule 1, Part 6.8),
   // and no two different problems may cite the identical signal set.
   const sourced = capIdeaOnlyScores(deduped.filter((c) => sourcedEvidenceCount(c.id, c.evidence) > 0));
-  const { kept: candidatePool, merged: mergedSimilar } = mergeSharedProblems(
-    distinctEvidenceSets(sourced, new Map(markets.map((m) => [m.id, m.signals.length]))),
-  );
+  // Merged first: a merge grows the kept candidate's signal set, so the distinct check runs on what survives.
+  const { kept: merged, merged: mergedSimilar } = mergeSharedProblems(sourced, marketProblemWords(markets));
+  const candidatePool = distinctEvidenceSets(merged, new Map(markets.map((m) => [m.id, m.signals.length])));
 
   // Step 2: Select a diversified set of at most targetCount
   // A format the wording does not name is suggested from the market's competitor listings, after
