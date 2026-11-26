@@ -23,6 +23,7 @@ function createMockSupabase(overrides: {
       const queryBuilder: Record<string, unknown> = {
         select: () => queryBuilder,
         order: () => queryBuilder,
+        range: () => queryBuilder,
         in: () => queryBuilder,
         eq: () => queryBuilder,
         then: (resolve: (val: { data: Record<string, unknown>[]; error: null }) => void) =>
@@ -339,7 +340,7 @@ describe("niche trend note visibility (issue #39 rule)", () => {
               : table === "run_signals"
                 ? [{ run_id: "r1", signals: { url: "u", engagement: { avg_interest: 40, direction: "rising", points: 5, window_days: 90 }, sources: { type: "gtrends" } } }]
                 : [];
-        const b: Record<string, unknown> = { select: () => b, order: () => b, in: () => b, eq: () => b, then: (r: (v: unknown) => void) => r({ data, error: null }) };
+        const b: Record<string, unknown> = { select: () => b, order: () => b, range: () => b, in: () => b, eq: () => b, then: (r: (v: unknown) => void) => r({ data, error: null }) };
         return b;
       },
     } as unknown as SupabaseClient;
