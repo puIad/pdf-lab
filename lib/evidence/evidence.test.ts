@@ -4,7 +4,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { writeEvidence } from "./writer.ts";
-import { formatEvidenceClaim, parseEvidenceClaim } from "./types.ts";
+import { distinctEvidenceRows, formatEvidenceClaim, parseEvidenceClaim } from "./types.ts";
 import {
   enforceRule1_OpportunityEvidence,
   sourcedEvidenceCount,
@@ -89,6 +89,28 @@ describe("writeEvidence (injected deps)", () => {
     assert.equal(result[1].id, "ev-2");
     assert.equal(result[1].entity_type, "opportunity");
     assert.equal(result[1].source_id, null);
+  });
+
+  it("writes a repeated (entity, claim, url) once and keeps a different url or entity (issue #122)", async () => {
+    const written: Omit<EvidenceRow, "id">[] = [];
+    const deps = {
+      insertEvidence: async (rows: Omit<EvidenceRow, "id">[]) => {
+        written.push(...rows);
+        return rows.map((r, i) => ({ id: `ev-${i}`, ...r }));
+      },
+    };
+    const row = { entityType: "opportunity" as const, entityId: "opp-1", claim: "Quick-idea phrase \"a\"", url: "https://x.test/1" };
+    const result = await writeEvidence(
+      [row, { ...row, confidence: 0.4 }, { ...row, url: "https://x.test/2" }, { ...row, entityId: "opp-2" }],
+      deps,
+    );
+    assert.equal(result.length, 3);
+    assert.deepEqual(written.map((r) => [r.entity_id, r.url]), [["opp-1", "https://x.test/1"], ["opp-1", "https://x.test/2"], ["opp-2", "https://x.test/1"]]);
+  });
+
+  it("distinctEvidenceRows counts stored repeats once", () => {
+    const r = { entity_id: "o", claim: "c", url: null as string | null };
+    assert.equal(distinctEvidenceRows([r, { ...r }, { ...r, url: "u" }]).length, 2);
   });
 
   it("rejects invalid items missing required fields", async () => {

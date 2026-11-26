@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResearchCompleteness } from "./types.ts";
 import { readAll, readAllIn } from "../db/read-all.ts";
+import { distinctEvidenceRows } from "../evidence/types.ts";
 import { isDemandOnly, isListing } from "../sources/demand-only.ts";
 
 export interface CompletenessRawCounts {
@@ -119,10 +120,13 @@ export async function fetchRunCompleteness(
   // Evidence of the run: its markets, its opportunities, and competitors attached to the run only.
   let evidenceCount = 0;
   let evidenceBackedOpportunitiesCount = 0;
-  const evRows = await readAllIn<{ id: string; entity_type: string; entity_id: string }>(
-    "evidence",
-    [runId, ...marketIds, ...oppIds],
-    (chunk) => supabase.from("evidence").select("id, entity_type, entity_id").in("entity_id", chunk).order("id"),
+  // Distinct citations: a run stored before issue #122 holds repeats of the same claim and url.
+  const evRows = distinctEvidenceRows(
+    await readAllIn<{ id: string; entity_type: string; entity_id: string; claim: string; url: string | null }>(
+      "evidence",
+      [runId, ...marketIds, ...oppIds],
+      (chunk) => supabase.from("evidence").select("id, entity_type, entity_id, claim, url").in("entity_id", chunk).order("id"),
+    ),
   );
   evidenceCount = evRows.length;
   evidenceBackedOpportunitiesCount = new Set(

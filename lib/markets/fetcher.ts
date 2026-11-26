@@ -11,6 +11,7 @@ import type {
 } from "./types.ts";
 import { fetchNicheTrends } from "../trends/niche.ts";
 import { readAll, readAllIn } from "../db/read-all.ts";
+import { distinctEvidenceRows } from "../evidence/types.ts";
 import { isCurrent, listCompletedRuns, listedRuns, type RunViewer } from "../runs/scope.ts";
 
 /**
@@ -127,13 +128,15 @@ export async function fetchMarketsData(
   }
 
   // 3. Fetch evidence rows
-  const rawEvidence = await readAll<Record<string, unknown>>("evidence", () =>
-    supabase.from("evidence").select("id, entity_type, entity_id").order("id"),
+  const rawEvidence = distinctEvidenceRows(
+    await readAll<{ entity_id: string; claim: string; url: string | null }>("evidence", () =>
+      supabase.from("evidence").select("id, entity_id, claim, url").order("id"),
+    ),
   );
   const evidenceCountByMarket: Record<string, number> = {};
 
   for (const ev of rawEvidence) {
-    const eId = ev.entity_id as string;
+    const eId = ev.entity_id;
     // Check if it's directly attached to market
     if (marketIds.includes(eId)) {
       evidenceCountByMarket[eId] = (evidenceCountByMarket[eId] || 0) + 1;
