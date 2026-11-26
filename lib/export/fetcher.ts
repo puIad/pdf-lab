@@ -8,6 +8,7 @@ import type {
   ExportProductGap,
   ExportEvidenceItem,
 } from "./types.ts";
+import { readAll } from "../db/read-all.ts";
 import { fetchRunCompleteness, calculateCompleteness } from "../runs/completeness.ts";
 import {
   marketCompletenessCounts,
@@ -23,6 +24,28 @@ import {
   mineReviewsAndGaps,
   type CompetitorProduct,
 } from "../competition/index.ts";
+
+interface EvidenceRead {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  source_id: string | null;
+  claim: string;
+  excerpt: string | null;
+  url: string | null;
+  created_at: string;
+  sources: { type?: string; name?: string } | null;
+}
+
+interface CompetitorRead {
+  id: string;
+  platform: string | null;
+  title: string | null;
+  url: string | null;
+  price: string | null;
+  rating: number | null;
+  review_count: number | null;
+}
 
 export interface FetchReportOptions {
   marketId?: string;
@@ -77,9 +100,10 @@ export async function fetchReportExportData(
   queryText = queryText || marketData.name;
 
   // 3. Fetch linked signals & analysis for this market
-  const { data: marketSignals } = await supabase
-    .from("market_signals")
-    .select(`
+  const marketSignals = await readAll<{ signals: Record<string, unknown> | null }>("market signals", () =>
+    supabase
+      .from("market_signals")
+      .select(`
       signal_id, relevance,
       signals (
         id, title, content, url, published_at,
@@ -87,12 +111,11 @@ export async function fetchReportExportData(
         signal_analysis ( audience, problem, urgency, pdf_relevance )
       )
     `)
-    .eq("market_id", targetMarketId);
+      .eq("market_id", targetMarketId)
+      .order("signal_id"),
+  );
 
-  const rawSignals = (marketSignals ?? []).flatMap((ms) => {
-    const s = (ms as unknown as { signals: Record<string, unknown> }).signals;
-    return s ? [s] : [];
-  });
+  const rawSignals = marketSignals.flatMap((ms) => (ms.signals ? [ms.signals] : []));
 
   // 4. Opportunities: the whole run's when the market belongs to one, else this market's only.
   // Never another run's rows (Part 6.7).
@@ -101,38 +124,40 @@ export async function fetchReportExportData(
     .from("opportunities")
     .select("id, market_id, title, target_audience, problem, solution, format, format_basis, price_range, opportunity_score, confidence, created_at");
   oppQuery = scopedRunId ? oppQuery.eq("run_id", scopedRunId) : oppQuery.eq("market_id", targetMarketId);
-  const { data: oppRows } = await oppQuery.order("opportunity_score", { ascending: false });
+  // shortcut: the export lists the 25 best opportunities, so ask for 25 (ties broken by id), not every row.
+  const { data: oppRows } = await oppQuery.order("opportunity_score", { ascending: false }).order("id").limit(25);
 
-  const opportunitiesList = (oppRows ?? []).slice(0, 25);
+  const opportunitiesList = oppRows ?? [];
   const oppIds = opportunitiesList.map((o) => o.id);
 
   // 5. Fetch evidence for opportunities and market
   const entityIdsToCheck = [targetMarketId, ...oppIds];
-  const { data: evRows } = await supabase
-    .from("evidence")
-    .select(`
+  const evRows = await readAll<EvidenceRead>("evidence", () =>
+    supabase
+      .from("evidence")
+      .select(`
       id, entity_type, entity_id, source_id, claim, excerpt, url, created_at,
       sources ( type, name )
     `)
-    .in("entity_id", entityIdsToCheck);
+      .in("entity_id", entityIdsToCheck)
+      .order("id"),
+  );
 
   const evidenceMap = new Map<string, ExportEvidenceItem[]>();
-  if (evRows) {
-    for (const ev of evRows) {
-      const sourceObj = (ev as unknown as { sources: { type?: string; name?: string } | null }).sources;
-      const item: ExportEvidenceItem = {
-        id: ev.id,
-        claim: ev.claim,
-        excerpt: ev.excerpt,
-        url: ev.url,
-        sourceName: sourceObj?.name || null,
-        sourceType: sourceObj?.type || null,
-        createdAt: ev.created_at,
-      };
-      const existing = evidenceMap.get(ev.entity_id) || [];
-      existing.push(item);
-      evidenceMap.set(ev.entity_id, existing);
-    }
+  for (const ev of evRows) {
+    const sourceObj = ev.sources;
+    const item: ExportEvidenceItem = {
+      id: ev.id,
+      claim: ev.claim,
+      excerpt: ev.excerpt,
+      url: ev.url,
+      sourceName: sourceObj?.name || null,
+      sourceType: sourceObj?.type || null,
+      createdAt: ev.created_at,
+    };
+    const existing = evidenceMap.get(ev.entity_id) || [];
+    existing.push(item);
+    evidenceMap.set(ev.entity_id, existing);
   }
 
   // Map opportunities to ExportOpportunity
@@ -159,12 +184,12 @@ export async function fetchReportExportData(
 
   // 6. Fetch competitors: the whole run's, like its opportunities, including listings that
   // overlap no market (`market_id` null); a legacy market only has its own.
-  const compQuery = supabase.from("competitors").select("id, platform, title, url, price, rating, review_count");
-  const { data: compRows } = await (scopedRunId
-    ? compQuery.eq("run_id", scopedRunId)
-    : compQuery.eq("market_id", targetMarketId));
+  const compRows = await readAll<CompetitorRead>("competitors", () => {
+    const compQuery = supabase.from("competitors").select("id, platform, title, url, price, rating, review_count");
+    return (scopedRunId ? compQuery.eq("run_id", scopedRunId) : compQuery.eq("market_id", targetMarketId)).order("id");
+  });
 
-  const exportCompetitors: ExportCompetitor[] = (compRows ?? []).map((comp) => ({
+  const exportCompetitors: ExportCompetitor[] = compRows.map((comp) => ({
     platform: comp.platform || "web",
     title: comp.title || "Competitor Product",
     url: comp.url || null,
@@ -174,7 +199,7 @@ export async function fetchReportExportData(
   }));
 
   // 7. Calculate landscape and product gaps
-  const competitorProducts: CompetitorProduct[] = (compRows ?? []).map((comp) => {
+  const competitorProducts: CompetitorProduct[] = compRows.map((comp) => {
     const { priceNumeric } = parsePrice(comp.price);
     return {
       id: comp.id,
@@ -229,7 +254,7 @@ export async function fetchReportExportData(
 
   // 8. Completeness: the run's own counts when the market belongs to a run, else this market's
   // stored rows. No floors: a thin market reads as thin (Part 6.14).
-  const evidenceForQc = (evRows ?? []).map((e) => ({
+  const evidenceForQc = evRows.map((e) => ({
     entity_type: e.entity_type as string,
     entity_id: e.entity_id as string,
     source_id: e.source_id as string | null,
@@ -243,7 +268,7 @@ export async function fetchReportExportData(
       competition_score: marketData.competition_score ?? null,
     },
     signals: rawSignals as ReportSignal[],
-    competitorCount: (compRows ?? []).length,
+    competitorCount: compRows.length,
     opportunityIds: oppIds,
     evidence: evidenceForQc,
   });

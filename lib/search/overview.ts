@@ -11,7 +11,7 @@
 // 9. Underserved submarkets
 // Each backed by concrete evidence citations or explicitly labeled "Not observed".
 
-import { readAll } from "../db/read-all.ts";
+import { readAll, readAllIn } from "../db/read-all.ts";
 import { isCurrent, latestRunIds } from "../runs/scope.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
@@ -195,7 +195,7 @@ export async function generateMarketOverview(
   // Also include signals linked to matched markets via market_signals if any
   if (matchedMarketIds.size > 0) {
     try {
-      const marketSignals = await readAll<{ signals: RawSignalRow | null }>("market signals", () =>
+      const marketSignals = await readAllIn<{ signals: RawSignalRow | null }>("market signals", Array.from(matchedMarketIds), (chunk) =>
         supabase
         .from("market_signals")
         .select(`
@@ -206,7 +206,7 @@ export async function generateMarketOverview(
             signal_analysis ( audience, problem, intent, urgency, pdf_relevance )
           )
         `)
-        .in("market_id", Array.from(matchedMarketIds))
+        .in("market_id", chunk)
         .order("market_id")
         .order("signal_id"),
       );

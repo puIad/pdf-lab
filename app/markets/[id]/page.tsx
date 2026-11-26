@@ -75,6 +75,8 @@ export default async function MarketPage(props: MarketPageProps) {
   const nicheTrend = await fetchNicheTrendOfRun(supabase, market.run_id as string | null, caller);
 
   // 2. Fetch linked signals & analysis
+  // The reads below are per one market (tens of rows today, at most 23 signals), far under the 1000-row
+  // response cap, so they stay one request each.
   const { data: marketSignals } = await supabase
     .from("market_signals")
     .select(`

@@ -15,7 +15,7 @@ import {
 } from "./check.ts";
 import { scanSourceKeys } from "../ideas/seeds.ts";
 import type { MarketSignal, RawSignal, SourceAdapter } from "../sources/types.ts";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { cappedSupabase } from "../db/capped-supabase.test-helpers.ts";
 
 function listing(source: string, url: string | null): MarketSignal {
   return {
@@ -131,24 +131,18 @@ describe("competition check", () => {
 
   it("loads stored checks and reconciles numbers with the stored rows", async () => {
     const id = checkEntityId("budget planner");
-    const tables: Record<string, unknown[]> = {
+    const tables: Record<string, Record<string, unknown>[]> = {
       evidence: [
-        { entity_id: id, url: "e1", created_at: "2026-11-06T10:00:00Z", sources: { type: "etsy" } },
-        { entity_id: id, url: "e2", created_at: "2026-11-06T10:00:01Z", sources: { type: "etsy" } },
-        { entity_id: id, url: null, created_at: "2026-11-06T10:00:01Z", sources: { type: "gumroad" } },
+        { entity_type: "competition", entity_id: id, url: "e1", created_at: "2026-11-06T10:00:00Z", sources: { type: "etsy" } },
+        { entity_type: "competition", entity_id: id, url: "e2", created_at: "2026-11-06T10:00:01Z", sources: { type: "etsy" } },
+        { entity_type: "competition", entity_id: id, url: null, created_at: "2026-11-06T10:00:01Z", sources: { type: "gumroad" } },
       ],
       signals: [
         { external_id: "e1", engagement: { price: "$3", review_count: 10 }, sources: { type: "etsy" } },
         { external_id: "e2", engagement: { price: "$9.50", review_count: null }, sources: { type: "etsy" } },
       ],
     };
-    const fake = {
-      from(t: string) {
-        const q = { select: () => q, eq: () => q, in: () => Promise.resolve({ data: tables[t], error: null }) };
-        return q;
-      },
-    } as unknown as SupabaseClient;
-    const out = await loadCompetitionChecks(fake, ["Budget planner", "other phrase"]);
+    const out = await loadCompetitionChecks(cappedSupabase(tables), ["Budget planner", "other phrase"]);
     assert.deepEqual(Object.keys(out), ["budget planner"]);
     const c = out["budget planner"];
     assert.equal(c.listings, 2);

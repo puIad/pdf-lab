@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MarketSignal, SignalEngagement } from "../sources/types.ts";
 import type { IdeaSignalRef } from "../opportunities/from-ideas.ts";
+import { readAll } from "../db/read-all.ts";
 import { buildIdeas, type IdeasResult } from "./ideas.ts";
 
 interface Row {
@@ -22,15 +23,16 @@ export async function loadStoredIdeas(
   seed: string,
 ): Promise<{ result: IdeasResult; refs: Map<string, IdeaSignalRef> }> {
   const pattern = seed.trim().toLowerCase().replace(/[%_\\]/g, (c) => `\\${c}`);
-  const { data, error } = await supabase
-    .from("signals")
-    .select("external_id, source_id, url, title, content, engagement, sources ( type )")
-    .ilike("engagement->>seed", pattern)
-    .limit(1000);
-  if (error) throw new Error(`failed to load stored ideas: ${error.message}`);
+  const data = await readAll<Row>("stored ideas", () =>
+    supabase
+      .from("signals")
+      .select("external_id, source_id, url, title, content, engagement, sources ( type )")
+      .ilike("engagement->>seed", pattern)
+      .order("id"),
+  );
 
   const refs = new Map<string, IdeaSignalRef>();
-  const signals: MarketSignal[] = ((data ?? []) as Row[]).map((r) => {
+  const signals: MarketSignal[] = data.map((r) => {
     const src = Array.isArray(r.sources) ? r.sources[0] : r.sources;
     refs.set(r.external_id, { sourceUuid: r.source_id, excerpt: r.content });
     return {

@@ -29,7 +29,10 @@ function createMockSupabase(overrides: {
           page = [from, Math.min(to, from + 999)];
           return queryBuilder;
         },
-        in: () => queryBuilder,
+        in: (col: string, vs: unknown[]) => {
+          currentData = currentData.filter((r) => vs.includes(r[col]));
+          return queryBuilder;
+        },
         eq: () => queryBuilder,
         then: (resolve: (val: { data: Record<string, unknown>[]; error: null }) => void) =>
           Promise.resolve(resolve({ data: currentData.slice(page[0], page[1] + 1), error: null })),
