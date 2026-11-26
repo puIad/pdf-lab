@@ -539,6 +539,8 @@ describe("Validate matches a concept on all its content words (issue #109, DEC-0
   test("a word matches at a word start, not inside another word; plurals still match", async () => {
     const rows = [row("d", "how i said goodbye to my resume template"), row("e", "ai resume templates for teachers")];
     assert.equal((await run("ai resume template", true, rows)).matchedSignalsCount, 1);
+    // A one-word concept gets no whole-phrase shortcut either.
+    assert.equal((await run("ai", true, [row("d", "how i said goodbye")])).matchedSignalsCount, 0);
   });
 
   test("question words are not content words on the all-words path", async () => {
