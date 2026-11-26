@@ -511,3 +511,40 @@ describe("Overview reads past Supabase's 1000-row cap (issue #111)", () => {
     assert.ok(overview.sizeProxy.evidence.some((c) => c.claim?.includes("origami folding")));
   });
 });
+
+describe("Validate matches a concept on all its content words (issue #109, DEC-021)", () => {
+  // SAMPLE DATA (fixture rule): two budgeting rows, only one about couples.
+  const row = (id: string, title: string) => ({
+    id,
+    source_id: "src-1",
+    external_id: `ext-${id}`,
+    url: `https://example.com/${id}`,
+    title,
+    content: null,
+    published_at: null,
+    collected_at: "2026-11-01T10:00:00Z",
+    engagement: {},
+    sources: { type: "reddit", name: "Reddit" },
+    signal_analysis: null,
+  });
+  const signals = [row("a", "budgeting for couples"), row("b", "budgeting apps")];
+  const run = (q: string, allWords?: boolean, rows = signals) =>
+    generateMarketOverview(q, createMockSupabase({ signals: rows }), { persistRun: false, allWords });
+
+  test("every content word must appear; the default keeps any-word matching", async () => {
+    assert.equal((await run("budgeting couples", true)).matchedSignalsCount, 1);
+    assert.equal((await run("budgeting couples")).matchedSignalsCount, 2);
+  });
+
+  test("question words are not content words on the all-words path", async () => {
+    // The unrelated row says "what": any-word matching on the raw words would keep it.
+    const rows = [...signals, row("c", "what to cook tonight")];
+    assert.equal((await run("what is budgeting", true, rows)).matchedSignalsCount, 2);
+  });
+
+  test("no matching row marks the concept as not scanned; Explore never does", async () => {
+    assert.equal((await run("origami cranes", true)).notScanned, true);
+    assert.equal((await run("origami cranes")).notScanned, undefined);
+    assert.equal((await run("budgeting couples", true)).notScanned, undefined);
+  });
+});

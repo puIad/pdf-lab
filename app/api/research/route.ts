@@ -143,7 +143,7 @@ export async function POST(req: Request) {
       }
       case "validate": {
         const concept = plan.query.concept ?? plan.query.raw;
-        const overview = await generateMarketOverview(concept, supabase, { mode: "validate", persistRun: false });
+        const overview = await generateMarketOverview(concept, supabase, { mode: "validate", persistRun: false, allWords: true });
         result = { mode: "validate", report: buildValidationReport(concept, overview), verdict: buildVerdict(overview) };
         break;
       }

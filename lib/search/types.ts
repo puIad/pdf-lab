@@ -102,6 +102,8 @@ export interface MarketOverview {
   searchedAt: string;
   matchedMarketsCount: number;
   matchedSignalsCount: number;
+  /** Validate only: no stored market, signal, opportunity or competitor row holds every content word of the concept. */
+  notScanned?: boolean;
   confidence: number; // 0..1
 
   // The 9 PRD §8 Overview Dimensions

@@ -27,6 +27,8 @@ export interface GenerateOverviewOptions {
   userId?: string | null;
   mode?: "explore" | "validate";
   persistRun?: boolean;
+  /** Validate: a row matches a concept only when it holds every content word (DEC-021). Default: any word. */
+  allWords?: boolean;
 }
 
 interface RawSignalRow {
@@ -100,6 +102,9 @@ interface RawEvidenceRow {
   sources?: { type?: string; name?: string } | null;
 }
 
+// shortcut: a hand-picked list of English question and auxiliary words, not a language model; extend when a Validate phrase shows another.
+const QUESTION_WORDS = ["what", "is", "are", "how", "why", "who", "which", "do", "does", "can", "should", "my", "you", "your", "it", "be"];
+
 export async function generateMarketOverview(
   query: string,
   supabase: SupabaseClient,
@@ -117,10 +122,16 @@ export async function generateMarketOverview(
   // 1. Sanitize & extract tokens for flexible matching
   const cleanQ = q.toLowerCase();
   const stopWords = new Set(["in", "for", "the", "and", "a", "an", "of", "to", "with", "on", "at", "by"]);
+  // Question words are function words, not part of the concept; dropped only when every word must match.
+  if (options?.allWords) for (const w of QUESTION_WORDS) stopWords.add(w);
   const tokens = cleanQ
     .replace(/[^\w\s]/g, " ")
     .split(/\s+/)
     .filter((w) => w.length >= 2 && !stopWords.has(w));
+  // One rule for every table: any word (Explore, search, brief) or all words (Validate, DEC-021).
+  const hasTokens = (...fields: string[]) =>
+    tokens.length > 0 &&
+    (options?.allWords ? tokens.every((t) => fields.some((f) => f.includes(t))) : tokens.some((t) => fields.some((f) => f.includes(t))));
 
   // Rows of a run that a newer run of the same seed replaced are left out (Part 6.7).
   // If the run list cannot be read, nothing is filtered.
@@ -141,7 +152,7 @@ export async function generateMarketOverview(
       const name = (m.name || "").toLowerCase();
       const desc = (m.description || "").toLowerCase();
       if (name.includes(cleanQ) || desc.includes(cleanQ)) return true;
-      return tokens.some((t) => name.includes(t) || desc.includes(t));
+      return hasTokens(name, desc);
     });
   } catch (err) {
     console.error("Error fetching markets:", err);
@@ -181,13 +192,7 @@ export async function generateMarketOverview(
       }
 
       // Token match
-      return tokens.some(
-        (t) =>
-          title.includes(t) ||
-          content.includes(t) ||
-          problem.includes(t) ||
-          audience.includes(t)
-      );
+      return hasTokens(title, content, problem, audience);
     });
   } catch (err) {
     console.error("Error fetching signals:", err);
@@ -248,7 +253,7 @@ export async function generateMarketOverview(
       const claim = (e.claim || "").toLowerCase();
       const excerpt = (e.excerpt || "").toLowerCase();
       if (claim.includes(cleanQ) || excerpt.includes(cleanQ)) return true;
-      return tokens.some((t) => claim.includes(t) || excerpt.includes(t));
+      return hasTokens(claim, excerpt);
     });
   } catch (err) {
     console.error("Error fetching evidence:", err);
@@ -271,7 +276,7 @@ export async function generateMarketOverview(
       const audience = (o.target_audience || "").toLowerCase();
       const prob = (o.problem || "").toLowerCase();
       if (title.includes(cleanQ) || audience.includes(cleanQ) || prob.includes(cleanQ)) return true;
-      return tokens.some((t) => title.includes(t) || audience.includes(t) || prob.includes(t));
+      return hasTokens(title, audience, prob);
     });
   } catch (err) {
     console.error("Error fetching opportunities:", err);
@@ -291,7 +296,7 @@ export async function generateMarketOverview(
       if (c.market_id && matchedMarketIds.has(c.market_id)) return true;
       const title = (c.title || "").toLowerCase();
       if (title.includes(cleanQ)) return true;
-      return tokens.some((t) => title.includes(t));
+      return hasTokens(title);
     });
   } catch (err) {
     console.error("Error fetching competitors:", err);
@@ -910,6 +915,14 @@ export async function generateMarketOverview(
     searchedAt,
     matchedMarketsCount: matchedMarkets.length,
     matchedSignalsCount: matchedSignals.length,
+    // Evidence is left out: a stored competition check quotes its own phrase, so it would always match.
+    ...(options?.allWords &&
+    !matchedMarkets.length &&
+    !matchedSignals.length &&
+    !matchedOpportunities.length &&
+    !matchedCompetitors.length
+      ? { notScanned: true }
+      : {}),
     confidence,
     sizeProxy,
     searchInterest,
