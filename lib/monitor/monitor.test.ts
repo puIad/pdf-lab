@@ -5,6 +5,8 @@ import type { StoredSignalForRun } from "../runs/orchestrator.ts";
 import { afterRun, buildChangeReport, countsOf, diffSnapshots, followedMarketIds, isDue, newThisWeek, reconciles, seedJobKey, marketJobKey } from "./diff.ts";
 import { runMonitorCron } from "./cron.ts";
 import { followMarket } from "./follow.ts";
+import { loadMonitorSignals } from "./signals.ts";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ChangeReport, Job, MonitorStore, SeedSnapshot } from "./types.ts";
 
 // ---- in-memory store ---------------------------------------------------------------------------
@@ -158,4 +160,36 @@ test("a phrase that reappears is new only once; followed market ids come from th
   const w = newThisWeek([snap("2026-11-10T00:00:00Z", ["a"]), snap("2026-11-18T00:00:00Z", ["a", "b"]), snap("2026-11-19T00:00:00Z", ["a"]), snap("2026-11-20T00:00:00Z", ["a", "b"])], new Date("2026-11-21T00:00:00Z"));
   assert.deepEqual(w.phrases, [{ phrase: "b", firstSeen: "2026-11-18T00:00:00Z" }]);
   assert.deepEqual(followedMarketIds({ w1: { market: { id: "m2" } }, w2: { market: null } }), ["m2"]);
+});
+
+test("monitor reads every dated signal, not only the newest 1000 (#112)", async () => {
+  // Like PostgREST: a request without a range gets at most 1000 rows. Newest first, as the query orders them.
+  const rows = Array.from({ length: 1500 }, (_, i) => ({
+    id: `s-${i}`,
+    title: i === 1400 ? "old meal prep thread" : "other",
+    content: null,
+    published_at: new Date(2026, 0, 1, 0, 0, 1500 - i).toISOString(),
+    external_id: `x-${i}`,
+    engagement: null,
+    sources: { type: "reddit" },
+    signal_analysis: null,
+  }));
+  const sb = {
+    from: () => {
+      let page: [number, number] = [0, 999];
+      const b: Record<string, unknown> = {
+        select: () => b,
+        not: () => b,
+        order: () => b,
+        range: (from: number, to: number) => {
+          page = [from, Math.min(to, from + 999)];
+          return b;
+        },
+        then: (r: (v: unknown) => void) => r({ data: rows.slice(page[0], page[1] + 1), error: null }),
+      };
+      return b;
+    },
+  } as unknown as SupabaseClient;
+  const signals = await loadMonitorSignals(sb, "meal prep");
+  assert.deepEqual(signals.map((s) => s.id), ["s-1400"]);
 });
