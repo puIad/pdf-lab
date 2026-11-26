@@ -113,16 +113,19 @@ function absorbEvidence(kept: GeneratedOpportunity, folded: GeneratedOpportunity
 
 /**
  * One opportunity per problem, best score first. A later candidate is folded into the kept one when
- * its problem is near-identical (token overlap SAME_PROBLEM) and either the audience is the same
- * (across markets and formats, issue #70) or, within one market, both problems use a word that
- * names this market's own fault (`marketProblemWords`, issue #121): "RAM was not seated" and "fixed
- * by reseating the RAM" in "RAM seating faults" are one fix whatever the audience label. A fold in one market keeps every
- * evidence row of both; the kept row keeps its wording and takes the format when it names none.
- * An idea-only candidate has an audience of its own ("People searching ..."), so it only merges when
- * the problem is the same text.
- * shortcut: a market name word shared by two different faults of one market ("power" in "PC won't
- * power on": no power at all vs powers on, no display) merges them; split on embeddings once Deep
- * runs always store them.
+ * (a) its problem is near-identical (token overlap SAME_PROBLEM) and the audience is the same, across
+ * markets and formats (issue #70), or (b) it is in the same market and both problems use a word that
+ * names this market's own fault (`marketProblemWords`, issue #121), with no overlap bar and whatever
+ * the audience: "RAM was not seated" and "fixed by reseating the RAM" in "RAM seating faults" are one
+ * fix. A fold in one market keeps every evidence row of both; the kept row keeps its wording and takes
+ * the format when it names none. An idea-only candidate has an audience of its own ("People
+ * searching ..."), so it only merges when the problem is the same text.
+ * shortcut: (b) trusts the market's name. A word of it shared by two different faults merges them
+ * ("power" in "PC won't power on": no power at all vs powers on, no display). `commonWords` ignores
+ * markets of 3 signals or fewer, so in one of those named after its theme ("Meal prep containers")
+ * every problem using "containers" merges into one; gate-run pairs sit in exactly such markets (2 and
+ * 3 signals), so a stricter small-market bar would undo them. Split on embeddings once Deep runs
+ * always store them.
  */
 export function mergeSharedProblems(
   candidates: GeneratedOpportunity[],
@@ -523,10 +526,9 @@ export async function generate25Opportunities(
   // A candidate without a sourced evidence row is dropped here, not saved (QC Rule 1, Part 6.8),
   // and no two different problems may cite the identical signal set.
   const sourced = capIdeaOnlyScores(deduped.filter((c) => sourcedEvidenceCount(c.id, c.evidence) > 0));
-  const { kept: candidatePool, merged: mergedSimilar } = mergeSharedProblems(
-    distinctEvidenceSets(sourced, new Map(markets.map((m) => [m.id, m.signals.length]))),
-    marketProblemWords(markets),
-  );
+  // Merged first: a merge grows the kept candidate's signal set, so the distinct check runs on what survives.
+  const { kept: merged, merged: mergedSimilar } = mergeSharedProblems(sourced, marketProblemWords(markets));
+  const candidatePool = distinctEvidenceSets(merged, new Map(markets.map((m) => [m.id, m.signals.length])));
 
   // Step 2: Select a diversified set of at most targetCount
   // A format the wording does not name is suggested from the market's competitor listings, after

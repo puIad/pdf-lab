@@ -723,6 +723,30 @@ test("mergeSharedProblems keeps different problems of one market apart (issue #1
   assert.deepEqual(mergeSharedProblems([ram2, ramElsewhere], names).kept.map((k) => k.id), ["b", "f"]);
 });
 
+test("a merge never leaves two different problems on the identical signal set (issue #121)", async () => {
+  const problems = ["Slot latch broke on the board", "Stick sits crooked", "Case moved and parts shifted", "Fan rattles", "Cable is too short"];
+  const signals: OpportunitySignalInput[] = problems.map((problem, i) => ({
+    id: `s${i + 1}`, source_id: `src-${i + 1}`, source_type: "web", title: problem, content: problem, url: `https://example.com/s${i + 1}`,
+    analysis: { audience: `audience ${i + 1}`, problem, intent: "strong", urgency: "high", pdf_relevance: 0.8, names_problem: true },
+  }));
+  const market: OpportunityMarketInput = { id: "mram", name: "RAM seating faults", demandScore: 40, confidence: 0.3, signals };
+  const cand = (id: string, audience: string, problem: string, ids: string[], own: string[], score: number) => ({
+    id, marketId: "mram", title: id, targetAudience: audience, problem, solution: "s", format: null, formatBasis: null, priceRange: null,
+    sophistication: null, mechanism: null, outcome: null, urgency: null, confidence: 0.5, opportunityScore: score,
+    matchingSignals: ids.length, marketSignals: 5, evidenceSignalIds: ids, ownSignalIds: own,
+    evidence: ids.map((sid) => ({ entityType: "opportunity" as const, entityId: id, sourceId: `src-${sid.slice(1)}`, claim: `Opportunity "${id}" addresses observed signal: "${sid}"`, excerpt: sid, url: `https://example.com/${sid}`, signalType: "pain_point", confidence: 0.5 })),
+  });
+  // X and Y merge on "ram" and X then cites {s1, s2, s3, s4}: the set Z, a different problem, already cites.
+  const x = cand("x", "Builders", "Reseat the RAM stick after a no POST", ["s1", "s3"], ["s1", "s3"], 90);
+  const y = cand("y", "PC users", "Most faults were fixed by reseating the RAM", ["s2", "s4"], ["s2", "s4"], 80);
+  const z = cand("z", "Movers", "Memory clicks loose after moving the case", ["s3", "s1", "s2", "s4"], ["s3"], 70);
+  const res = await generate25Opportunities([market], { targetCount: 25, extraCandidates: [x, y, z] });
+  const sets = res.opportunities.map((o) => [...(o.evidenceSignalIds ?? [])].sort().join(","));
+  assert.equal(new Set(sets).size, sets.length);
+  assert.ok(sets.includes("s1,s2,s3,s4")); // X and Y, merged
+  assert.ok(res.opportunities.some((o) => o.id === "x" && !res.opportunities.some((p) => p.id === "y")));
+});
+
 test("a signal whose analysed problem says none is described yields no opportunity (issue #88)", async () => {
   // Rows stored before the flag (names_problem null) fall back to the problem text itself.
   const isUndescribedProblem = (problem: string) => namesNoProblem({ problem, names_problem: null });
